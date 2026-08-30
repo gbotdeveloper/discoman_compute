@@ -1,0 +1,7 @@
+# Runtime Python packages for the cloud compute image. Pinned to the exact
+# versions the legacy executor used (executor/requirements.txt), minus the
+# FastAPI/uvicorn web stack the worker no longer needs.
+matplotlib==3.10.1
+numpy==2.2.1
+pandas==2.2.3
+Pillow==11.2.1

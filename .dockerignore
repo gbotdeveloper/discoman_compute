@@ -1,0 +1,8 @@
+# Host build output: a package_config.json pointing at host paths overwrites
+# what `dart pub get` resolves inside the image, and the compile then fails.
+.dart_tool/
+build/
+
+.git/
+.gitignore
+README.md
