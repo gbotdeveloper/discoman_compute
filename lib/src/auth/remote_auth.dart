@@ -18,6 +18,70 @@ class RemoteAuthException implements Exception {
   String toString() => message;
 }
 
+/// Signs [email] in and returns a [WorkerSession] carrying their own Serverpod
+/// session.
+///
+/// Used wherever a creator is present — the `login` and `link` commands, and
+/// the desktop app. None of them persist the session: a creator session grants
+/// far more than the machine token does (see `loginRemote` on the server), so
+/// it lives only as long as the command or the window. The caller closes the
+/// client.
+///
+/// Throws [RemoteAuthException] with a readable message on any failure.
+Future<WorkerSession> signIn(
+  WorkerConfig config, {
+  required String email,
+  required String password,
+}) async {
+  final apiKey = config.firebaseApiKey;
+  if (apiKey.isEmpty) {
+    throw RemoteAuthException(
+      'FIREBASE_API_KEY is not set. Set it to the Firebase Web API key of the '
+      'Discoman project before signing in.',
+    );
+  }
+  if (email.trim().isEmpty || password.isEmpty) {
+    throw RemoteAuthException('Email and password are both required.');
+  }
+
+  final idToken = await _firebaseSignIn(apiKey, email.trim(), password);
+
+  final session = buildWorkerSession(config.serverUrl);
+  try {
+    final authSuccess = await session.client.firebaseIdp.login(
+      idToken: idToken,
+    );
+    await session.sessionManager.updateSignedInUser(authSuccess);
+    return session;
+  } catch (error) {
+    session.client.close();
+    throw RemoteAuthException('Sign-in failed: $error');
+  }
+}
+
+/// As [signIn], but reads the credentials from the terminal.
+Future<WorkerSession> signInInteractively(WorkerConfig config) async {
+  stdout.write('Email: ');
+  final email = stdin.readLineSync()?.trim() ?? '';
+  final password = _promptHidden('Password: ');
+  return signIn(config, email: email, password: password);
+}
+
+/// Mints a revocable per-machine credential for [session]'s creator and stores
+/// its token at `~/.discoman/credentials.json`.
+///
+/// This is what lets the worker run later without the creator's own session.
+/// Returns the name the machine will show under in GBot.
+Future<String> enrolMachine(
+  WorkerSession session,
+  WorkerConfig config,
+) async {
+  final created = await session.client.computeSettings
+      .createComputeClientCredential(config.hostname);
+  MachineTokenStore.defaultLocation().write(created.token);
+  return created.info.name;
+}
+
 /// The `login` flow (interactive, run once per machine).
 ///
 /// Prompts for the creator's email + password, exchanges them with Firebase for
@@ -26,46 +90,21 @@ class RemoteAuthException implements Exception {
 /// `~/.discoman/credentials.json`. The Serverpod session is discarded when the
 /// process exits — it is never written to disk.
 Future<int> runRemoteLogin(WorkerConfig config) async {
-  final apiKey = config.firebaseApiKey;
-  if (apiKey.isEmpty) {
-    stderr.writeln(
-      'FIREBASE_API_KEY is not set. Set it to the Firebase Web API key of the '
-      'Discoman project before running `discoman-compute login`.',
-    );
-    return 1;
-  }
-
-  stdout.write('Email: ');
-  final email = stdin.readLineSync()?.trim() ?? '';
-  final password = _promptHidden('Password: ');
-  if (email.isEmpty || password.isEmpty) {
-    stderr.writeln('Email and password are both required.');
-    return 1;
-  }
-
-  final String idToken;
+  final WorkerSession session;
   try {
-    idToken = await _firebaseSignIn(apiKey, email, password);
+    session = await signInInteractively(config);
   } on RemoteAuthException catch (error) {
     stderr.writeln(error.message);
     return 1;
   }
 
-  final session = buildWorkerSession(config.serverUrl);
   try {
-    final authSuccess = await session.client.firebaseIdp.login(
-      idToken: idToken,
+    final name = await enrolMachine(session, config);
+
+    stdout.writeln('Registered compute client "$name".');
+    stdout.writeln(
+      'Machine token saved to ${MachineTokenStore.defaultLocation().path}.',
     );
-    await session.sessionManager.updateSignedInUser(authSuccess);
-
-    final created = await session.client.computeSettings
-        .createComputeClientCredential(config.hostname);
-
-    final store = MachineTokenStore.defaultLocation();
-    store.write(created.token);
-
-    stdout.writeln('Registered compute client "${created.info.name}".');
-    stdout.writeln('Machine token saved to ${store.path}.');
     stdout.writeln("Run 'discoman-compute start' to begin processing runs.");
     return 0;
   } catch (error) {

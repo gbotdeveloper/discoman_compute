@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:discoman_compute/src/auth/remote_auth.dart';
+import 'package:discoman_compute/src/scripts/link_script.dart';
 import 'package:discoman_compute/src/worker_config.dart';
 import 'package:discoman_compute/src/worker_loop.dart';
 
@@ -13,7 +14,8 @@ Future<void> main(List<String> arguments) async {
               'pool or on a creator\'s own machine.',
         )
         ..addCommand(StartCommand())
-        ..addCommand(LoginCommand());
+        ..addCommand(LoginCommand())
+        ..addCommand(LinkCommand());
 
   try {
     final code = await runner.run(arguments) ?? 0;
@@ -109,5 +111,47 @@ class LoginCommand extends Command<int> {
       nameArg: argResults?['name'] as String?,
     );
     return runRemoteLogin(config);
+  }
+}
+
+/// `discoman-compute link` — attaches a Python script on this machine to one of
+/// the creator's projects.
+class LinkCommand extends Command<int> {
+  LinkCommand() {
+    argParser
+      ..addOption(
+        'script',
+        help: 'Path to the Python script. Prompts for it when omitted.',
+      )
+      ..addOption(
+        'project',
+        help: 'Project id to link to. Prompts with a list when omitted.',
+      )
+      ..addOption(
+        'server-url',
+        help:
+            'Serverpod server URL. Falls back to DISCOMAN_API_URL, then '
+            'the production backend.',
+      );
+  }
+
+  @override
+  String get name => 'link';
+
+  @override
+  String get description =>
+      'Link a Python script on this machine to one of your projects.';
+
+  @override
+  Future<int> run() async {
+    final config = WorkerConfig.resolve(
+      modeArg: 'remote',
+      serverUrlArg: argResults?['server-url'] as String?,
+    );
+    return runLink(
+      config,
+      scriptPathArg: argResults?['script'] as String?,
+      projectIdArg: argResults?['project'] as String?,
+    );
   }
 }
