@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	App Sandbox is deliberately off. The app runs the creator's own Python
+	interpreter as a subprocess and shares ~/.discoman with the command-line
+	worker; a sandboxed app can do neither. This app is distributed directly
+	(notarized), not through the Mac App Store, which is what makes that a
+	choice rather than a blocker.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+</dict>
+</plist>

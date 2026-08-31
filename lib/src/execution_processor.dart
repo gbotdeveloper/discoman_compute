@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 
 import 'heartbeat.dart';
 import 'python/python_runner.dart';
+import 'scripts/script_store.dart';
 
 /// Runs one claimed execution end to end: Python execution (honoring cancel and
 /// timeout), output-asset upload, and the final `reportResult` call.
@@ -14,21 +15,53 @@ class ExecutionProcessor {
     required this.workerId,
     required this.pythonRunner,
     required this.heartbeat,
-  });
+    ScriptStore? scriptStore,
+  }) : _injectedScriptStore = scriptStore;
 
   final Client client;
   final UuidValue workerId;
   final PythonRunner pythonRunner;
   final ExecutionHeartbeat heartbeat;
 
+  final ScriptStore? _injectedScriptStore;
+
+  /// Where scripts linked with `discoman-compute link` are kept. Only read for
+  /// runs whose script never reached the server.
+  ///
+  /// Resolved on first use rather than in the constructor: a cloud replica
+  /// never reads a local script, and its container has no home directory to
+  /// resolve one from.
+  late final ScriptStore scriptStore =
+      _injectedScriptStore ?? ScriptStore.defaultLocation();
+
   Future<void> process(ClaimedExecution claimed) async {
+    final String source;
+    try {
+      source = _resolveSource(claimed);
+    } on _MissingLocalScript catch (error) {
+      // The run is finished here rather than left to time out: the person
+      // waiting on the app should be told, and a lease that expires would
+      // just be retried into the same missing file.
+      await _report(
+        claimed.executionId,
+        ExecutionOutcome(
+          success: false,
+          errorReason: 'scriptMissing',
+          errorMessage: error.message,
+          warnings: const [],
+          logs: const [],
+        ),
+      );
+      return;
+    }
+
     final inputs = _decodeInputs(claimed.inputsJson);
 
     heartbeat.start(claimed.executionId);
     PythonRunResult result;
     try {
       result = await pythonRunner.run(
-        source: claimed.source,
+        source: source,
         entrypointName: claimed.entrypointName,
         inputs: inputs,
         timeoutSeconds: claimed.timeoutSeconds,
@@ -138,6 +171,32 @@ class ExecutionProcessor {
         value['sizeBytes'] is int;
   }
 
+  /// The Python to run: the server's snapshot when it has one, otherwise this
+  /// machine's own copy of the project's script.
+  ///
+  /// A null snapshot means the creator linked the script with
+  /// `discoman-compute link` and it was never uploaded, so we are the only
+  /// place it exists.
+  String _resolveSource(ClaimedExecution claimed) {
+    final snapshot = claimed.source;
+    if (snapshot != null) return snapshot;
+
+    final file = scriptStore.fileFor(claimed.projectId);
+    if (!file.existsSync()) {
+      throw _MissingLocalScript(
+        'No script is linked to this project on this machine. Run '
+        "'discoman-compute link' here to attach it.",
+      );
+    }
+    try {
+      return file.readAsStringSync();
+    } on IOException catch (error) {
+      throw _MissingLocalScript(
+        'Could not read the linked script at ${file.path}: $error',
+      );
+    }
+  }
+
   Map<String, dynamic> _decodeInputs(String inputsJson) {
     if (inputsJson.trim().isEmpty) return {};
     try {
@@ -160,4 +219,11 @@ class ExecutionProcessor {
       stderr.writeln('Failed to report result for $executionId: $error');
     }
   }
+}
+
+/// Raised when a run needs this machine's copy of a script and it is not there.
+class _MissingLocalScript implements Exception {
+  _MissingLocalScript(this.message);
+
+  final String message;
 }

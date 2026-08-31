@@ -9,6 +9,7 @@ import 'auth/session.dart';
 import 'execution_processor.dart';
 import 'heartbeat.dart';
 import 'python/python_runner.dart';
+import 'remote_worker.dart';
 import 'worker_config.dart';
 
 /// Runs the worker in the mode selected by [config], returning the process exit
@@ -82,74 +83,47 @@ Future<int> _runCloudWorker(WorkerConfig config) async {
   return exitCode;
 }
 
-/// Remote (self-hosted) mode: authenticate with the stored machine token,
-/// long-poll forever, and run Python with the local interpreter. SIGINT
-/// deregisters cleanly and exits.
+/// Remote (self-hosted) mode: run [RemoteWorker] until Ctrl+C, printing its
+/// log to stdout. The loop itself lives in that class so the desktop app can
+/// run the same worker in a window.
 Future<int> _runRemoteWorker(WorkerConfig config) async {
-  final session = buildWorkerSession(config.serverUrl);
+  final worker = RemoteWorker(config);
+  final logSubscription = worker.log.listen(stdout.writeln);
+
   try {
-    await remoteRuntimeLogin(session);
+    await worker.start();
   } on RemoteAuthException catch (error) {
     stderr.writeln(error.message);
+    await logSubscription.cancel();
     return 1;
   } catch (error) {
-    stderr.writeln('Remote authentication failed: $error');
+    stderr.writeln('Remote worker failed to start: $error');
+    await logSubscription.cancel();
     return 1;
   }
 
-  final WorkerRegistration registration;
-  try {
-    registration = await session.client.computeWorker.register(
-      config.hostname,
-      workerVersion,
-    );
-  } catch (error) {
-    stderr.writeln('Worker registration failed: $error');
-    return 1;
-  }
+  stdout.writeln('Press Ctrl+C to stop.');
 
-  final workerId = registration.workerId;
-  final processor = _buildProcessor(session, registration, config);
-
-  stdout.writeln(
-    'Compute client "${config.hostname}" is online. '
-    'Waiting for runs — press Ctrl+C to stop.',
-  );
-
-  var running = true;
-  final sigint = ProcessSignal.sigint.watch().listen((_) async {
-    if (!running) return;
-    running = false;
-    stdout.writeln('\nStopping; deregistering this worker...');
-    await _safeDeregister(session.client, workerId);
-    session.client.close();
-    exit(0);
+  // Ctrl+C stops the worker cleanly rather than killing the process mid-run,
+  // so the machine deregisters instead of waiting out its lease.
+  final stopped = Completer<void>();
+  final sigint = ProcessSignal.sigint.watch().listen((_) {
+    if (!stopped.isCompleted) stopped.complete();
   });
 
-  var exitCode = 0;
-  try {
-    while (running) {
-      final claimed = await session.client.computeWorker.claimNext(workerId);
-      if (claimed == null) {
-        // Idle: heartbeat (no execution) to stay marked online, then back off.
-        try {
-          await session.client.computeWorker.heartbeat(workerId, null);
-        } catch (_) {
-          // Transient; retry on the next tick.
-        }
-        await Future<void>.delayed(const Duration(seconds: 3));
-        continue;
-      }
-      await processor.process(claimed);
-    }
-  } catch (error) {
-    stderr.writeln('Fatal error in the remote worker loop: $error');
-    exitCode = 1;
-  }
+  final failed = worker.state
+      .firstWhere((state) => state == RemoteWorkerState.failed)
+      .then((_) {
+        if (!stopped.isCompleted) stopped.complete();
+      });
+  unawaited(failed);
 
+  await stopped.future;
   await sigint.cancel();
-  await _safeDeregister(session.client, workerId);
-  session.client.close();
+
+  final exitCode = worker.currentState == RemoteWorkerState.failed ? 1 : 0;
+  await worker.dispose();
+  await logSubscription.cancel();
   return exitCode;
 }
 

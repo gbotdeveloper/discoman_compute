@@ -18,16 +18,21 @@ class RemoteAuthException implements Exception {
   String toString() => message;
 }
 
-/// Prompts for the creator's email + password and returns a signed-in
-/// [WorkerSession] carrying their own Serverpod session.
+/// Signs [email] in and returns a [WorkerSession] carrying their own Serverpod
+/// session.
 ///
-/// Used by the commands a creator runs at the keyboard — `login` and `link`.
-/// Neither persists the session: a creator session grants far more than the
-/// machine token does (see `loginRemote` on the server), so it lives only for
-/// the length of the command. The caller closes the client.
+/// Used wherever a creator is present — the `login` and `link` commands, and
+/// the desktop app. None of them persist the session: a creator session grants
+/// far more than the machine token does (see `loginRemote` on the server), so
+/// it lives only as long as the command or the window. The caller closes the
+/// client.
 ///
 /// Throws [RemoteAuthException] with a readable message on any failure.
-Future<WorkerSession> signInInteractively(WorkerConfig config) async {
+Future<WorkerSession> signIn(
+  WorkerConfig config, {
+  required String email,
+  required String password,
+}) async {
   final apiKey = config.firebaseApiKey;
   if (apiKey.isEmpty) {
     throw RemoteAuthException(
@@ -35,15 +40,11 @@ Future<WorkerSession> signInInteractively(WorkerConfig config) async {
       'Discoman project before signing in.',
     );
   }
-
-  stdout.write('Email: ');
-  final email = stdin.readLineSync()?.trim() ?? '';
-  final password = _promptHidden('Password: ');
-  if (email.isEmpty || password.isEmpty) {
+  if (email.trim().isEmpty || password.isEmpty) {
     throw RemoteAuthException('Email and password are both required.');
   }
 
-  final idToken = await _firebaseSignIn(apiKey, email, password);
+  final idToken = await _firebaseSignIn(apiKey, email.trim(), password);
 
   final session = buildWorkerSession(config.serverUrl);
   try {
@@ -56,6 +57,29 @@ Future<WorkerSession> signInInteractively(WorkerConfig config) async {
     session.client.close();
     throw RemoteAuthException('Sign-in failed: $error');
   }
+}
+
+/// As [signIn], but reads the credentials from the terminal.
+Future<WorkerSession> signInInteractively(WorkerConfig config) async {
+  stdout.write('Email: ');
+  final email = stdin.readLineSync()?.trim() ?? '';
+  final password = _promptHidden('Password: ');
+  return signIn(config, email: email, password: password);
+}
+
+/// Mints a revocable per-machine credential for [session]'s creator and stores
+/// its token at `~/.discoman/credentials.json`.
+///
+/// This is what lets the worker run later without the creator's own session.
+/// Returns the name the machine will show under in GBot.
+Future<String> enrolMachine(
+  WorkerSession session,
+  WorkerConfig config,
+) async {
+  final created = await session.client.computeSettings
+      .createComputeClientCredential(config.hostname);
+  MachineTokenStore.defaultLocation().write(created.token);
+  return created.info.name;
 }
 
 /// The `login` flow (interactive, run once per machine).
@@ -75,14 +99,12 @@ Future<int> runRemoteLogin(WorkerConfig config) async {
   }
 
   try {
-    final created = await session.client.computeSettings
-        .createComputeClientCredential(config.hostname);
+    final name = await enrolMachine(session, config);
 
-    final store = MachineTokenStore.defaultLocation();
-    store.write(created.token);
-
-    stdout.writeln('Registered compute client "${created.info.name}".');
-    stdout.writeln('Machine token saved to ${store.path}.');
+    stdout.writeln('Registered compute client "$name".');
+    stdout.writeln(
+      'Machine token saved to ${MachineTokenStore.defaultLocation().path}.',
+    );
     stdout.writeln("Run 'discoman-compute start' to begin processing runs.");
     return 0;
   } catch (error) {

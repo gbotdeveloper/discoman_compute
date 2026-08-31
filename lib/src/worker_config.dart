@@ -55,6 +55,13 @@ class WorkerConfig {
   /// name at `login`.
   final String hostname;
 
+  /// The interpreter to try when nothing names one.
+  ///
+  /// Windows installs Python as `python`; `python3` usually resolves to the
+  /// Store stub that opens a download page instead of running anything.
+  static String get _defaultPythonCommand =>
+      Platform.isWindows ? 'python' : 'python3';
+
   static String _env(String key) => Platform.environment[key]?.trim() ?? '';
 
   /// The Firebase Web API key of the `no-code-ui-kosgeb` project, used only by
@@ -103,7 +110,7 @@ class WorkerConfig {
         ? pythonArg!.trim()
         : (_env('DISCOMAN_PYTHON').isNotEmpty
               ? _env('DISCOMAN_PYTHON')
-              : 'python3');
+              : _defaultPythonCommand);
 
     final maxRuntimeRaw = _env('EXECUTION_MAX_RUNTIME_SECONDS');
     final maxRuntime = int.tryParse(maxRuntimeRaw) ?? 3300;

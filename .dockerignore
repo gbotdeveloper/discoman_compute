@@ -3,6 +3,10 @@
 .dart_tool/
 build/
 
+# The desktop app. It needs the Flutter SDK, which this image does not have and
+# the cloud worker does not need — the shared engine lives in lib/.
+app/
+
 .git/
 .gitignore
 README.md

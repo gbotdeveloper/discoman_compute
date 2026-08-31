@@ -19,7 +19,8 @@ abstract class ClaimedExecution implements _i1.SerializableModel {
     required this.executionId,
     required this.kind,
     required this.computeMode,
-    required this.source,
+    required this.projectId,
+    this.source,
     required this.entrypointName,
     required this.inputsJson,
     required this.timeoutSeconds,
@@ -31,7 +32,8 @@ abstract class ClaimedExecution implements _i1.SerializableModel {
     required _i1.UuidValue executionId,
     required _i2.ExecutionKind kind,
     required _i3.ComputeMode computeMode,
-    required String source,
+    required String projectId,
+    String? source,
     required String entrypointName,
     required String inputsJson,
     required int timeoutSeconds,
@@ -48,7 +50,8 @@ abstract class ClaimedExecution implements _i1.SerializableModel {
       computeMode: _i3.ComputeMode.fromJson(
         (jsonSerialization['computeMode'] as String),
       ),
-      source: jsonSerialization['source'] as String,
+      projectId: jsonSerialization['projectId'] as String,
+      source: jsonSerialization['source'] as String?,
       entrypointName: jsonSerialization['entrypointName'] as String,
       inputsJson: jsonSerialization['inputsJson'] as String,
       timeoutSeconds: jsonSerialization['timeoutSeconds'] as int,
@@ -63,7 +66,9 @@ abstract class ClaimedExecution implements _i1.SerializableModel {
 
   _i3.ComputeMode computeMode;
 
-  String source;
+  String projectId;
+
+  String? source;
 
   String entrypointName;
 
@@ -80,6 +85,7 @@ abstract class ClaimedExecution implements _i1.SerializableModel {
     _i1.UuidValue? executionId,
     _i2.ExecutionKind? kind,
     _i3.ComputeMode? computeMode,
+    String? projectId,
     String? source,
     String? entrypointName,
     String? inputsJson,
@@ -94,7 +100,8 @@ abstract class ClaimedExecution implements _i1.SerializableModel {
       'executionId': executionId.toJson(),
       'kind': kind.toJson(),
       'computeMode': computeMode.toJson(),
-      'source': source,
+      'projectId': projectId,
+      if (source != null) 'source': source,
       'entrypointName': entrypointName,
       'inputsJson': inputsJson,
       'timeoutSeconds': timeoutSeconds,
@@ -116,7 +123,8 @@ class _ClaimedExecutionImpl extends ClaimedExecution {
     required _i1.UuidValue executionId,
     required _i2.ExecutionKind kind,
     required _i3.ComputeMode computeMode,
-    required String source,
+    required String projectId,
+    String? source,
     required String entrypointName,
     required String inputsJson,
     required int timeoutSeconds,
@@ -126,6 +134,7 @@ class _ClaimedExecutionImpl extends ClaimedExecution {
          executionId: executionId,
          kind: kind,
          computeMode: computeMode,
+         projectId: projectId,
          source: source,
          entrypointName: entrypointName,
          inputsJson: inputsJson,
@@ -140,7 +149,8 @@ class _ClaimedExecutionImpl extends ClaimedExecution {
     _i1.UuidValue? executionId,
     _i2.ExecutionKind? kind,
     _i3.ComputeMode? computeMode,
-    String? source,
+    String? projectId,
+    Object? source = _Undefined,
     String? entrypointName,
     String? inputsJson,
     int? timeoutSeconds,
@@ -151,7 +161,8 @@ class _ClaimedExecutionImpl extends ClaimedExecution {
       executionId: executionId ?? this.executionId,
       kind: kind ?? this.kind,
       computeMode: computeMode ?? this.computeMode,
-      source: source ?? this.source,
+      projectId: projectId ?? this.projectId,
+      source: source is String? ? source : this.source,
       entrypointName: entrypointName ?? this.entrypointName,
       inputsJson: inputsJson ?? this.inputsJson,
       timeoutSeconds: timeoutSeconds ?? this.timeoutSeconds,

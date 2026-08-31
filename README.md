@@ -14,8 +14,9 @@ Your account is never stored on disk — only a revocable per-machine token, at
 
 ## What you need
 
-- **Dart SDK** — to install this program ([install guide](https://dart.dev/get-dart))
 - **Python 3.11** with the packages your scripts import
+- The **GBot compute app** for your computer (below), or the Dart SDK if you
+  would rather run it from a terminal ([install guide](https://dart.dev/get-dart))
 
 If your scripts use the usual data and plotting libraries, a virtual
 environment is the cleanest way to get them:
@@ -25,54 +26,57 @@ python3.11 -m venv ~/.gbot-python
 ~/.gbot-python/bin/pip install matplotlib numpy pandas Pillow
 ```
 
-You will pass that interpreter to `start` below.
+On Windows:
 
-## 1. Install
+```
+py -3.11 -m venv %USERPROFILE%\.gbot-python
+%USERPROFILE%\.gbot-python\Scripts\pip install matplotlib numpy pandas Pillow
+```
+
+You will point the worker at that interpreter below.
+
+## Using the app
+
+Open **GBot compute** and sign in with the same email and password you use for
+GBot. That enrols this computer; you only do it once.
+
+The window has two parts:
+
+- **This computer** — Start and Stop, and a log of what has run. Leave it
+  started. In GBot, the **Compute** section of your project's Publish step will
+  show the client as online. While it is stopped, requests to your apps wait in
+  the queue rather than failing — they run as soon as you start it again.
+- **Your projects** — pick one and choose **Link a script**. The app reads the
+  `.py` file you select, shows you the inputs and outputs it found, and asks you
+  to confirm. Only that list is sent; the script is copied to
+  `~/.discoman/scripts/` and stays here.
+
+Link again whenever you change what your script takes or returns.
+
+## Using it from a terminal instead
+
+The same worker runs headless, which is what you want on a machine with no
+screen:
 
 ```sh
 dart pub global activate --source git https://github.com/gbotdeveloper/discoman_compute.git
 ```
 
-Make sure `~/.pub-cache/bin` is on your `PATH`, so the `discoman-compute`
-command is found.
-
-## 2. Sign in
+Make sure `~/.pub-cache/bin` is on your `PATH`, then:
 
 ```sh
-discoman-compute login
-```
-
-Enter the same email and password you use for GBot. This enrolls the machine
-and saves its token. You only do this once per computer.
-
-## 3. Link a script
-
-```sh
+discoman-compute login                                  # once per computer
 discoman-compute link --script ~/scripts/my_analysis.py
-```
-
-It reads the script, shows you the inputs and outputs it found, and asks which
-of your projects to attach them to. Nothing is sent until you confirm, and what
-is sent is the list you just saw — not the script.
-
-Run it again whenever you change what your script takes or returns.
-
-## 4. Start it
-
-```sh
 discoman-compute start --python ~/.gbot-python/bin/python3
 ```
 
-Leave it running. In GBot, the **Compute** section of your project's Publish
-step will show the client as online, and runs will start landing here.
-
-Press `Ctrl+C` to stop. While it is stopped, requests to your app wait in the
-queue rather than failing — they run as soon as you start it again.
+`Ctrl+C` stops it. The app and the command share the same credentials and
+scripts, so you can use either.
 
 ## Keeping it running
 
-Runs only happen while this program is running. If your computer sleeps or you
-close the terminal, visitors to your app will wait. For an app people use
+Runs only happen while the worker is running. If your computer sleeps, or you
+quit the app or close the terminal, visitors to your app will wait. For an app people use
 regularly, run it on a machine that stays awake, or switch that app back to
 GBot's cloud in the Compute section.
 
@@ -85,10 +89,14 @@ the server could not be reached. Check your connection, then sign in again.
 have. Install it into the interpreter you passed to `--python`.
 
 **The client never shows as online** — check that the project's Compute setting
-is "My own machine", and that `start` is still running in your terminal.
+is "My own machine", and that the worker is started.
 
-**GBot shows the wrong inputs** — the contract is only re-read when you run
-`link`. Run it again after changing your script's parameters or return value.
+**GBot shows the wrong inputs** — the contract is only re-read when you link the
+script. Link it again after changing your script's parameters or return value.
+
+**`No script is linked to this project on this machine.`** — the project expects
+a local script but this computer has none. Link one here, or link it on the
+computer that is meant to serve the app.
 
 ## Commands
 
