@@ -18,6 +18,46 @@ class RemoteAuthException implements Exception {
   String toString() => message;
 }
 
+/// Prompts for the creator's email + password and returns a signed-in
+/// [WorkerSession] carrying their own Serverpod session.
+///
+/// Used by the commands a creator runs at the keyboard — `login` and `link`.
+/// Neither persists the session: a creator session grants far more than the
+/// machine token does (see `loginRemote` on the server), so it lives only for
+/// the length of the command. The caller closes the client.
+///
+/// Throws [RemoteAuthException] with a readable message on any failure.
+Future<WorkerSession> signInInteractively(WorkerConfig config) async {
+  final apiKey = config.firebaseApiKey;
+  if (apiKey.isEmpty) {
+    throw RemoteAuthException(
+      'FIREBASE_API_KEY is not set. Set it to the Firebase Web API key of the '
+      'Discoman project before signing in.',
+    );
+  }
+
+  stdout.write('Email: ');
+  final email = stdin.readLineSync()?.trim() ?? '';
+  final password = _promptHidden('Password: ');
+  if (email.isEmpty || password.isEmpty) {
+    throw RemoteAuthException('Email and password are both required.');
+  }
+
+  final idToken = await _firebaseSignIn(apiKey, email, password);
+
+  final session = buildWorkerSession(config.serverUrl);
+  try {
+    final authSuccess = await session.client.firebaseIdp.login(
+      idToken: idToken,
+    );
+    await session.sessionManager.updateSignedInUser(authSuccess);
+    return session;
+  } catch (error) {
+    session.client.close();
+    throw RemoteAuthException('Sign-in failed: $error');
+  }
+}
+
 /// The `login` flow (interactive, run once per machine).
 ///
 /// Prompts for the creator's email + password, exchanges them with Firebase for
@@ -26,38 +66,15 @@ class RemoteAuthException implements Exception {
 /// `~/.discoman/credentials.json`. The Serverpod session is discarded when the
 /// process exits — it is never written to disk.
 Future<int> runRemoteLogin(WorkerConfig config) async {
-  final apiKey = config.firebaseApiKey;
-  if (apiKey.isEmpty) {
-    stderr.writeln(
-      'FIREBASE_API_KEY is not set. Set it to the Firebase Web API key of the '
-      'Discoman project before running `discoman-compute login`.',
-    );
-    return 1;
-  }
-
-  stdout.write('Email: ');
-  final email = stdin.readLineSync()?.trim() ?? '';
-  final password = _promptHidden('Password: ');
-  if (email.isEmpty || password.isEmpty) {
-    stderr.writeln('Email and password are both required.');
-    return 1;
-  }
-
-  final String idToken;
+  final WorkerSession session;
   try {
-    idToken = await _firebaseSignIn(apiKey, email, password);
+    session = await signInInteractively(config);
   } on RemoteAuthException catch (error) {
     stderr.writeln(error.message);
     return 1;
   }
 
-  final session = buildWorkerSession(config.serverUrl);
   try {
-    final authSuccess = await session.client.firebaseIdp.login(
-      idToken: idToken,
-    );
-    await session.sessionManager.updateSignedInUser(authSuccess);
-
     final created = await session.client.computeSettings
         .createComputeClientCredential(config.hostname);
 

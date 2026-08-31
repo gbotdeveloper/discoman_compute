@@ -57,12 +57,14 @@ import 'package:discoman_client/src/protocol/execution/models/execution_ticket.d
 import 'package:discoman_client/src/protocol/runtime/script_run_result.dart'
     as _i24;
 import 'package:discoman_client/src/protocol/greetings/greeting.dart' as _i25;
-import 'package:discoman_client/src/protocol/runtime/published_app_run_entry.dart'
+import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
     as _i26;
 import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
     as _i27;
-import 'package:http/http.dart' as _i28;
-import 'protocol.dart' as _i29;
+import 'package:discoman_client/src/protocol/runtime/published_app_run_entry.dart'
+    as _i28;
+import 'package:http/http.dart' as _i29;
+import 'protocol.dart' as _i30;
 
 class EndpointEmailIdp extends _i1.EndpointEmailIdpBase {
   EndpointEmailIdp(_i2.EndpointCaller caller) : super(caller);
@@ -518,6 +520,34 @@ class EndpointGreeting extends _i2.EndpointRef {
       );
 }
 
+class EndpointCreatorScript extends _i2.EndpointRef {
+  EndpointCreatorScript(_i2.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'creatorScript';
+
+  _i3.Future<List<_i26.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i26.CreatorProjectSummary>>(
+        'creatorScript',
+        'listProjects',
+        {},
+      );
+
+  _i3.Future<void> publishContract(
+    String projectId,
+    _i27.ContractDraft draft,
+    String fingerprint,
+  ) => caller.callServerEndpoint<void>(
+    'creatorScript',
+    'publishContract',
+    {
+      'projectId': projectId,
+      'draft': draft,
+      'fingerprint': fingerprint,
+    },
+  );
+}
+
 class EndpointPublishedApp extends _i2.EndpointRef {
   EndpointPublishedApp(_i2.EndpointCaller caller) : super(caller);
 
@@ -531,10 +561,10 @@ class EndpointPublishedApp extends _i2.EndpointRef {
         {'slug': slug},
       );
 
-  _i3.Future<List<_i26.PublishedAppRunEntry>> getHistory(
+  _i3.Future<List<_i28.PublishedAppRunEntry>> getHistory(
     String slug,
     int limit,
-  ) => caller.callServerEndpoint<List<_i26.PublishedAppRunEntry>>(
+  ) => caller.callServerEndpoint<List<_i28.PublishedAppRunEntry>>(
     'publishedApp',
     'getHistory',
     {
@@ -611,10 +641,10 @@ class Client extends _i2.ServerpodClientShared {
     onFailedCall,
     Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i28.Client? httpClientOverride,
+    _i29.Client? httpClientOverride,
   }) : super(
          host,
-         _i29.Protocol(),
+         _i30.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -634,6 +664,7 @@ class Client extends _i2.ServerpodClientShared {
     execution = EndpointExecution(this);
     workerAuth = EndpointWorkerAuth(this);
     greeting = EndpointGreeting(this);
+    creatorScript = EndpointCreatorScript(this);
     publishedApp = EndpointPublishedApp(this);
     runtime = EndpointRuntime(this);
     modules = Modules(this);
@@ -659,6 +690,8 @@ class Client extends _i2.ServerpodClientShared {
 
   late final EndpointGreeting greeting;
 
+  late final EndpointCreatorScript creatorScript;
+
   late final EndpointPublishedApp publishedApp;
 
   late final EndpointRuntime runtime;
@@ -677,6 +710,7 @@ class Client extends _i2.ServerpodClientShared {
     'execution': execution,
     'workerAuth': workerAuth,
     'greeting': greeting,
+    'creatorScript': creatorScript,
     'publishedApp': publishedApp,
     'runtime': runtime,
   };
