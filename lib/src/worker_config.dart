@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'settings/worker_settings.dart';
+
 /// The worker build/version string reported to the server on `register`.
 const String workerVersion = '0.1.0';
 
@@ -106,11 +108,16 @@ class WorkerConfig {
       _ => throw FormatException('Unknown --mode "$modeRaw".'),
     };
 
+    // Most specific wins: the flag for this one run, then the environment,
+    // then what the creator chose in the desktop app, then the platform
+    // default. The saved setting sits below the environment so a container or
+    // a CI job can still override what a developer picked on their laptop.
     final python = (pythonArg?.trim().isNotEmpty ?? false)
         ? pythonArg!.trim()
         : (_env('DISCOMAN_PYTHON').isNotEmpty
               ? _env('DISCOMAN_PYTHON')
-              : _defaultPythonCommand);
+              : (loadWorkerSettingsOrEmpty().pythonPath ??
+                    _defaultPythonCommand));
 
     final maxRuntimeRaw = _env('EXECUTION_MAX_RUNTIME_SECONDS');
     final maxRuntime = int.tryParse(maxRuntimeRaw) ?? 3300;

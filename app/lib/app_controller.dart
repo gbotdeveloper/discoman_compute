@@ -36,7 +36,9 @@ class AppController extends ChangeNotifier {
   AppController({WorkerConfig? config})
     : config = config ?? WorkerConfig.resolve(modeArg: 'remote');
 
-  final WorkerConfig config;
+  /// Rebuilt when a setting that feeds it changes, so the panel shows what the
+  /// next run will actually use.
+  WorkerConfig config;
 
   WorkerSession? _session;
   RemoteWorker? _worker;
@@ -133,6 +135,21 @@ class AppController extends ChangeNotifier {
       );
       candidate = null;
       await _loadProjects();
+    });
+  }
+
+  /// Saves the Python interpreter the creator picked.
+  ///
+  /// Takes effect on the next start: [RemoteWorker] builds its runner from the
+  /// config it was handed, so a worker already running keeps the interpreter
+  /// it started with. The panel disables this while it runs rather than
+  /// pretending otherwise.
+  Future<void> setPythonPath(String path) async {
+    await _run(() async {
+      WorkerSettingsStore.defaultLocation().save(
+        WorkerSettings(pythonPath: path),
+      );
+      config = WorkerConfig.resolve(modeArg: 'remote');
     });
   }
 

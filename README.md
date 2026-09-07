@@ -14,9 +14,8 @@ Your account is never stored on disk — only a revocable per-machine token, at
 
 ## What you need
 
+- The **GBot compute app** for your computer
 - **Python 3.11** with the packages your scripts import
-- The **GBot compute app** for your computer (below), or the Dart SDK if you
-  would rather run it from a terminal ([install guide](https://dart.dev/get-dart))
 
 If your scripts use the usual data and plotting libraries, a virtual
 environment is the cleanest way to get them:
@@ -42,10 +41,12 @@ GBot. That enrols this computer; you only do it once.
 
 The window has two parts:
 
-- **This computer** — Start and Stop, and a log of what has run. Leave it
-  started. In GBot, the **Compute** section of your project's Publish step will
-  show the client as online. While it is stopped, requests to your apps wait in
-  the queue rather than failing — they run as soon as you start it again.
+- **This computer** — Start and Stop, and a log of what has run. The **Python**
+  row shows which interpreter your scripts run with; **Change** lets you pick
+  another and checks it before you commit to it. Leave the worker started. In
+  GBot, the **Compute** section of your project's Publish step will show the
+  client as online. While it is stopped, requests to your apps wait in the queue
+  rather than failing — they run as soon as you start it again.
 - **Your projects** — pick one and choose **Link a script**. The app reads the
   `.py` file you select, shows you the inputs and outputs it found, and asks you
   to confirm. Only that list is sent; the script is copied to
@@ -53,10 +54,11 @@ The window has two parts:
 
 Link again whenever you change what your script takes or returns.
 
-## Using it from a terminal instead
+## On a machine with no screen
 
-The same worker runs headless, which is what you want on a machine with no
-screen:
+The app is how this is meant to be used. The one case it cannot cover is a
+computer you never sit at — a spare box or a server you leave running — where
+there is no window to open. The same worker runs from a terminal there:
 
 ```sh
 dart pub global activate --source git https://github.com/gbotdeveloper/discoman_compute.git
@@ -70,8 +72,11 @@ discoman-compute link --script ~/scripts/my_analysis.py
 discoman-compute start --python ~/.gbot-python/bin/python3
 ```
 
-`Ctrl+C` stops it. The app and the command share the same credentials and
-scripts, so you can use either.
+`Ctrl+C` stops it.
+
+Both read the same `~/.discoman`, so nothing diverges: the machine token, the
+scripts you have linked, and the interpreter you picked in the app all apply
+here too. `--python` overrides the saved interpreter for that one run.
 
 ## Keeping it running
 
@@ -86,7 +91,8 @@ GBot's cloud in the Compute section.
 the server could not be reached. Check your connection, then sign in again.
 
 **`ModuleNotFoundError`** — your script imports a package your Python does not
-have. Install it into the interpreter you passed to `--python`.
+have. Install it into that interpreter, or point the app at one that has it
+(**This computer → Python → Change**).
 
 **The client never shows as online** — check that the project's Compute setting
 is "My own machine", and that the worker is started.
@@ -98,7 +104,9 @@ script. Link it again after changing your script's parameters or return value.
 a local script but this computer has none. Link one here, or link it on the
 computer that is meant to serve the app.
 
-## Commands
+## Terminal commands
+
+Only needed on a machine with no screen; the app does all three for you.
 
 ```
 discoman-compute login  [--name NAME]
