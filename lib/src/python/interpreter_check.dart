@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../home_path.dart';
+
 /// What running `<interpreter> --version` told us.
 class InterpreterCheck {
   const InterpreterCheck._({
@@ -31,7 +33,7 @@ Future<InterpreterCheck> checkInterpreter(
   Future<ProcessResult> Function(String executable, List<String> arguments)?
   runProcess,
 }) async {
-  final trimmed = path.trim();
+  final trimmed = expandHomePath(path);
   if (trimmed.isEmpty) {
     return const InterpreterCheck._(
       isUsable: false,

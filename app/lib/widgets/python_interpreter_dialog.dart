@@ -157,9 +157,13 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                   const SizedBox(width: 10),
                   ActionButton(
                     label: 'Use this Python',
+                    // Expanded before it leaves this dialog: a stored `~` is
+                    // meaningless to the process that will run it later.
                     onPressed: _path.text.trim().isEmpty
                         ? null
-                        : () => Navigator.of(context).pop(_path.text.trim()),
+                        : () => Navigator.of(
+                            context,
+                          ).pop(expandHomePath(_path.text)),
                   ),
                 ],
               ),

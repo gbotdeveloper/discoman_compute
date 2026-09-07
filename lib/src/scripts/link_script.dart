@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:discoman_client/discoman_client.dart';
 
 import '../auth/remote_auth.dart';
+import '../home_path.dart';
 import '../auth/session.dart';
 import '../python/contract_extractor.dart';
 import '../worker_config.dart';
@@ -108,12 +109,7 @@ Future<File> _resolveScriptFile(String? pathArg) async {
     throw _LinkAborted('No script path given.');
   }
 
-  // Shells do not expand `~` inside a quoted argument or a prompt answer, so a
-  // path typed with one would otherwise look like a missing file.
-  final home = Platform.environment['HOME'];
-  if (path.startsWith('~/') && home != null) {
-    path = '$home${path.substring(1)}';
-  }
+  path = expandHomePath(path);
 
   final file = File(path);
   if (!file.existsSync()) {

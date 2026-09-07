@@ -66,6 +66,22 @@ void main() {
     expect(result.message, contains('127'));
   });
 
+  test('expands a leading tilde before launching', () async {
+    // A stored `~` would be handed straight to Process.start, which does not
+    // expand it — the interpreter would look missing when it is not.
+    String? launched;
+    await checkInterpreter(
+      '~/py/bin/python3',
+      runProcess: (exe, _) async {
+        launched = exe;
+        return ProcessResult(0, 0, 'Python 3.11.9', '');
+      },
+    );
+
+    expect(launched, isNot(startsWith('~')));
+    expect(launched, endsWith('/py/bin/python3'));
+  });
+
   test('rejects an empty path without launching anything', () async {
     var launched = false;
     final result = await checkInterpreter(

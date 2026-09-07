@@ -32,7 +32,15 @@ py -3.11 -m venv %USERPROFILE%\.gbot-python
 %USERPROFILE%\.gbot-python\Scripts\pip install matplotlib numpy pandas Pillow
 ```
 
-You will point the worker at that interpreter below.
+Point the app at that interpreter under **This computer → Python → Change**.
+Note the two layouts differ: macOS and Linux put it in `bin/python3`, Windows in
+`Scripts\python.exe`.
+
+    macOS, Linux   ~/.gbot-python/bin/python3
+    Windows        C:\Users\<you>\.gbot-python\Scripts\python.exe
+
+`~` is expanded for you, so typing it is fine. Windows environment variables
+like `%USERPROFILE%` are not — use the full path there.
 
 ## Using the app
 
