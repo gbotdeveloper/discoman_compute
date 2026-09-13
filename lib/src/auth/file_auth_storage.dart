@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../home_path.dart';
+
 /// Persists the remote worker's per-machine token at `~/.discoman/credentials.json`.
 ///
 /// This is NOT a Serverpod session store. Remote mode never persists a
@@ -15,30 +17,16 @@ class MachineTokenStore {
 
   final File _file;
 
-  /// The default location: `~/.discoman/credentials.json`.
+  /// The default location: `credentials.json` under [discomanHomeDirectory].
   factory MachineTokenStore.defaultLocation() {
-    final home = _homeDirectory();
+    final home = discomanHomeDirectory();
     return MachineTokenStore(
-      File(
-        '${home.path}${Platform.pathSeparator}.discoman'
-        '${Platform.pathSeparator}credentials.json',
-      ),
+      File('${home.path}${Platform.pathSeparator}credentials.json'),
     );
   }
 
   /// The credentials file path (for user-facing messages).
   String get path => _file.path;
-
-  static Directory _homeDirectory() {
-    final env = Platform.environment;
-    final home = env['HOME'] ?? env['USERPROFILE'];
-    if (home == null || home.trim().isEmpty) {
-      throw StateError(
-        'Cannot determine the home directory (HOME/USERPROFILE unset).',
-      );
-    }
-    return Directory(home);
-  }
 
   /// Returns the stored machine token, or null if none is stored / the file is
   /// missing or unreadable.

@@ -3,5 +3,12 @@
 .packages
 build/
 
-# Never commit a machine token or a local server override
+# Never commit a machine token or a local server override.
+#
+# These normally live in ~/.discoman, not here — but this is a public
+# repository, and a creator debugging a problem is the kind of person who
+# copies one next to the code to try something. Catching it here costs
+# nothing; not catching it publishes their machine token.
 .env
+credentials*.json
+settings.json

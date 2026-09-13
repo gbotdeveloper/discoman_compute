@@ -63,7 +63,12 @@ Future<int> _runCloudWorker(WorkerConfig config) async {
         break;
       }
 
-      final claimed = await session.client.computeWorker.claimNext(workerId);
+      // Cloud replicas run whatever the row carries, so the served-project
+      // list a self-hosted machine sends means nothing here.
+      final claimed = await session.client.computeWorker.claimNext(
+        workerId,
+        const [],
+      );
       if (claimed == null) {
         stdout.writeln('Queue empty; drain complete.');
         break;

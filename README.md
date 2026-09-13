@@ -86,6 +86,20 @@ Both read the same `~/.discoman`, so nothing diverges: the machine token, the
 scripts you have linked, and the interpreter you picked in the app all apply
 here too. `--python` overrides the saved interpreter for that one run.
 
+## Acting as a second computer
+
+Everything above lives in `~/.discoman`. Point `DISCOMAN_HOME` somewhere else
+and you get a clean one: its own machine token, its own linked scripts, its own
+interpreter. The server sees a second worker, because that is exactly what a
+second computer looks like to it.
+
+```
+DISCOMAN_HOME=~/.discoman-machine-2 discoman-compute login
+```
+
+Useful for trying the split — this app on one machine, that app on another —
+without a second machine.
+
 ## Keeping it running
 
 Runs only happen while the worker is running. If your computer sleeps, or you

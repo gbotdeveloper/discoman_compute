@@ -46,4 +46,48 @@ void main() {
         .where((path) => path.endsWith('.tmp'));
     expect(leftovers, isEmpty);
   });
+
+  group('paused projects', () {
+    test('survive a round trip', () {
+      store.save(const WorkerSettings(pausedProjectIds: {'b', 'a'}));
+
+      expect(store.load().pausedProjectIds, {'a', 'b'});
+    });
+
+    test('an empty set writes no key at all', () {
+      store.save(const WorkerSettings(pythonPath: '/p'));
+
+      expect(store.file.readAsStringSync(), isNot(contains('paused')));
+    });
+
+    test('a stored interpreter is not lost when pauses change', () {
+      store.save(const WorkerSettings(pythonPath: '/usr/bin/python3'));
+
+      store.save(store.load().copyWith(pausedProjectIds: {'a'}));
+
+      final loaded = store.load();
+      expect(loaded.pythonPath, '/usr/bin/python3');
+      expect(loaded.pausedProjectIds, {'a'});
+    });
+
+    test('pauses are not lost when the interpreter changes', () {
+      // Both halves are written through the same file; a save that rebuilt
+      // WorkerSettings from scratch used to drop the other one.
+      store.save(const WorkerSettings(pausedProjectIds: {'a'}));
+
+      store.save(store.load().copyWith(pythonPath: '/usr/bin/python3'));
+
+      final loaded = store.load();
+      expect(loaded.pausedProjectIds, {'a'});
+      expect(loaded.pythonPath, '/usr/bin/python3');
+    });
+
+    test('junk in the file reads as no pauses', () {
+      store.file.parent.createSync(recursive: true);
+      store.file.writeAsStringSync('{"pausedProjectIds": "nope"}');
+
+      expect(store.load().pausedProjectIds, isEmpty);
+    });
+  });
+
 }

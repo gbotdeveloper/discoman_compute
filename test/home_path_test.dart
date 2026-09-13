@@ -31,19 +31,19 @@ void main() {
   });
 
   group('on Windows, where HOME is usually unset', () {
-    const windowsEnv = {'USERPROFILE': r'C:\Users\barkin'};
+    const windowsEnv = {'USERPROFILE': r'C:\Users\creator'};
 
     test('falls back to USERPROFILE', () {
       expect(
         expandHomePath('~/py/python.exe', environment: windowsEnv),
-        r'C:\Users\barkin/py/python.exe',
+        r'C:\Users\creator/py/python.exe',
       );
     });
 
     test('expands a backslash tilde, which is what gets typed there', () {
       expect(
         expandHomePath(r'~\py\Scripts\python.exe', environment: windowsEnv),
-        r'C:\Users\barkin\py\Scripts\python.exe',
+        r'C:\Users\creator\py\Scripts\python.exe',
       );
     });
 
@@ -51,9 +51,9 @@ void main() {
       expect(
         expandHomePath(
           '~/py',
-          environment: {'HOME': '/c/Users/barkin', ...windowsEnv},
+          environment: {'HOME': '/c/Users/creator', ...windowsEnv},
         ),
-        '/c/Users/barkin/py',
+        '/c/Users/creator/py',
       );
     });
   });
@@ -61,4 +61,48 @@ void main() {
   test('leaves the path alone when there is no home to expand to', () {
     expect(expandHomePath('~/py', environment: const {}), '~/py');
   });
+
+  group('discomanHomeDirectory', () {
+    test('falls back to ~/.discoman', () {
+      final dir = discomanHomeDirectory(
+        environment: {'HOME': '/Users/someone'},
+      );
+      expect(dir.path, '/Users/someone/.discoman');
+    });
+
+    test('uses USERPROFILE when HOME is absent', () {
+      final dir = discomanHomeDirectory(
+        environment: {'USERPROFILE': '/Users/someone'},
+      );
+      expect(dir.path, '/Users/someone/.discoman');
+    });
+
+    test('DISCOMAN_HOME wins over the home directory', () {
+      final dir = discomanHomeDirectory(
+        environment: {'HOME': '/Users/someone', 'DISCOMAN_HOME': '/tmp/two'},
+      );
+      expect(dir.path, '/tmp/two');
+    });
+
+    test('expands a tilde in DISCOMAN_HOME', () {
+      final dir = discomanHomeDirectory(
+        environment: {'HOME': '/Users/someone', 'DISCOMAN_HOME': '~/second'},
+      );
+      expect(dir.path, '/Users/someone/second');
+    });
+
+    test('an empty DISCOMAN_HOME is no override at all', () {
+      // Shells export an unset variable as the empty string often enough that
+      // treating it as "put my state in /" would be a nasty surprise.
+      final dir = discomanHomeDirectory(
+        environment: {'HOME': '/Users/someone', 'DISCOMAN_HOME': '   '},
+      );
+      expect(dir.path, '/Users/someone/.discoman');
+    });
+
+    test('throws when there is no home to fall back to', () {
+      expect(() => discomanHomeDirectory(environment: {}), throwsStateError);
+    });
+  });
+
 }

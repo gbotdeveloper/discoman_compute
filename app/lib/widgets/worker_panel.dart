@@ -15,6 +15,9 @@ class WorkerPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRunning = controller.isWorkerBusy;
+    // Starting with nothing linked would register a machine that shows as
+    // online and never runs anything — worse than refusing to start.
+    final canStart = controller.canServeAnything;
 
     return SectionCard(
       title: 'This computer',
@@ -22,7 +25,7 @@ class WorkerPanel extends StatelessWidget {
         label: isRunning ? 'Stop' : 'Start',
         icon: isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
         isPrimary: !isRunning,
-        onPressed: controller.isBusy
+        onPressed: controller.isBusy || (!isRunning && !canStart)
             ? null
             : (isRunning ? controller.stopWorker : controller.startWorker),
       ),
@@ -31,6 +34,10 @@ class WorkerPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _WorkerStatusLine(state: controller.workerState),
+          if (!isRunning && !canStart) ...[
+            const SizedBox(height: 8),
+            _NothingToServe(),
+          ],
           const SizedBox(height: 12),
           _DetailRow(
             label: 'Python',
@@ -63,6 +70,36 @@ Future<void> _changeInterpreter(
   );
   if (picked == null) return;
   await controller.setPythonPath(picked);
+}
+
+/// Explains why Start is unavailable.
+class _NothingToServe extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.link_off_rounded,
+          size: 16,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Link a script below before starting. This computer can only run '
+            'projects whose script is on it.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _WorkerStatusLine extends StatelessWidget {

@@ -16,7 +16,7 @@ void main() {
       ),
     );
 
-    expect(find.text('GBot compute'), findsOneWidget);
+    expect(find.text('Discoman Compute'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);

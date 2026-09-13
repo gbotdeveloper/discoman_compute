@@ -1,16 +1,36 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../home_path.dart';
+
 /// Preferences a creator sets once and both front ends honour.
 class WorkerSettings {
-  const WorkerSettings({this.pythonPath});
+  const WorkerSettings({
+    this.pythonPath,
+    this.pausedProjectIds = const {},
+  });
 
   /// The Python interpreter to run scripts with, or null when the creator has
   /// expressed no preference and the platform default should apply.
   final String? pythonPath;
 
-  WorkerSettings copyWith({String? pythonPath}) {
-    return WorkerSettings(pythonPath: pythonPath ?? this.pythonPath);
+  /// Projects this machine will not take work for, even though it holds their
+  /// script.
+  ///
+  /// Stored rather than held in memory: a creator who switches a project off
+  /// and closes the window has said something about this machine, not about
+  /// this session. Coming back to find it switched on again — and a day of
+  /// held-back runs starting at once — is not what they asked for.
+  final Set<String> pausedProjectIds;
+
+  WorkerSettings copyWith({
+    String? pythonPath,
+    Set<String>? pausedProjectIds,
+  }) {
+    return WorkerSettings(
+      pythonPath: pythonPath ?? this.pythonPath,
+      pausedProjectIds: pausedProjectIds ?? this.pausedProjectIds,
+    );
   }
 }
 
@@ -27,15 +47,10 @@ class WorkerSettingsStore {
 
   /// The default location, beside the other per-machine state.
   factory WorkerSettingsStore.defaultLocation() {
-    final env = Platform.environment;
-    final home = env['HOME'] ?? env['USERPROFILE'];
-    if (home == null || home.trim().isEmpty) {
-      throw StateError(
-        'Cannot determine the home directory (HOME/USERPROFILE unset).',
-      );
-    }
-    final sep = Platform.pathSeparator;
-    return WorkerSettingsStore(File('$home$sep.discoman${sep}settings.json'));
+    final home = discomanHomeDirectory();
+    return WorkerSettingsStore(
+      File('${home.path}${Platform.pathSeparator}settings.json'),
+    );
   }
 
   /// The stored settings, or empty settings when there is nothing to read.
@@ -48,10 +63,17 @@ class WorkerSettingsStore {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map) return const WorkerSettings();
       final python = decoded['pythonPath'];
+      final paused = decoded['pausedProjectIds'];
       return WorkerSettings(
         pythonPath: (python is String && python.trim().isNotEmpty)
             ? python.trim()
             : null,
+        pausedProjectIds: paused is List
+            ? {
+                for (final id in paused)
+                  if (id is String && id.trim().isNotEmpty) id.trim(),
+              }
+            : const {},
       );
     } catch (_) {
       return const WorkerSettings();
@@ -71,6 +93,8 @@ class WorkerSettingsStore {
     tmp.writeAsStringSync(
       jsonEncode({
         if (settings.pythonPath != null) 'pythonPath': settings.pythonPath,
+        if (settings.pausedProjectIds.isNotEmpty)
+          'pausedProjectIds': settings.pausedProjectIds.toList()..sort(),
       }),
       flush: true,
     );

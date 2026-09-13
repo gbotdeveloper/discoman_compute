@@ -29,3 +29,31 @@ String expandHomePath(String path, {Map<String, String>? environment}) {
   if (trimmed == '~') return home;
   return '$home${trimmed.substring(1)}';
 }
+
+/// Where this machine's compute state lives: the machine token, the linked
+/// scripts, and the creator's settings.
+///
+/// `~/.discoman` normally. `DISCOMAN_HOME` overrides it, which is how one
+/// computer can act as two: a second instance pointed at another directory
+/// gets its own machine token and its own linked scripts, which is exactly
+/// what a second computer has. Overriding `HOME` would do the same but drags
+/// everything else in the process with it.
+///
+/// Throws when there is no home directory to fall back to — a caller that can
+/// live without these files should catch it rather than let it propagate.
+Directory discomanHomeDirectory({Map<String, String>? environment}) {
+  final env = environment ?? Platform.environment;
+
+  final override = env['DISCOMAN_HOME']?.trim() ?? '';
+  if (override.isNotEmpty) {
+    return Directory(expandHomePath(override, environment: env));
+  }
+
+  final home = env['HOME'] ?? env['USERPROFILE'];
+  if (home == null || home.trim().isEmpty) {
+    throw StateError(
+      'Cannot determine the home directory (HOME/USERPROFILE unset).',
+    );
+  }
+  return Directory('${home.trim()}${Platform.pathSeparator}.discoman');
+}

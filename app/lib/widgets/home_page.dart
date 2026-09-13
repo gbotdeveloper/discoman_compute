@@ -89,7 +89,7 @@ class _SignedInHeader extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'GBot compute',
+            'Discoman Compute',
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
