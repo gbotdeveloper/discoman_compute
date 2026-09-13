@@ -57,7 +57,7 @@ class _SignInPageState extends State<SignInPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'GBot compute',
+                'Discoman Compute',
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),

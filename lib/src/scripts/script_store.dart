@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
+import '../home_path.dart';
+
 /// Holds the Python scripts a creator has linked to their projects, one file
 /// per project, under `~/.discoman/scripts/`.
 ///
@@ -18,17 +20,13 @@ class ScriptStore {
 
   final Directory directory;
 
-  /// The default location: `~/.discoman/scripts/`, beside the machine token.
+  /// The default location: `scripts/` under [discomanHomeDirectory], beside the
+  /// machine token.
   factory ScriptStore.defaultLocation() {
-    final env = Platform.environment;
-    final home = env['HOME'] ?? env['USERPROFILE'];
-    if (home == null || home.trim().isEmpty) {
-      throw StateError(
-        'Cannot determine the home directory (HOME/USERPROFILE unset).',
-      );
-    }
-    final sep = Platform.pathSeparator;
-    return ScriptStore(Directory('$home$sep.discoman${sep}scripts'));
+    final home = discomanHomeDirectory();
+    return ScriptStore(
+      Directory('${home.path}${Platform.pathSeparator}scripts'),
+    );
   }
 
   /// Where the script for [projectId] lives, whether or not it exists yet.
@@ -54,6 +52,20 @@ class ScriptStore {
     tmp.renameSync(target.path);
     _chmod(target.path, '600');
     return target;
+  }
+
+  /// The project ids this machine holds a script for.
+  ///
+  /// Read from disk on demand rather than cached: a creator setting up a second
+  /// computer links scripts while the worker is already running, and the next
+  /// poll should pick them up without a restart.
+  List<String> linkedProjectIds() {
+    if (!directory.existsSync()) return const [];
+    return [
+      for (final entry in directory.listSync())
+        if (entry is File && entry.path.endsWith('.py'))
+          entry.uri.pathSegments.last.replaceAll(RegExp(r'\.py$'), ''),
+    ]..sort();
   }
 
   static void _chmod(String path, String mode) {

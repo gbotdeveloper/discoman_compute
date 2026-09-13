@@ -314,12 +314,17 @@ class EndpointComputeWorker extends _i2.EndpointRef {
     },
   );
 
-  _i3.Future<_i12.ClaimedExecution?> claimNext(_i2.UuidValue workerId) =>
-      caller.callServerEndpoint<_i12.ClaimedExecution?>(
-        'computeWorker',
-        'claimNext',
-        {'workerId': workerId},
-      );
+  _i3.Future<_i12.ClaimedExecution?> claimNext(
+    _i2.UuidValue workerId,
+    List<String> servedProjectIds,
+  ) => caller.callServerEndpoint<_i12.ClaimedExecution?>(
+    'computeWorker',
+    'claimNext',
+    {
+      'workerId': workerId,
+      'servedProjectIds': servedProjectIds,
+    },
+  );
 
   _i3.Future<_i13.HeartbeatResponse> heartbeat(
     _i2.UuidValue workerId,
@@ -531,6 +536,13 @@ class EndpointCreatorScript extends _i2.EndpointRef {
         'creatorScript',
         'listProjects',
         {},
+      );
+
+  _i3.Future<int> migrateQueuedRunsToCloud(String projectId) =>
+      caller.callServerEndpoint<int>(
+        'creatorScript',
+        'migrateQueuedRunsToCloud',
+        {'projectId': projectId},
       );
 
   _i3.Future<void> publishContract(

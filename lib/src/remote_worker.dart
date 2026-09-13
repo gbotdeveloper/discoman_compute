@@ -7,6 +7,8 @@ import 'auth/session.dart';
 import 'execution_processor.dart';
 import 'heartbeat.dart';
 import 'python/python_runner.dart';
+import 'scripts/script_store.dart';
+import 'settings/worker_settings.dart';
 import 'worker_config.dart';
 
 /// How far along the worker is, for anything that shows the creator a status.
@@ -32,9 +34,26 @@ enum RemoteWorkerState {
 /// and stop the worker without killing itself, and the CLI wraps this with the
 /// stdout and signal handling it wants.
 class RemoteWorker {
-  RemoteWorker(this._config);
+  RemoteWorker(
+    this._config, {
+    ScriptStore? scriptStore,
+    WorkerSettingsStore? settingsStore,
+  }) : _scriptStore = scriptStore,
+       _settingsStore = settingsStore;
 
   final WorkerConfig _config;
+  final ScriptStore? _scriptStore;
+  final WorkerSettingsStore? _settingsStore;
+
+  /// Where linked scripts live. Resolved on first use rather than in the
+  /// constructor, so a machine with no home directory can still construct one.
+  late final ScriptStore scriptStore =
+      _scriptStore ?? ScriptStore.defaultLocation();
+
+  /// Where the creator's switched-off projects are recorded. Resolved on first
+  /// use for the same reason as [scriptStore].
+  late final WorkerSettingsStore settingsStore =
+      _settingsStore ?? WorkerSettingsStore.defaultLocation();
 
   final _log = StreamController<String>.broadcast();
   final _state = StreamController<RemoteWorkerState>.broadcast();
@@ -52,6 +71,19 @@ class RemoteWorker {
   Stream<RemoteWorkerState> get state => _state.stream;
 
   RemoteWorkerState get currentState => _currentState;
+
+  /// The projects this machine is currently willing to run.
+  ///
+  /// Read from disk on every call, so a script linked while the worker runs is
+  /// picked up on the next poll — which is exactly how a creator sets up a
+  /// second computer.
+  List<String> servedProjectIds() {
+    final paused = settingsStore.load().pausedProjectIds;
+    return [
+      for (final id in scriptStore.linkedProjectIds())
+        if (!paused.contains(id)) id,
+    ];
+  }
 
   /// Signs in with the stored machine token, registers this machine, and starts
   /// claiming runs. Returns once the worker is online (or has failed); the loop
@@ -133,7 +165,10 @@ class RemoteWorker {
 
     try {
       while (!_stopRequested) {
-        final claimed = await session.client.computeWorker.claimNext(workerId);
+        final claimed = await session.client.computeWorker.claimNext(
+          workerId,
+          servedProjectIds(),
+        );
         if (claimed == null) {
           // Idle: heartbeat (no execution) to stay marked online, then back
           // off before asking again.

@@ -33,10 +33,19 @@ class ScriptCandidate {
 /// audit, so every dependency it does not have is a dependency they do not
 /// have to trust.
 class AppController extends ChangeNotifier {
-  AppController({WorkerConfig? config})
-    : config = config ?? WorkerConfig.resolve(modeArg: 'remote');
+  AppController({WorkerConfig? config, WorkerSettingsStore? settingsStore})
+    : config = config ?? WorkerConfig.resolve(modeArg: 'remote'),
+      _settingsStore = settingsStore;
 
-  final WorkerConfig config;
+  /// Injectable so a test never writes to the creator's real home directory.
+  final WorkerSettingsStore? _settingsStore;
+
+  late final WorkerSettingsStore settingsStore =
+      _settingsStore ?? WorkerSettingsStore.defaultLocation();
+
+  /// Rebuilt when a setting that feeds it changes, so the panel shows what the
+  /// next run will actually use.
+  WorkerConfig config;
 
   WorkerSession? _session;
   RemoteWorker? _worker;
@@ -57,6 +66,24 @@ class AppController extends ChangeNotifier {
 
   RemoteWorkerState workerState = RemoteWorkerState.stopped;
 
+  /// Projects whose script is on this machine, so it can serve them.
+  Set<String> linkedProjectIds = {};
+
+  /// Projects the creator has switched off for this machine.
+  ///
+  /// Mirrors what is on disk so the list can render without reading a file on
+  /// every frame; [setProjectServed] writes through.
+  late Set<String> pausedProjectIds = _loadPaused();
+
+  Set<String> _loadPaused() {
+    try {
+      return settingsStore.load().pausedProjectIds;
+    } catch (_) {
+      // No home directory to read from is a normal condition, not a fault.
+      return const {};
+    }
+  }
+
   /// The most recent worker log lines, oldest first.
   final List<String> log = [];
 
@@ -67,6 +94,13 @@ class AppController extends ChangeNotifier {
   static const _maxLogLines = 500;
 
   bool get isSignedIn => _session != null;
+
+  /// Whether this machine can serve anything at all.
+  ///
+  /// Starting with nothing linked would register a worker that claims nothing,
+  /// which looks online but never runs — worse than refusing to start.
+  bool get canServeAnything =>
+      linkedProjectIds.any((id) => !pausedProjectIds.contains(id));
 
   bool get isWorkerBusy =>
       workerState == RemoteWorkerState.connecting ||
@@ -96,6 +130,31 @@ class AppController extends ChangeNotifier {
     final session = _session;
     if (session == null) return;
     projects = await session.client.creatorScript.listProjects();
+    _refreshLinkedProjects();
+  }
+
+  /// Re-reads which projects have a script on this machine.
+  void _refreshLinkedProjects() {
+    linkedProjectIds = ScriptStore.defaultLocation().linkedProjectIds().toSet();
+  }
+
+  /// Stops or resumes taking work for one project on this machine.
+  ///
+  /// Takes effect on the worker's next poll; the served list is read fresh
+  /// each time rather than fixed when it started.
+  void setProjectServed(String projectId, {required bool served}) {
+    final store = settingsStore;
+    final paused = {...pausedProjectIds};
+    if (served) {
+      paused.remove(projectId);
+    } else {
+      paused.add(projectId);
+    }
+    // Written before the worker can read it: the loop re-reads this file on
+    // every poll, so saving is the whole of telling it.
+    store.save(store.load().copyWith(pausedProjectIds: paused));
+    pausedProjectIds = paused;
+    _notify();
   }
 
   /// Reads [path] and extracts its contract, without sending anything.
@@ -126,6 +185,7 @@ class AppController extends ChangeNotifier {
       // Stored first: a contract published against a script this machine does
       // not have would leave the project pointing at nothing.
       ScriptStore.defaultLocation().store(projectId, picked.source);
+      _refreshLinkedProjects();
       await session.client.creatorScript.publishContract(
         projectId,
         picked.draft,
@@ -136,9 +196,25 @@ class AppController extends ChangeNotifier {
     });
   }
 
+  /// Saves the Python interpreter the creator picked.
+  ///
+  /// Takes effect on the next start: [RemoteWorker] builds its runner from the
+  /// config it was handed, so a worker already running keeps the interpreter
+  /// it started with. The panel disables this while it runs rather than
+  /// pretending otherwise.
+  Future<void> setPythonPath(String path) async {
+    await _run(() async {
+      // Merged into what is already there: writing a fresh WorkerSettings
+      // would silently clear the projects switched off on this machine.
+      final store = settingsStore;
+      store.save(store.load().copyWith(pythonPath: path));
+      config = WorkerConfig.resolve(modeArg: 'remote');
+    });
+  }
+
   Future<void> startWorker() async {
     if (_worker != null) return;
-    final worker = RemoteWorker(config);
+    final worker = RemoteWorker(config, settingsStore: _settingsStore);
     _worker = worker;
     _logSubscription = worker.log.listen(_appendLog);
     _stateSubscription = worker.state.listen((state) {

@@ -28,7 +28,7 @@ class _DiscomanComputeAppState extends State<DiscomanComputeApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GBot compute',
+      title: 'Discoman Compute',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),

@@ -33,6 +33,26 @@ void main() {
     );
   });
 
+  group('linkedProjectIds', () {
+    test('lists the projects this machine holds a script for', () {
+      store.store('abc123', 'def run():\n    return {}\n');
+      store.store('xyz789', 'def run():\n    return {}\n');
+
+      expect(store.linkedProjectIds(), ['abc123', 'xyz789']);
+    });
+
+    test('is empty before anything has been linked', () {
+      expect(store.linkedProjectIds(), isEmpty);
+    });
+
+    test('ignores anything that is not a script', () {
+      store.store('abc123', 'def run():\n    return {}\n');
+      File('${store.directory.path}/notes.txt').writeAsStringSync('hello');
+
+      expect(store.linkedProjectIds(), ['abc123']);
+    });
+  });
+
   test('fingerprint is stable and prefixed with the algorithm', () {
     const source = 'def run():\n    return {}\n';
 
