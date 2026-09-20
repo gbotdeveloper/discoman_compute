@@ -1,0 +1,253 @@
+name: Release
+
+# Bump `version:` in pubspec.yaml and push to main — that is the whole release
+# flow. This reads the new version, builds the desktop app on macOS and
+# Windows, and publishes a GitHub Release carrying the installers. A push that
+# leaves the version line alone does nothing.
+#
+# Running it by hand from the Actions tab builds both platforms but publishes
+# nothing, so the pipeline can be exercised without cutting a release.
+#
+# The builds are not code signed yet, so the release notes tell people how to
+# get past Gatekeeper and SmartScreen. Signing (an Apple Developer ID plus
+# notarisation, and a Windows certificate) is a separate step later.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+      full_version: ${{ steps.version.outputs.full_version }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      build_number: ${{ steps.version.outputs.build_number }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the checks below need the history and the tags
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        run: |
+          version_line=$(grep '^version:' pubspec.yaml | cut -d' ' -f2)
+          echo "full_version=$version_line" >> $GITHUB_OUTPUT
+          echo "version_name=$(echo "$version_line" | cut -d'+' -f1)" >> $GITHUB_OUTPUT
+          echo "build_number=$(echo "$version_line" | cut -d'+' -f2)" >> $GITHUB_OUTPUT
+
+      - name: Check if the version line changed in this commit
+        id: version_diff
+        run: |
+          # A manual run is a test build, not a release, so whether this
+          # commit touched the version line does not apply to it.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger, version diff check bypassed"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          current=$(git show HEAD:pubspec.yaml | grep '^version:')
+          previous=$(git show HEAD~1:pubspec.yaml 2>/dev/null | grep '^version:' || echo "")
+
+          if [ "$current" = "$previous" ]; then
+            echo "Version line unchanged in this commit ('$current'), skipping build"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version line changed: '$previous' -> '$current'"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if the version was already released
+        id: decide
+        run: |
+          if [ "${{ steps.version_diff.outputs.version_changed }}" != "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          release_tag="v${{ steps.version.outputs.full_version }}"
+
+          if [ -n "$(git tag -l "$release_tag")" ]; then
+            echo "$release_tag already exists, skipping build"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "$release_tag is new, proceeding with builds"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-macos:
+    needs: version-check
+    if: needs.version-check.outputs.should_build == 'true'
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build the app
+        run: |
+          flutter build macos --release \
+            --build-name=${{ needs.version-check.outputs.version_name }} \
+            --build-number=${{ needs.version-check.outputs.build_number }}
+
+      - name: Pack the disk image
+        run: |
+          set -euo pipefail
+          app=$(ls -d build/macos/Build/Products/Release/*.app)
+          staging=$(mktemp -d)
+          cp -R "$app" "$staging/"
+          # The Applications symlink is what makes the window a drag-and-drop
+          # install rather than something the person has to copy by hand.
+          ln -s /Applications "$staging/Applications"
+          hdiutil create \
+            -volname "Discoman Compute" \
+            -srcfolder "$staging" \
+            -format UDZO -ov \
+            DiscomanCompute-macos.dmg
+
+      - name: Upload the disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: DiscomanCompute-macos.dmg
+
+  build-windows:
+    needs: version-check
+    if: needs.version-check.outputs.should_build == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build the app
+        run: >
+          flutter build windows --release
+          --build-name=${{ needs.version-check.outputs.version_name }}
+          --build-number=${{ needs.version-check.outputs.build_number }}
+
+      - name: Zip the build
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path build\windows\x64\runner\Release\* `
+            -DestinationPath DiscomanCompute-windows.zip
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          # Installed rather than assumed: the runner image ships some version
+          # of Inno Setup, and setup.iss needs 6.3 or newer for
+          # ArchitecturesAllowed=x64compatible.
+          choco install innosetup --no-progress -y
+
+          $source = "$PWD\build\windows\x64\runner\Release"
+          $exe = (Get-ChildItem "$source\*.exe")[0].Name
+
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=${{ needs.version-check.outputs.version_name }}" `
+            "/DAppExeName=$exe" `
+            "/DSourceDir=$source" `
+            "/DOutputDir=$PWD" `
+            installer\setup.iss
+
+      - name: Upload the installer and the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            DiscomanCompute-Setup.exe
+            DiscomanCompute-windows.zip
+
+  release:
+    needs: [version-check, build-macos, build-windows]
+    # A manual run stops after the builds: its artifacts are there to download
+    # from the run page, but only a version bump on main publishes a release.
+    if: needs.version-check.outputs.should_build == 'true' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download the builds
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect the release files
+        run: |
+          mkdir -p release
+          mv artifacts/macos/DiscomanCompute-macos.dmg release/
+          mv artifacts/windows/DiscomanCompute-Setup.exe release/
+          mv artifacts/windows/DiscomanCompute-windows.zip release/
+          ls -la release
+
+      - name: Write the release notes
+        id: notes
+        run: |
+          previous_tag=$(git tag -l 'v*' | sort -V | tail -1)
+
+          if [ -z "$previous_tag" ]; then
+            changelog=$(git log --pretty=format:'- %s' --no-merges --max-count=50)
+            compare=""
+          else
+            changelog=$(git log --pretty=format:'- %s' --no-merges "${previous_tag}..HEAD")
+            compare="**Full changelog**: https://github.com/${{ github.repository }}/compare/${previous_tag}...v${{ needs.version-check.outputs.full_version }}"
+          fi
+
+          {
+            echo "body<<GBOT_EOF"
+            echo "## Downloads"
+            echo
+            echo "- **macOS** — \`DiscomanCompute-macos.dmg\`"
+            echo "- **Windows** — \`DiscomanCompute-Setup.exe\`"
+            echo "- **Windows, no installer** — \`DiscomanCompute-windows.zip\`"
+            echo
+            echo "These builds are not code signed yet. macOS blocks the first launch:"
+            echo "open **System Settings → Privacy & Security** and choose **Open Anyway**."
+            echo "Windows shows a SmartScreen warning: choose **More info → Run anyway**."
+            echo
+            echo "## What's changed"
+            echo
+            echo "$changelog"
+            echo
+            echo "$compare"
+            echo "GBOT_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version-check.outputs.full_version }}
+          name: Discoman Compute v${{ needs.version-check.outputs.version_name }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          # Deliberately not marked prerelease while the version is 0.x:
+          # GitHub's /releases/latest/download/ links skip prereleases, and
+          # those links are what the website's download buttons point at.
+          prerelease: false
+          files: release/*
