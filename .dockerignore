@@ -1,11 +1,21 @@
 # Host build output: a package_config.json pointing at host paths overwrites
 # what `dart pub get` resolves inside the image, and the compile then fails.
-.dart_tool/
-build/
+# Matched at every depth — the worker package carries its own.
+**/.dart_tool/
+**/build/
 
-# The desktop app. It needs the Flutter SDK, which this image does not have and
-# the cloud worker does not need — the shared engine lives in lib/.
-app/
+# The desktop app, which is what the repository root now is. It needs the
+# Flutter SDK, which this image does not have and the cloud worker does not
+# need: the worker and everything it shares with the app live in
+# packages/discoman_compute.
+lib/
+test/
+macos/
+windows/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+.metadata
 
 .git/
 .gitignore

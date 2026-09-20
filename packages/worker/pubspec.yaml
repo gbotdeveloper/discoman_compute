@@ -1,0 +1,27 @@
+name: discoman_worker
+description: >-
+  The discoman compute worker: runs queued Python executions, in the cloud
+  Container App Job pool (cloud mode) or on a creator's own machine (remote
+  mode).
+publish_to: none
+
+environment:
+  sdk: ^3.11.4
+
+executables:
+  discoman-compute: discoman_compute
+
+dependencies:
+  discoman_client:
+    path: ../discoman_client
+  serverpod_client: 4.0.0-beta.0
+  # Provides ClientAuthSessionManager, ClientAuthSuccessStorage and AuthSuccess,
+  # the same session plumbing the apps use (see tool/authenticated_client.dart).
+  serverpod_auth_core_client: 4.0.0-beta.0
+  http: ^1.2.0
+  args: ^2.4.0
+  crypto: ^3.0.3
+
+dev_dependencies:
+  lints: '>=3.0.0 <7.0.0'
+  test: ^1.25.5

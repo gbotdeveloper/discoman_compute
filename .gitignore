@@ -12,3 +12,8 @@ build/
 .env
 credentials*.json
 settings.json
+
+# Flutter desktop app
+.flutter-plugins-dependencies
+*.iml
+.idea/

@@ -11,16 +11,19 @@
 # ---------------------------------------------------------------------------
 FROM dart:3.11.4 AS dart_builder
 
-WORKDIR /app
+# Only the worker package is built here. The repository root is the Flutter
+# desktop app, which this image has no SDK for and the cloud worker does not
+# need — .dockerignore keeps it out of the context entirely.
+WORKDIR /app/packages/worker
 
 # Manifests and the vendored client first, so a source-only change reuses the
 # resolved dependency layer.
-COPY pubspec.yaml pubspec.lock ./
-COPY packages/ packages/
+COPY packages/worker/pubspec.yaml packages/worker/pubspec.lock ./
+COPY packages/discoman_client/ ../discoman_client/
 RUN dart pub get
 
-COPY . .
-RUN dart compile aot-snapshot bin/discoman_compute.dart -o discoman_compute.aot
+COPY packages/worker/ ./
+RUN dart compile aot-snapshot bin/cloud_worker.dart -o /app/discoman_compute.aot
 
 # ---------------------------------------------------------------------------
 # Stage 2: minimal Python runtime.
@@ -57,4 +60,4 @@ ENV MPLBACKEND=Agg \
 
 # Drain the cloud queue and exit. DISCOMAN_API_URL and WORKER_AUTH_SECRET are
 # provided by the Container App Job environment / Key Vault.
-CMD ["./dartaotruntime", "discoman_compute.aot", "start", "--mode=cloud"]
+CMD ["./dartaotruntime", "discoman_compute.aot"]

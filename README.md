@@ -69,7 +69,9 @@ computer you never sit at — a spare box or a server you leave running — wher
 there is no window to open. The same worker runs from a terminal there:
 
 ```sh
-dart pub global activate --source git https://github.com/gbotdeveloper/discoman_compute.git
+dart pub global activate --source git \
+  https://github.com/gbotdeveloper/discoman_compute.git \
+  --git-path packages/worker
 ```
 
 Make sure `~/.pub-cache/bin` is on your `PATH`, then:
@@ -137,3 +139,31 @@ discoman-compute start  [--python PATH] [--name NAME]
 ```
 
 `--name` labels this machine in GBot; it defaults to your computer's hostname.
+
+## Building it yourself
+
+The repository root is the app; the worker it runs, and the command-line
+version of the same thing, are in `packages/worker`.
+
+```sh
+flutter run -d macos                  # from the repository root
+flutter build macos --release
+flutter build windows --release       # on a Windows machine
+```
+
+### macOS
+
+App Sandbox is switched off in `macos/Runner/*.entitlements`. The app runs your
+own Python interpreter and shares `~/.discoman` with the command-line worker,
+neither of which a sandboxed app can do. It is distributed directly (notarized),
+not through the Mac App Store.
+
+### Windows
+
+Nothing to configure. Credentials and scripts go under `%USERPROFILE%\.discoman`
+— the same layout as macOS, minus the file permissions, which are only applied
+on POSIX.
+
+The default interpreter is `python` rather than `python3`: on Windows `python3`
+usually resolves to the Store stub, which opens a download page instead of
+running anything.
