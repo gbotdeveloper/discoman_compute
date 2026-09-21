@@ -10,8 +10,10 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// Returned by computeWorker.heartbeat.
 abstract class HeartbeatResponse implements _i1.SerializableModel {
   HeartbeatResponse._({required this.cancelRequested});
 
@@ -26,8 +28,12 @@ abstract class HeartbeatResponse implements _i1.SerializableModel {
     );
   }
 
+  /// True when the caller should stop the current execution's Python process
+  /// and report a canceled outcome.
   bool cancelRequested;
 
+  /// Returns a shallow copy of this [HeartbeatResponse]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   HeartbeatResponse copyWith({bool? cancelRequested});
   @override
@@ -48,6 +54,8 @@ class _HeartbeatResponseImpl extends HeartbeatResponse {
   _HeartbeatResponseImpl({required bool cancelRequested})
     : super._(cancelRequested: cancelRequested);
 
+  /// Returns a shallow copy of this [HeartbeatResponse]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   HeartbeatResponse copyWith({bool? cancelRequested}) {

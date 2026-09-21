@@ -10,8 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// Returned by uploadExecutionAsset: where the server stored the asset. The
+/// worker substitutes this (as the history-descriptor map shape) for the
+/// asset's value in the outputs it reports.
 abstract class ExecutionAssetRef implements _i1.SerializableModel {
   ExecutionAssetRef._({
     required this.outputKey,
@@ -64,6 +68,8 @@ abstract class ExecutionAssetRef implements _i1.SerializableModel {
 
   String downloadUrl;
 
+  /// Returns a shallow copy of this [ExecutionAssetRef]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ExecutionAssetRef copyWith({
     String? outputKey,
@@ -117,6 +123,8 @@ class _ExecutionAssetRefImpl extends ExecutionAssetRef {
          downloadUrl: downloadUrl,
        );
 
+  /// Returns a shallow copy of this [ExecutionAssetRef]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ExecutionAssetRef copyWith({

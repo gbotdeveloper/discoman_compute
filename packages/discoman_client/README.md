@@ -1,29 +1,23 @@
 # discoman_client (vendored)
 
-A copy of the Serverpod client generated from the discoman backend. It is what
-lets this worker call the server with typed methods instead of hand-written
-HTTP.
+A copy of the Serverpod client generated from the discoman backend, trimmed to
+the endpoints and models this worker uses. It is what lets the worker call the
+server with typed methods instead of hand-written HTTP.
 
-**Do not edit these files.** They are generated output. The source of truth is
-`discoman_client/` in the backend repository, produced by `serverpod generate`.
+**Do not edit these files.** They are generated output, copied by
+`tool/sync_compute_client.dart` in the backend repository. To update them,
+run `serverpod generate` there and then run that script.
 
-## What it contains
+## What was left out
 
-Endpoint call stubs and the model classes they send and receive — the shape of
-the protocol, nothing else. There is no server logic here: no queue engine, no
-database access, no credentials. A call like `claimNext` is one line that posts
-to `computeWorker/claimNext` and parses the reply.
+Endpoints the worker never calls, and the models only those endpoints use.
+The kept set is computed from the source on every sync: the endpoints are
+listed in the script, the models are whatever those endpoints' signatures, the
+worker's own source, and the protocol's exceptions reach.
 
-Doc comments have been removed from this copy; the upstream files carry them.
+`jwtRefresh` is kept although nothing calls it — the auth-core session manager
+looks it up by type at runtime when a JWT session refreshes.
 
-## Updating it
-
-When the backend protocol changes, copy `lib/`, `pubspec.yaml`,
-`analysis_options.yaml` and `.gitignore` over from the generated package, strip
-`///` lines, and drop the `resolution: workspace` line from `pubspec.yaml` —
-that line ties the package to the backend's pub workspace and stops it
-resolving on its own.
-
-Then rebuild the worker and run one real execution end to end. Compilation
-proves the method signatures; only a real run proves the serialization registry,
-because a missing type fails at runtime rather than at build time.
+`ScriptRunException` is kept for the same kind of reason: the server throws it
+from every endpoint the worker calls, and an exception that is not in the
+serialization registry is silently downgraded to a generic client error.

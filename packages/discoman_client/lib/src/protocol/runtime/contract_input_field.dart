@@ -10,10 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../runtime/python_field_type.dart' as _i2;
 import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
 
+/// A single input parameter inferred from a Python script's entrypoint.
+/// Mirrors `ExtractedInputField` from the legacy contract extraction.
 abstract class ContractInputField implements _i1.SerializableModel {
   ContractInputField._({
     required this.id,
@@ -54,22 +57,32 @@ abstract class ContractInputField implements _i1.SerializableModel {
     );
   }
 
+  /// Stable draft identifier, e.g. "draft-input-1".
   String id;
 
+  /// The Python parameter name.
   String parameterName;
 
+  /// Human-friendly label derived from the parameter name.
   String label;
 
+  /// Inferred field type.
   _i2.PythonFieldType type;
 
+  /// Whether the parameter has no default value (i.e. is required).
   bool isRequired;
 
+  /// Hint describing the suggested UI control for this input.
   String controlHint;
 
+  /// Optional validation guidance for this input.
   String validationHint;
 
+  /// Category/dropdown options when the type is `category`.
   List<String> options;
 
+  /// Returns a shallow copy of this [ContractInputField]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ContractInputField copyWith({
     String? id,
@@ -123,6 +136,8 @@ class _ContractInputFieldImpl extends ContractInputField {
          options: options,
        );
 
+  /// Returns a shallow copy of this [ContractInputField]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ContractInputField copyWith({

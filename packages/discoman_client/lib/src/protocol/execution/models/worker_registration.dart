@@ -10,8 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// Returned by computeWorker.register: the worker's id plus the cadence the
+/// server expects (heartbeat interval and lease length are server-owned so
+/// they can be tuned without shipping new workers).
 abstract class WorkerRegistration implements _i1.SerializableModel {
   WorkerRegistration._({
     required this.workerId,
@@ -42,6 +46,8 @@ abstract class WorkerRegistration implements _i1.SerializableModel {
 
   int leaseSeconds;
 
+  /// Returns a shallow copy of this [WorkerRegistration]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   WorkerRegistration copyWith({
     _i1.UuidValue? workerId,
@@ -75,6 +81,8 @@ class _WorkerRegistrationImpl extends WorkerRegistration {
          leaseSeconds: leaseSeconds,
        );
 
+  /// Returns a shallow copy of this [WorkerRegistration]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   WorkerRegistration copyWith({

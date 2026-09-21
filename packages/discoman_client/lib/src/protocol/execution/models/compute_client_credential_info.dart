@@ -10,8 +10,10 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// Client-safe view of a compute-client credential (never the token or hash).
 abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
   ComputeClientCredentialInfo._({
     required this.credentialId,
@@ -57,6 +59,8 @@ abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
 
   bool revoked;
 
+  /// Returns a shallow copy of this [ComputeClientCredentialInfo]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ComputeClientCredentialInfo copyWith({
     _i1.UuidValue? credentialId,
@@ -100,6 +104,8 @@ class _ComputeClientCredentialInfoImpl extends ComputeClientCredentialInfo {
          revoked: revoked,
        );
 
+  /// Returns a shallow copy of this [ComputeClientCredentialInfo]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ComputeClientCredentialInfo copyWith({

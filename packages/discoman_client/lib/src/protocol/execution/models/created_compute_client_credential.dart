@@ -10,10 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../../execution/models/compute_client_credential_info.dart' as _i2;
 import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
 
+/// Returned once from createComputeClientCredential: the only time the
+/// plaintext token is ever visible.
 abstract class CreatedComputeClientCredential implements _i1.SerializableModel {
   CreatedComputeClientCredential._({
     required this.info,
@@ -38,8 +41,12 @@ abstract class CreatedComputeClientCredential implements _i1.SerializableModel {
 
   _i2.ComputeClientCredentialInfo info;
 
+  /// Plaintext machine token — store it on the client machine; the server
+  /// keeps only its hash.
   String token;
 
+  /// Returns a shallow copy of this [CreatedComputeClientCredential]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   CreatedComputeClientCredential copyWith({
     _i2.ComputeClientCredentialInfo? info,
@@ -70,6 +77,8 @@ class _CreatedComputeClientCredentialImpl
          token: token,
        );
 
+  /// Returns a shallow copy of this [CreatedComputeClientCredential]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   CreatedComputeClientCredential copyWith({

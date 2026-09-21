@@ -10,9 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'package:discoman_client/src/protocol/protocol.dart' as _i2;
 
+/// Final result a worker reports for a claimed execution. For asset outputs
+/// the values in [outputsJson] must already be storage references produced by
+/// uploadExecutionAsset.
 abstract class ExecutionOutcome implements _i1.SerializableModel {
   ExecutionOutcome._({
     required this.success,
@@ -52,6 +56,7 @@ abstract class ExecutionOutcome implements _i1.SerializableModel {
 
   String? outputsJson;
 
+  /// Pure Python wall time measured by the runner.
   int? durationMs;
 
   String? errorReason;
@@ -62,6 +67,8 @@ abstract class ExecutionOutcome implements _i1.SerializableModel {
 
   List<String> logs;
 
+  /// Returns a shallow copy of this [ExecutionOutcome]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ExecutionOutcome copyWith({
     bool? success,
@@ -113,6 +120,8 @@ class _ExecutionOutcomeImpl extends ExecutionOutcome {
          logs: logs,
        );
 
+  /// Returns a shallow copy of this [ExecutionOutcome]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ExecutionOutcome copyWith({
