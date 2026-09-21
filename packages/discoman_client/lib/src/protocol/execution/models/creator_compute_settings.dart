@@ -10,9 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../../execution/models/compute_mode.dart' as _i2;
 
+/// Per-creator execution routing. Lives in Postgres (not the publicly-gettable
+/// Firestore publish config) so it is server-trusted, flips without
+/// re-publishing, and is read atomically with the execution insert.
 abstract class CreatorComputeSettings implements _i1.SerializableModel {
   CreatorComputeSettings._({
     this.id,
@@ -53,18 +57,26 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
     );
   }
 
+  /// The database id, set if the object has been inserted into the
+  /// database or if it has been fetched from the database. Otherwise,
+  /// the id will be null.
   _i1.UuidValue? id;
 
   String creatorFirebaseUid;
 
   _i2.ComputeMode computeMode;
 
+  /// Hard wall-clock limit for a self-hosted run.
   int selfHostedTimeoutSeconds;
 
+  /// How long a queued run waits for the creator's machine to come online
+  /// before failing with computeOffline. Distinct from the run timeout.
   int selfHostedQueueDeadlineHours;
 
   DateTime updatedAt;
 
+  /// Returns a shallow copy of this [CreatorComputeSettings]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   CreatorComputeSettings copyWith({
     _i1.UuidValue? id,
@@ -112,6 +124,8 @@ class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
          updatedAt: updatedAt,
        );
 
+  /// Returns a shallow copy of this [CreatorComputeSettings]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   CreatorComputeSettings copyWith({

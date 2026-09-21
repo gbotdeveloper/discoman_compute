@@ -1,0 +1,57 @@
+name: Checks
+
+# The worker engine and the desktop app around it.
+#
+# test/vendored_client_test.dart matters more here than the count suggests: the
+# vendored client is trimmed to what this worker uses, and the two things it
+# guards are looked up by name at runtime, so dropping either leaves everything
+# analysing clean and fails only against a real server.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+
+      - name: Install dependencies
+        working-directory: packages/worker
+        run: dart pub get
+
+      - name: Analyze
+        working-directory: packages/worker
+        run: dart analyze
+
+      - name: Test
+        working-directory: packages/worker
+        run: dart test
+
+  app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze lib
+
+      - name: Test
+        run: flutter test

@@ -10,9 +10,15 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../runtime/script_location.dart' as _i2;
 
+/// One of the creator's projects, as listed by their compute client so they can
+/// pick which one a script belongs to.
+///
+/// Deliberately thin: the client only needs enough to show a chooser and say
+/// what state each project is in.
 abstract class CreatorProjectSummary implements _i1.SerializableModel {
   CreatorProjectSummary._({
     required this.projectId,
@@ -48,14 +54,20 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
 
   String projectId;
 
+  /// Project name as the creator typed it in the web app.
   String name;
 
   _i2.ScriptLocation scriptLocation;
 
+  /// False until a contract has been published for this project.
   bool hasContract;
 
+  /// Fingerprint of the script the current contract came from, when it was
+  /// published from a compute client.
   String? scriptFingerprint;
 
+  /// Returns a shallow copy of this [CreatorProjectSummary]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   CreatorProjectSummary copyWith({
     String? projectId,
@@ -99,6 +111,8 @@ class _CreatorProjectSummaryImpl extends CreatorProjectSummary {
          scriptFingerprint: scriptFingerprint,
        );
 
+  /// Returns a shallow copy of this [CreatorProjectSummary]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   CreatorProjectSummary copyWith({

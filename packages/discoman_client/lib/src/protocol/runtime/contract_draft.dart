@@ -10,11 +10,15 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../runtime/contract_input_field.dart' as _i2;
 import '../runtime/contract_output_field.dart' as _i3;
 import 'package:discoman_client/src/protocol/protocol.dart' as _i4;
 
+/// The contract draft extracted by statically inspecting a Python script.
+/// Returned to the client, which persists it (e.g. to Firestore). Mirrors
+/// `ExtractionDraft` from the legacy `inspectPythonScript` Cloud Function.
 abstract class ContractDraft implements _i1.SerializableModel {
   ContractDraft._({
     required this.entrypointName,
@@ -48,16 +52,23 @@ abstract class ContractDraft implements _i1.SerializableModel {
     );
   }
 
+  /// The detected entrypoint function name (e.g. "run", "main").
   String entrypointName;
 
+  /// Inferred input parameters.
   List<_i2.ContractInputField> inputFields;
 
+  /// Inferred output fields.
   List<_i3.ContractOutputField> outputFields;
 
+  /// Diagnostic notes about how the extraction was performed.
   List<String> notes;
 
+  /// Short human-readable summary of the extraction result.
   String summaryMessage;
 
+  /// Returns a shallow copy of this [ContractDraft]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ContractDraft copyWith({
     String? entrypointName,
@@ -99,6 +110,8 @@ class _ContractDraftImpl extends ContractDraft {
          summaryMessage: summaryMessage,
        );
 
+  /// Returns a shallow copy of this [ContractDraft]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ContractDraft copyWith({

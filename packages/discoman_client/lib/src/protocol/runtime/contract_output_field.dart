@@ -10,9 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../runtime/python_field_type.dart' as _i2;
 
+/// A single output field inferred from a Python script's return value.
+/// Mirrors `ExtractedOutputField` from the legacy contract extraction.
 abstract class ContractOutputField implements _i1.SerializableModel {
   ContractOutputField._({
     required this.id,
@@ -40,16 +43,23 @@ abstract class ContractOutputField implements _i1.SerializableModel {
     );
   }
 
+  /// Stable draft identifier, e.g. "draft-output-1".
   String id;
 
+  /// The key under which this value appears in the returned dict.
   String outputKey;
 
+  /// Human-friendly label derived from the output key.
   String displayLabel;
 
+  /// Inferred field type.
   _i2.PythonFieldType type;
 
+  /// Hint describing how this output was inferred / should be presented.
   String presentationHint;
 
+  /// Returns a shallow copy of this [ContractOutputField]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ContractOutputField copyWith({
     String? id,
@@ -91,6 +101,8 @@ class _ContractOutputFieldImpl extends ContractOutputField {
          presentationHint: presentationHint,
        );
 
+  /// Returns a shallow copy of this [ContractOutputField]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ContractOutputField copyWith({

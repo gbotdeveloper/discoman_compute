@@ -10,9 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../../execution/models/compute_mode.dart' as _i2;
+import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
 
+/// Client-safe view of a worker for the dashboard and the creator's
+/// self-hosting UI.
 abstract class ComputeWorkerInfo implements _i1.SerializableModel {
   ComputeWorkerInfo._({
     required this.workerId,
@@ -24,6 +28,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     required this.startedAt,
     required this.lastSeenAt,
     this.currentExecutionId,
+    this.servedProjectIds,
   });
 
   factory ComputeWorkerInfo({
@@ -36,6 +41,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     required DateTime startedAt,
     required DateTime lastSeenAt,
     _i1.UuidValue? currentExecutionId,
+    List<String>? servedProjectIds,
   }) = _ComputeWorkerInfoImpl;
 
   factory ComputeWorkerInfo.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -59,6 +65,11 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
           : _i1.UuidValueJsonExtension.fromJson(
               jsonSerialization['currentExecutionId'],
             ),
+      servedProjectIds: jsonSerialization['servedProjectIds'] == null
+          ? null
+          : _i3.Protocol().deserialize<List<String>>(
+              jsonSerialization['servedProjectIds'],
+            ),
     );
   }
 
@@ -80,6 +91,12 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
 
   _i1.UuidValue? currentExecutionId;
 
+  /// Which of the creator's projects this machine is standing behind. Null
+  /// where the machine has not said yet.
+  List<String>? servedProjectIds;
+
+  /// Returns a shallow copy of this [ComputeWorkerInfo]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ComputeWorkerInfo copyWith({
     _i1.UuidValue? workerId,
@@ -91,6 +108,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     DateTime? startedAt,
     DateTime? lastSeenAt,
     _i1.UuidValue? currentExecutionId,
+    List<String>? servedProjectIds,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -106,6 +124,8 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
       'lastSeenAt': lastSeenAt.toJson(),
       if (currentExecutionId != null)
         'currentExecutionId': currentExecutionId?.toJson(),
+      if (servedProjectIds != null)
+        'servedProjectIds': servedProjectIds?.toJson(),
     };
   }
 
@@ -128,6 +148,7 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
     required DateTime startedAt,
     required DateTime lastSeenAt,
     _i1.UuidValue? currentExecutionId,
+    List<String>? servedProjectIds,
   }) : super._(
          workerId: workerId,
          mode: mode,
@@ -138,8 +159,11 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
          startedAt: startedAt,
          lastSeenAt: lastSeenAt,
          currentExecutionId: currentExecutionId,
+         servedProjectIds: servedProjectIds,
        );
 
+  /// Returns a shallow copy of this [ComputeWorkerInfo]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ComputeWorkerInfo copyWith({
@@ -152,6 +176,7 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
     DateTime? startedAt,
     DateTime? lastSeenAt,
     Object? currentExecutionId = _Undefined,
+    Object? servedProjectIds = _Undefined,
   }) {
     return ComputeWorkerInfo(
       workerId: workerId ?? this.workerId,
@@ -167,6 +192,9 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
       currentExecutionId: currentExecutionId is _i1.UuidValue?
           ? currentExecutionId
           : this.currentExecutionId,
+      servedProjectIds: servedProjectIds is List<String>?
+          ? servedProjectIds
+          : this.servedProjectIds?.map((e0) => e0).toList(),
     );
   }
 }

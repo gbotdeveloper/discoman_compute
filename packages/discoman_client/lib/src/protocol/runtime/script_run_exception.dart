@@ -10,8 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// Raised when running or inspecting a user Python script fails in a way the
+/// client should be able to display (validation errors, disallowed imports,
+/// executor errors, timeouts). The message is safe to show to the user.
 abstract class ScriptRunException
     implements _i1.SerializableException, _i1.SerializableModel {
   ScriptRunException._({
@@ -31,10 +35,15 @@ abstract class ScriptRunException
     );
   }
 
+  /// Human-readable error message safe to surface to the client.
   String message;
 
+  /// Machine-readable failure category (e.g. "disallowedImport", "timeout",
+  /// "executorError", "invalidScriptPath", "extractionFailed").
   String reason;
 
+  /// Returns a shallow copy of this [ScriptRunException]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ScriptRunException copyWith({
     String? message,
@@ -64,6 +73,8 @@ class _ScriptRunExceptionImpl extends ScriptRunException {
          reason: reason,
        );
 
+  /// Returns a shallow copy of this [ScriptRunException]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ScriptRunException copyWith({

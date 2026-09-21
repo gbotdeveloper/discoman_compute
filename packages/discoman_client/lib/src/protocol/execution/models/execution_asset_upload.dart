@@ -10,8 +10,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// One output asset sent by a worker. Base64 payload; the server validates
+/// size caps and decoded length before uploading to Firebase Storage.
 abstract class ExecutionAssetUpload implements _i1.SerializableModel {
   ExecutionAssetUpload._({
     required this.outputKey,
@@ -49,10 +52,12 @@ abstract class ExecutionAssetUpload implements _i1.SerializableModel {
 
   String outputKey;
 
+  /// image | file
   String kind;
 
   String name;
 
+  /// File extension without the dot ('extension' is reserved in model fields).
   String fileExtension;
 
   String mimeType;
@@ -61,6 +66,8 @@ abstract class ExecutionAssetUpload implements _i1.SerializableModel {
 
   String base64;
 
+  /// Returns a shallow copy of this [ExecutionAssetUpload]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ExecutionAssetUpload copyWith({
     String? outputKey,
@@ -110,6 +117,8 @@ class _ExecutionAssetUploadImpl extends ExecutionAssetUpload {
          base64: base64,
        );
 
+  /// Returns a shallow copy of this [ExecutionAssetUpload]
+  /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
   ExecutionAssetUpload copyWith({

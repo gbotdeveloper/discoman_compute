@@ -10,8 +10,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
+/// The inferred UI/data type of a Python script input or output field.
+/// Mirrors the `PythonFieldType` union from the legacy Cloud Functions runtime.
 enum PythonFieldType implements _i1.SerializableModel {
   text,
   integer,
