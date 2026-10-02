@@ -10,13 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Returned by uploadExecutionAsset: where the server stored the asset. The
 /// worker substitutes this (as the history-descriptor map shape) for the
 /// asset's value in the outputs it reports.
-abstract class ExecutionAssetRef implements _i1.SerializableModel {
+abstract class ExecutionAssetRef
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ExecutionAssetRef._({
     required this.outputKey,
     required this.kind,
@@ -70,7 +70,7 @@ abstract class ExecutionAssetRef implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ExecutionAssetRef]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ExecutionAssetRef copyWith({
     String? outputKey,
     String? kind,
@@ -97,8 +97,23 @@ abstract class ExecutionAssetRef implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ExecutionAssetRef',
+      'outputKey': outputKey,
+      'kind': kind,
+      'name': name,
+      'fileExtension': fileExtension,
+      'mimeType': mimeType,
+      'sizeBytes': sizeBytes,
+      'storagePath': storagePath,
+      'downloadUrl': downloadUrl,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -125,7 +140,7 @@ class _ExecutionAssetRefImpl extends ExecutionAssetRef {
 
   /// Returns a shallow copy of this [ExecutionAssetRef]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ExecutionAssetRef copyWith({
     String? outputKey,

@@ -10,11 +10,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Returned by computeWorker.heartbeat.
-abstract class HeartbeatResponse implements _i1.SerializableModel {
+abstract class HeartbeatResponse
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   HeartbeatResponse._({required this.cancelRequested});
 
   factory HeartbeatResponse({required bool cancelRequested}) =
@@ -22,7 +22,7 @@ abstract class HeartbeatResponse implements _i1.SerializableModel {
 
   factory HeartbeatResponse.fromJson(Map<String, dynamic> jsonSerialization) {
     return HeartbeatResponse(
-      cancelRequested: _i1.BoolJsonExtension.fromJson(
+      cancelRequested: _isc.BoolJsonExtension.fromJson(
         jsonSerialization['cancelRequested'],
       ),
     );
@@ -34,7 +34,7 @@ abstract class HeartbeatResponse implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [HeartbeatResponse]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   HeartbeatResponse copyWith({bool? cancelRequested});
   @override
   Map<String, dynamic> toJson() {
@@ -45,8 +45,16 @@ abstract class HeartbeatResponse implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'HeartbeatResponse',
+      'cancelRequested': cancelRequested,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -56,7 +64,7 @@ class _HeartbeatResponseImpl extends HeartbeatResponse {
 
   /// Returns a shallow copy of this [HeartbeatResponse]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   HeartbeatResponse copyWith({bool? cancelRequested}) {
     return HeartbeatResponse(

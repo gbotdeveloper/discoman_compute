@@ -14,10 +14,10 @@ executables:
 dependencies:
   discoman_client:
     path: ../discoman_client
-  serverpod_client: 4.0.0-beta.0
+  serverpod_client: 4.0.3
   # Provides ClientAuthSessionManager, ClientAuthSuccessStorage and AuthSuccess,
   # the same session plumbing the apps use (see tool/authenticated_client.dart).
-  serverpod_auth_core_client: 4.0.0-beta.0
+  serverpod_auth_core_client: 4.0.3
   http: ^1.2.0
   args: ^2.4.0
   crypto: ^3.0.3

@@ -8,39 +8,39 @@
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
 // ignore_for_file: invalid_use_of_internal_member
+// ignore_for_file: dead_code, unnecessary_type_check
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'execution/models/claimed_execution.dart' as _i2;
-import 'execution/models/compute_client_credential_info.dart' as _i3;
-import 'execution/models/compute_mode.dart' as _i4;
-import 'execution/models/compute_worker_info.dart' as _i5;
-import 'execution/models/created_compute_client_credential.dart' as _i6;
-import 'execution/models/creator_compute_settings.dart' as _i7;
-import 'execution/models/execution_asset_ref.dart' as _i10;
-import 'execution/models/execution_asset_upload.dart' as _i11;
-import 'execution/models/execution_kind.dart' as _i14;
-import 'execution/models/execution_outcome.dart' as _i15;
-import 'execution/models/heartbeat_response.dart' as _i20;
-import 'execution/models/worker_registration.dart' as _i22;
-import 'runtime/contract_draft.dart' as _i24;
-import 'runtime/contract_input_field.dart' as _i25;
-import 'runtime/contract_output_field.dart' as _i26;
-import 'runtime/creator_project_summary.dart' as _i27;
-import 'runtime/python_field_type.dart' as _i30;
-import 'runtime/script_location.dart' as _i31;
-import 'runtime/script_run_exception.dart' as _i32;
-import 'package:discoman_client/src/protocol/execution/models/compute_worker_info.dart'
-    as _i34;
 import 'package:discoman_client/src/protocol/execution/models/compute_client_credential_info.dart'
-    as _i35;
+    as _iywakebc;
+import 'package:discoman_client/src/protocol/execution/models/compute_worker_info.dart'
+    as _iu3gutcn;
 import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i37;
-import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
-    as _i39;
+    as _i4qtshzf;
 import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
-    as _i40;
+    as _iacc;
+import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
+    as _iaic;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import 'execution/models/claimed_execution.dart' as _iawd25jn;
+import 'execution/models/compute_client_credential_info.dart' as _ivg9lqrn;
+import 'execution/models/compute_mode.dart' as _i0in2gxv;
+import 'execution/models/compute_worker_info.dart' as _iife5tw8;
+import 'execution/models/created_compute_client_credential.dart' as _ipqdvjbs;
+import 'execution/models/creator_compute_settings.dart' as _ibbdejyk;
+import 'execution/models/execution_asset_ref.dart' as _ijgs7z7c;
+import 'execution/models/execution_asset_upload.dart' as _ivda8bev;
+import 'execution/models/execution_kind.dart' as _i1bow5es;
+import 'execution/models/execution_outcome.dart' as _iz3ik4nj;
+import 'execution/models/heartbeat_response.dart' as _iakg6oi5;
+import 'execution/models/worker_registration.dart' as _ixeou3vb;
+import 'runtime/contract_draft.dart' as _isg42qwi;
+import 'runtime/contract_input_field.dart' as _ikz23b0o;
+import 'runtime/contract_output_field.dart' as _iw4gh6q0;
+import 'runtime/creator_project_summary.dart' as _iygdtk1e;
+import 'runtime/python_field_type.dart' as _irc3xa7s;
+import 'runtime/script_location.dart' as _i7zdbq5c;
+import 'runtime/script_run_exception.dart' as _i2xjf2ew;
 export 'execution/models/claimed_execution.dart';
 export 'execution/models/compute_client_credential_info.dart';
 export 'execution/models/compute_mode.dart';
@@ -62,7 +62,7 @@ export 'runtime/script_location.dart';
 export 'runtime/script_run_exception.dart';
 export 'client.dart';
 
-class Protocol extends _i1.SerializationManager {
+class Protocol extends _isc.SerializationManager {
   Protocol._();
 
   factory Protocol() => _instance;
@@ -89,212 +89,230 @@ class Protocol extends _i1.SerializationManager {
           'className': dataClassName,
           'data': data,
         });
-      } on FormatException catch (_) {
+      } on _isc.DeserializationClassNameNotFoundException catch (_) {
         // If the className is not recognized (e.g., older client receiving
         // data with a new subtype), fall back to deserializing without the
         // className, using the expected type T.
       }
     }
 
-    if (t == _i2.ClaimedExecution) {
-      return _i2.ClaimedExecution.fromJson(data) as T;
+    if (t == _iawd25jn.ClaimedExecution) {
+      return _iawd25jn.ClaimedExecution.fromJson(data) as T;
     }
-    if (t == _i3.ComputeClientCredentialInfo) {
-      return _i3.ComputeClientCredentialInfo.fromJson(data) as T;
+    if (t == _ivg9lqrn.ComputeClientCredentialInfo) {
+      return _ivg9lqrn.ComputeClientCredentialInfo.fromJson(data) as T;
     }
-    if (t == _i4.ComputeMode) {
-      return _i4.ComputeMode.fromJson(data) as T;
+    if (t == _i0in2gxv.ComputeMode) {
+      return _i0in2gxv.ComputeMode.fromJson(data) as T;
     }
-    if (t == _i5.ComputeWorkerInfo) {
-      return _i5.ComputeWorkerInfo.fromJson(data) as T;
+    if (t == _iife5tw8.ComputeWorkerInfo) {
+      return _iife5tw8.ComputeWorkerInfo.fromJson(data) as T;
     }
-    if (t == _i6.CreatedComputeClientCredential) {
-      return _i6.CreatedComputeClientCredential.fromJson(data) as T;
+    if (t == _ipqdvjbs.CreatedComputeClientCredential) {
+      return _ipqdvjbs.CreatedComputeClientCredential.fromJson(data) as T;
     }
-    if (t == _i7.CreatorComputeSettings) {
-      return _i7.CreatorComputeSettings.fromJson(data) as T;
+    if (t == _ibbdejyk.CreatorComputeSettings) {
+      return _ibbdejyk.CreatorComputeSettings.fromJson(data) as T;
     }
-    if (t == _i10.ExecutionAssetRef) {
-      return _i10.ExecutionAssetRef.fromJson(data) as T;
+    if (t == _ijgs7z7c.ExecutionAssetRef) {
+      return _ijgs7z7c.ExecutionAssetRef.fromJson(data) as T;
     }
-    if (t == _i11.ExecutionAssetUpload) {
-      return _i11.ExecutionAssetUpload.fromJson(data) as T;
+    if (t == _ivda8bev.ExecutionAssetUpload) {
+      return _ivda8bev.ExecutionAssetUpload.fromJson(data) as T;
     }
-    if (t == _i14.ExecutionKind) {
-      return _i14.ExecutionKind.fromJson(data) as T;
+    if (t == _i1bow5es.ExecutionKind) {
+      return _i1bow5es.ExecutionKind.fromJson(data) as T;
     }
-    if (t == _i15.ExecutionOutcome) {
-      return _i15.ExecutionOutcome.fromJson(data) as T;
+    if (t == _iz3ik4nj.ExecutionOutcome) {
+      return _iz3ik4nj.ExecutionOutcome.fromJson(data) as T;
     }
-    if (t == _i20.HeartbeatResponse) {
-      return _i20.HeartbeatResponse.fromJson(data) as T;
+    if (t == _iakg6oi5.HeartbeatResponse) {
+      return _iakg6oi5.HeartbeatResponse.fromJson(data) as T;
     }
-    if (t == _i22.WorkerRegistration) {
-      return _i22.WorkerRegistration.fromJson(data) as T;
+    if (t == _ixeou3vb.WorkerRegistration) {
+      return _ixeou3vb.WorkerRegistration.fromJson(data) as T;
     }
-    if (t == _i24.ContractDraft) {
-      return _i24.ContractDraft.fromJson(data) as T;
+    if (t == _isg42qwi.ContractDraft) {
+      return _isg42qwi.ContractDraft.fromJson(data) as T;
     }
-    if (t == _i25.ContractInputField) {
-      return _i25.ContractInputField.fromJson(data) as T;
+    if (t == _ikz23b0o.ContractInputField) {
+      return _ikz23b0o.ContractInputField.fromJson(data) as T;
     }
-    if (t == _i26.ContractOutputField) {
-      return _i26.ContractOutputField.fromJson(data) as T;
+    if (t == _iw4gh6q0.ContractOutputField) {
+      return _iw4gh6q0.ContractOutputField.fromJson(data) as T;
     }
-    if (t == _i27.CreatorProjectSummary) {
-      return _i27.CreatorProjectSummary.fromJson(data) as T;
+    if (t == _iygdtk1e.CreatorProjectSummary) {
+      return _iygdtk1e.CreatorProjectSummary.fromJson(data) as T;
     }
-    if (t == _i30.PythonFieldType) {
-      return _i30.PythonFieldType.fromJson(data) as T;
+    if (t == _irc3xa7s.PythonFieldType) {
+      return _irc3xa7s.PythonFieldType.fromJson(data) as T;
     }
-    if (t == _i31.ScriptLocation) {
-      return _i31.ScriptLocation.fromJson(data) as T;
+    if (t == _i7zdbq5c.ScriptLocation) {
+      return _i7zdbq5c.ScriptLocation.fromJson(data) as T;
     }
-    if (t == _i32.ScriptRunException) {
-      return _i32.ScriptRunException.fromJson(data) as T;
+    if (t == _i2xjf2ew.ScriptRunException) {
+      return _i2xjf2ew.ScriptRunException.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i2.ClaimedExecution?>()) {
-      return (data != null ? _i2.ClaimedExecution.fromJson(data) : null) as T;
+    if (t == _isc.getType<_iawd25jn.ClaimedExecution?>()) {
+      return (data != null ? _iawd25jn.ClaimedExecution.fromJson(data) : null)
+          as T;
     }
-    if (t == _i1.getType<_i3.ComputeClientCredentialInfo?>()) {
+    if (t == _isc.getType<_ivg9lqrn.ComputeClientCredentialInfo?>()) {
       return (data != null
-              ? _i3.ComputeClientCredentialInfo.fromJson(data)
+              ? _ivg9lqrn.ComputeClientCredentialInfo.fromJson(data)
               : null)
           as T;
     }
-    if (t == _i1.getType<_i4.ComputeMode?>()) {
-      return (data != null ? _i4.ComputeMode.fromJson(data) : null) as T;
+    if (t == _isc.getType<_i0in2gxv.ComputeMode?>()) {
+      return (data != null ? _i0in2gxv.ComputeMode.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i5.ComputeWorkerInfo?>()) {
-      return (data != null ? _i5.ComputeWorkerInfo.fromJson(data) : null) as T;
+    if (t == _isc.getType<_iife5tw8.ComputeWorkerInfo?>()) {
+      return (data != null ? _iife5tw8.ComputeWorkerInfo.fromJson(data) : null)
+          as T;
     }
-    if (t == _i1.getType<_i6.CreatedComputeClientCredential?>()) {
+    if (t == _isc.getType<_ipqdvjbs.CreatedComputeClientCredential?>()) {
       return (data != null
-              ? _i6.CreatedComputeClientCredential.fromJson(data)
+              ? _ipqdvjbs.CreatedComputeClientCredential.fromJson(data)
               : null)
           as T;
     }
-    if (t == _i1.getType<_i7.CreatorComputeSettings?>()) {
-      return (data != null ? _i7.CreatorComputeSettings.fromJson(data) : null)
+    if (t == _isc.getType<_ibbdejyk.CreatorComputeSettings?>()) {
+      return (data != null
+              ? _ibbdejyk.CreatorComputeSettings.fromJson(data)
+              : null)
           as T;
     }
-    if (t == _i1.getType<_i10.ExecutionAssetRef?>()) {
-      return (data != null ? _i10.ExecutionAssetRef.fromJson(data) : null) as T;
-    }
-    if (t == _i1.getType<_i11.ExecutionAssetUpload?>()) {
-      return (data != null ? _i11.ExecutionAssetUpload.fromJson(data) : null)
+    if (t == _isc.getType<_ijgs7z7c.ExecutionAssetRef?>()) {
+      return (data != null ? _ijgs7z7c.ExecutionAssetRef.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i14.ExecutionKind?>()) {
-      return (data != null ? _i14.ExecutionKind.fromJson(data) : null) as T;
-    }
-    if (t == _i1.getType<_i15.ExecutionOutcome?>()) {
-      return (data != null ? _i15.ExecutionOutcome.fromJson(data) : null) as T;
-    }
-    if (t == _i1.getType<_i20.HeartbeatResponse?>()) {
-      return (data != null ? _i20.HeartbeatResponse.fromJson(data) : null) as T;
-    }
-    if (t == _i1.getType<_i22.WorkerRegistration?>()) {
-      return (data != null ? _i22.WorkerRegistration.fromJson(data) : null)
+    if (t == _isc.getType<_ivda8bev.ExecutionAssetUpload?>()) {
+      return (data != null
+              ? _ivda8bev.ExecutionAssetUpload.fromJson(data)
+              : null)
           as T;
     }
-    if (t == _i1.getType<_i24.ContractDraft?>()) {
-      return (data != null ? _i24.ContractDraft.fromJson(data) : null) as T;
-    }
-    if (t == _i1.getType<_i25.ContractInputField?>()) {
-      return (data != null ? _i25.ContractInputField.fromJson(data) : null)
+    if (t == _isc.getType<_i1bow5es.ExecutionKind?>()) {
+      return (data != null ? _i1bow5es.ExecutionKind.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i26.ContractOutputField?>()) {
-      return (data != null ? _i26.ContractOutputField.fromJson(data) : null)
+    if (t == _isc.getType<_iz3ik4nj.ExecutionOutcome?>()) {
+      return (data != null ? _iz3ik4nj.ExecutionOutcome.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i27.CreatorProjectSummary?>()) {
-      return (data != null ? _i27.CreatorProjectSummary.fromJson(data) : null)
+    if (t == _isc.getType<_iakg6oi5.HeartbeatResponse?>()) {
+      return (data != null ? _iakg6oi5.HeartbeatResponse.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i30.PythonFieldType?>()) {
-      return (data != null ? _i30.PythonFieldType.fromJson(data) : null) as T;
+    if (t == _isc.getType<_ixeou3vb.WorkerRegistration?>()) {
+      return (data != null ? _ixeou3vb.WorkerRegistration.fromJson(data) : null)
+          as T;
     }
-    if (t == _i1.getType<_i31.ScriptLocation?>()) {
-      return (data != null ? _i31.ScriptLocation.fromJson(data) : null) as T;
+    if (t == _isc.getType<_isg42qwi.ContractDraft?>()) {
+      return (data != null ? _isg42qwi.ContractDraft.fromJson(data) : null)
+          as T;
     }
-    if (t == _i1.getType<_i32.ScriptRunException?>()) {
-      return (data != null ? _i32.ScriptRunException.fromJson(data) : null)
+    if (t == _isc.getType<_ikz23b0o.ContractInputField?>()) {
+      return (data != null ? _ikz23b0o.ContractInputField.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_iw4gh6q0.ContractOutputField?>()) {
+      return (data != null
+              ? _iw4gh6q0.ContractOutputField.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _isc.getType<_iygdtk1e.CreatorProjectSummary?>()) {
+      return (data != null
+              ? _iygdtk1e.CreatorProjectSummary.fromJson(data)
+              : null)
+          as T;
+    }
+    if (t == _isc.getType<_irc3xa7s.PythonFieldType?>()) {
+      return (data != null ? _irc3xa7s.PythonFieldType.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_i7zdbq5c.ScriptLocation?>()) {
+      return (data != null ? _i7zdbq5c.ScriptLocation.fromJson(data) : null)
+          as T;
+    }
+    if (t == _isc.getType<_i2xjf2ew.ScriptRunException?>()) {
+      return (data != null ? _i2xjf2ew.ScriptRunException.fromJson(data) : null)
           as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == _i1.getType<List<String>?>()) {
+    if (t == _isc.getType<List<String>?>()) {
       return (data != null
               ? (data as List).map((e) => deserialize<String>(e)).toList()
               : null)
           as T;
     }
-    if (t == List<_i25.ContractInputField>) {
+    if (t == List<_ikz23b0o.ContractInputField>) {
       return (data as List)
-              .map((e) => deserialize<_i25.ContractInputField>(e))
+              .map((e) => deserialize<_ikz23b0o.ContractInputField>(e))
               .toList()
           as T;
     }
-    if (t == List<_i26.ContractOutputField>) {
+    if (t == List<_iw4gh6q0.ContractOutputField>) {
       return (data as List)
-              .map((e) => deserialize<_i26.ContractOutputField>(e))
+              .map((e) => deserialize<_iw4gh6q0.ContractOutputField>(e))
               .toList()
           as T;
     }
-    if (t == List<_i34.ComputeWorkerInfo>) {
+    if (t == List<_iu3gutcn.ComputeWorkerInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i34.ComputeWorkerInfo>(e))
+              .map((e) => deserialize<_iu3gutcn.ComputeWorkerInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i35.ComputeClientCredentialInfo>) {
+    if (t == List<_iywakebc.ComputeClientCredentialInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i35.ComputeClientCredentialInfo>(e))
+              .map((e) => deserialize<_iywakebc.ComputeClientCredentialInfo>(e))
               .toList()
           as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i37.CreatorProjectSummary>) {
+    if (t == List<_i4qtshzf.CreatorProjectSummary>) {
       return (data as List)
-              .map((e) => deserialize<_i37.CreatorProjectSummary>(e))
+              .map((e) => deserialize<_i4qtshzf.CreatorProjectSummary>(e))
               .toList()
           as T;
     }
     try {
-      return _i39.Protocol().deserialize<T>(data, t);
-    } on _i1.DeserializationTypeNotFoundException catch (_) {}
+      return _iaic.Protocol().deserialize<T>(data, t);
+    } on _isc.DeserializationTypeNotFoundException catch (_) {}
     try {
-      return _i40.Protocol().deserialize<T>(data, t);
-    } on _i1.DeserializationTypeNotFoundException catch (_) {}
+      return _iacc.Protocol().deserialize<T>(data, t);
+    } on _isc.DeserializationTypeNotFoundException catch (_) {}
     return super.deserialize<T>(data, t);
   }
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i2.ClaimedExecution => 'ClaimedExecution',
-      _i3.ComputeClientCredentialInfo => 'ComputeClientCredentialInfo',
-      _i4.ComputeMode => 'ComputeMode',
-      _i5.ComputeWorkerInfo => 'ComputeWorkerInfo',
-      _i6.CreatedComputeClientCredential => 'CreatedComputeClientCredential',
-      _i7.CreatorComputeSettings => 'CreatorComputeSettings',
-      _i10.ExecutionAssetRef => 'ExecutionAssetRef',
-      _i11.ExecutionAssetUpload => 'ExecutionAssetUpload',
-      _i14.ExecutionKind => 'ExecutionKind',
-      _i15.ExecutionOutcome => 'ExecutionOutcome',
-      _i20.HeartbeatResponse => 'HeartbeatResponse',
-      _i22.WorkerRegistration => 'WorkerRegistration',
-      _i24.ContractDraft => 'ContractDraft',
-      _i25.ContractInputField => 'ContractInputField',
-      _i26.ContractOutputField => 'ContractOutputField',
-      _i27.CreatorProjectSummary => 'CreatorProjectSummary',
-      _i30.PythonFieldType => 'PythonFieldType',
-      _i31.ScriptLocation => 'ScriptLocation',
-      _i32.ScriptRunException => 'ScriptRunException',
+      _iawd25jn.ClaimedExecution => 'ClaimedExecution',
+      _ivg9lqrn.ComputeClientCredentialInfo => 'ComputeClientCredentialInfo',
+      _i0in2gxv.ComputeMode => 'ComputeMode',
+      _iife5tw8.ComputeWorkerInfo => 'ComputeWorkerInfo',
+      _ipqdvjbs.CreatedComputeClientCredential =>
+        'CreatedComputeClientCredential',
+      _ibbdejyk.CreatorComputeSettings => 'CreatorComputeSettings',
+      _ijgs7z7c.ExecutionAssetRef => 'ExecutionAssetRef',
+      _ivda8bev.ExecutionAssetUpload => 'ExecutionAssetUpload',
+      _i1bow5es.ExecutionKind => 'ExecutionKind',
+      _iz3ik4nj.ExecutionOutcome => 'ExecutionOutcome',
+      _iakg6oi5.HeartbeatResponse => 'HeartbeatResponse',
+      _ixeou3vb.WorkerRegistration => 'WorkerRegistration',
+      _isg42qwi.ContractDraft => 'ContractDraft',
+      _ikz23b0o.ContractInputField => 'ContractInputField',
+      _iw4gh6q0.ContractOutputField => 'ContractOutputField',
+      _iygdtk1e.CreatorProjectSummary => 'CreatorProjectSummary',
+      _irc3xa7s.PythonFieldType => 'PythonFieldType',
+      _i7zdbq5c.ScriptLocation => 'ScriptLocation',
+      _i2xjf2ew.ScriptRunException => 'ScriptRunException',
       _ => null,
     };
   }
@@ -309,52 +327,52 @@ class Protocol extends _i1.SerializationManager {
     }
 
     switch (data) {
-      case _i2.ClaimedExecution():
+      case _iawd25jn.ClaimedExecution():
         return 'ClaimedExecution';
-      case _i3.ComputeClientCredentialInfo():
+      case _ivg9lqrn.ComputeClientCredentialInfo():
         return 'ComputeClientCredentialInfo';
-      case _i4.ComputeMode():
+      case _i0in2gxv.ComputeMode():
         return 'ComputeMode';
-      case _i5.ComputeWorkerInfo():
+      case _iife5tw8.ComputeWorkerInfo():
         return 'ComputeWorkerInfo';
-      case _i6.CreatedComputeClientCredential():
+      case _ipqdvjbs.CreatedComputeClientCredential():
         return 'CreatedComputeClientCredential';
-      case _i7.CreatorComputeSettings():
+      case _ibbdejyk.CreatorComputeSettings():
         return 'CreatorComputeSettings';
-      case _i10.ExecutionAssetRef():
+      case _ijgs7z7c.ExecutionAssetRef():
         return 'ExecutionAssetRef';
-      case _i11.ExecutionAssetUpload():
+      case _ivda8bev.ExecutionAssetUpload():
         return 'ExecutionAssetUpload';
-      case _i14.ExecutionKind():
+      case _i1bow5es.ExecutionKind():
         return 'ExecutionKind';
-      case _i15.ExecutionOutcome():
+      case _iz3ik4nj.ExecutionOutcome():
         return 'ExecutionOutcome';
-      case _i20.HeartbeatResponse():
+      case _iakg6oi5.HeartbeatResponse():
         return 'HeartbeatResponse';
-      case _i22.WorkerRegistration():
+      case _ixeou3vb.WorkerRegistration():
         return 'WorkerRegistration';
-      case _i24.ContractDraft():
+      case _isg42qwi.ContractDraft():
         return 'ContractDraft';
-      case _i25.ContractInputField():
+      case _ikz23b0o.ContractInputField():
         return 'ContractInputField';
-      case _i26.ContractOutputField():
+      case _iw4gh6q0.ContractOutputField():
         return 'ContractOutputField';
-      case _i27.CreatorProjectSummary():
+      case _iygdtk1e.CreatorProjectSummary():
         return 'CreatorProjectSummary';
-      case _i30.PythonFieldType():
+      case _irc3xa7s.PythonFieldType():
         return 'PythonFieldType';
-      case _i31.ScriptLocation():
+      case _i7zdbq5c.ScriptLocation():
         return 'ScriptLocation';
-      case _i32.ScriptRunException():
+      case _i2xjf2ew.ScriptRunException():
         return 'ScriptRunException';
     }
-    className = _i39.Protocol().getClassNameForObject(data);
+    className = _iaic.Protocol().getClassNameForObject(data);
     if (className != null) {
       return className.contains('.')
           ? className
           : 'serverpod_auth_idp.$className';
     }
-    className = _i40.Protocol().getClassNameForObject(data);
+    className = _iacc.Protocol().getClassNameForObject(data);
     if (className != null) {
       return className.contains('.')
           ? className
@@ -370,76 +388,78 @@ class Protocol extends _i1.SerializationManager {
       return super.deserializeByClassName(data);
     }
     if (dataClassName == 'ClaimedExecution') {
-      return deserialize<_i2.ClaimedExecution>(data['data']);
+      return deserialize<_iawd25jn.ClaimedExecution>(data['data']);
     }
     if (dataClassName == 'ComputeClientCredentialInfo') {
-      return deserialize<_i3.ComputeClientCredentialInfo>(data['data']);
+      return deserialize<_ivg9lqrn.ComputeClientCredentialInfo>(data['data']);
     }
     if (dataClassName == 'ComputeMode') {
-      return deserialize<_i4.ComputeMode>(data['data']);
+      return deserialize<_i0in2gxv.ComputeMode>(data['data']);
     }
     if (dataClassName == 'ComputeWorkerInfo') {
-      return deserialize<_i5.ComputeWorkerInfo>(data['data']);
+      return deserialize<_iife5tw8.ComputeWorkerInfo>(data['data']);
     }
     if (dataClassName == 'CreatedComputeClientCredential') {
-      return deserialize<_i6.CreatedComputeClientCredential>(data['data']);
+      return deserialize<_ipqdvjbs.CreatedComputeClientCredential>(
+        data['data'],
+      );
     }
     if (dataClassName == 'CreatorComputeSettings') {
-      return deserialize<_i7.CreatorComputeSettings>(data['data']);
+      return deserialize<_ibbdejyk.CreatorComputeSettings>(data['data']);
     }
     if (dataClassName == 'ExecutionAssetRef') {
-      return deserialize<_i10.ExecutionAssetRef>(data['data']);
+      return deserialize<_ijgs7z7c.ExecutionAssetRef>(data['data']);
     }
     if (dataClassName == 'ExecutionAssetUpload') {
-      return deserialize<_i11.ExecutionAssetUpload>(data['data']);
+      return deserialize<_ivda8bev.ExecutionAssetUpload>(data['data']);
     }
     if (dataClassName == 'ExecutionKind') {
-      return deserialize<_i14.ExecutionKind>(data['data']);
+      return deserialize<_i1bow5es.ExecutionKind>(data['data']);
     }
     if (dataClassName == 'ExecutionOutcome') {
-      return deserialize<_i15.ExecutionOutcome>(data['data']);
+      return deserialize<_iz3ik4nj.ExecutionOutcome>(data['data']);
     }
     if (dataClassName == 'HeartbeatResponse') {
-      return deserialize<_i20.HeartbeatResponse>(data['data']);
+      return deserialize<_iakg6oi5.HeartbeatResponse>(data['data']);
     }
     if (dataClassName == 'WorkerRegistration') {
-      return deserialize<_i22.WorkerRegistration>(data['data']);
+      return deserialize<_ixeou3vb.WorkerRegistration>(data['data']);
     }
     if (dataClassName == 'ContractDraft') {
-      return deserialize<_i24.ContractDraft>(data['data']);
+      return deserialize<_isg42qwi.ContractDraft>(data['data']);
     }
     if (dataClassName == 'ContractInputField') {
-      return deserialize<_i25.ContractInputField>(data['data']);
+      return deserialize<_ikz23b0o.ContractInputField>(data['data']);
     }
     if (dataClassName == 'ContractOutputField') {
-      return deserialize<_i26.ContractOutputField>(data['data']);
+      return deserialize<_iw4gh6q0.ContractOutputField>(data['data']);
     }
     if (dataClassName == 'CreatorProjectSummary') {
-      return deserialize<_i27.CreatorProjectSummary>(data['data']);
+      return deserialize<_iygdtk1e.CreatorProjectSummary>(data['data']);
     }
     if (dataClassName == 'PythonFieldType') {
-      return deserialize<_i30.PythonFieldType>(data['data']);
+      return deserialize<_irc3xa7s.PythonFieldType>(data['data']);
     }
     if (dataClassName == 'ScriptLocation') {
-      return deserialize<_i31.ScriptLocation>(data['data']);
+      return deserialize<_i7zdbq5c.ScriptLocation>(data['data']);
     }
     if (dataClassName == 'ScriptRunException') {
-      return deserialize<_i32.ScriptRunException>(data['data']);
+      return deserialize<_i2xjf2ew.ScriptRunException>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
-      return _i39.Protocol().deserializeByClassName(data);
+      return _iaic.Protocol().deserializeByClassName(data);
     }
     if (dataClassName.startsWith('serverpod_auth_core.')) {
       data['className'] = dataClassName.substring(20);
-      return _i40.Protocol().deserializeByClassName(data);
+      return _iacc.Protocol().deserializeByClassName(data);
     }
     return super.deserializeByClassName(data);
   }
 
   void _registerHostProtocols() {
-    _i39.Protocol().registerHostProtocol('discoman', this);
-    _i40.Protocol().registerHostProtocol('discoman', this);
+    _iaic.Protocol().registerHostProtocol('discoman', this);
+    _iacc.Protocol().registerHostProtocol('discoman', this);
   }
 
   @override
@@ -455,10 +475,10 @@ class Protocol extends _i1.SerializationManager {
       return null;
     }
     try {
-      return _i39.Protocol().mapRecordToJson(record);
+      return _iaic.Protocol().mapRecordToJson(record);
     } catch (_) {}
     try {
-      return _i40.Protocol().mapRecordToJson(record);
+      return _iacc.Protocol().mapRecordToJson(record);
     } catch (_) {}
     throw Exception('Unsupported record type ${record.runtimeType}');
   }

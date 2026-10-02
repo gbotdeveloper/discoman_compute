@@ -10,13 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Returned by computeWorker.register: the worker's id plus the cadence the
 /// server expects (heartbeat interval and lease length are server-owned so
 /// they can be tuned without shipping new workers).
-abstract class WorkerRegistration implements _i1.SerializableModel {
+abstract class WorkerRegistration
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   WorkerRegistration._({
     required this.workerId,
     required this.heartbeatIntervalSeconds,
@@ -24,14 +24,14 @@ abstract class WorkerRegistration implements _i1.SerializableModel {
   });
 
   factory WorkerRegistration({
-    required _i1.UuidValue workerId,
+    required _isc.UuidValue workerId,
     required int heartbeatIntervalSeconds,
     required int leaseSeconds,
   }) = _WorkerRegistrationImpl;
 
   factory WorkerRegistration.fromJson(Map<String, dynamic> jsonSerialization) {
     return WorkerRegistration(
-      workerId: _i1.UuidValueJsonExtension.fromJson(
+      workerId: _isc.UuidValueJsonExtension.fromJson(
         jsonSerialization['workerId'],
       ),
       heartbeatIntervalSeconds:
@@ -40,7 +40,7 @@ abstract class WorkerRegistration implements _i1.SerializableModel {
     );
   }
 
-  _i1.UuidValue workerId;
+  _isc.UuidValue workerId;
 
   int heartbeatIntervalSeconds;
 
@@ -48,9 +48,9 @@ abstract class WorkerRegistration implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [WorkerRegistration]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   WorkerRegistration copyWith({
-    _i1.UuidValue? workerId,
+    _isc.UuidValue? workerId,
     int? heartbeatIntervalSeconds,
     int? leaseSeconds,
   });
@@ -65,14 +65,24 @@ abstract class WorkerRegistration implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'WorkerRegistration',
+      'workerId': workerId.toJson(),
+      'heartbeatIntervalSeconds': heartbeatIntervalSeconds,
+      'leaseSeconds': leaseSeconds,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
 class _WorkerRegistrationImpl extends WorkerRegistration {
   _WorkerRegistrationImpl({
-    required _i1.UuidValue workerId,
+    required _isc.UuidValue workerId,
     required int heartbeatIntervalSeconds,
     required int leaseSeconds,
   }) : super._(
@@ -83,10 +93,10 @@ class _WorkerRegistrationImpl extends WorkerRegistration {
 
   /// Returns a shallow copy of this [WorkerRegistration]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   WorkerRegistration copyWith({
-    _i1.UuidValue? workerId,
+    _isc.UuidValue? workerId,
     int? heartbeatIntervalSeconds,
     int? leaseSeconds,
   }) {

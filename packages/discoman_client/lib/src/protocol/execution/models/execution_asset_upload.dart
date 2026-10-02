@@ -10,12 +10,12 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// One output asset sent by a worker. Base64 payload; the server validates
 /// size caps and decoded length before uploading to Firebase Storage.
-abstract class ExecutionAssetUpload implements _i1.SerializableModel {
+abstract class ExecutionAssetUpload
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ExecutionAssetUpload._({
     required this.outputKey,
     required this.kind,
@@ -68,7 +68,7 @@ abstract class ExecutionAssetUpload implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ExecutionAssetUpload]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ExecutionAssetUpload copyWith({
     String? outputKey,
     String? kind,
@@ -93,8 +93,22 @@ abstract class ExecutionAssetUpload implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ExecutionAssetUpload',
+      'outputKey': outputKey,
+      'kind': kind,
+      'name': name,
+      'fileExtension': fileExtension,
+      'mimeType': mimeType,
+      'sizeBytes': sizeBytes,
+      'base64': base64,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -119,7 +133,7 @@ class _ExecutionAssetUploadImpl extends ExecutionAssetUpload {
 
   /// Returns a shallow copy of this [ExecutionAssetUpload]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ExecutionAssetUpload copyWith({
     String? outputKey,

@@ -10,14 +10,14 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import '../../execution/models/compute_mode.dart' as _i2;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
+import 'package:discoman_client/src/protocol/protocol.dart' as _iy9hkqa4;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import '../../execution/models/compute_mode.dart' as _ij2201jp;
 
 /// Client-safe view of a worker for the dashboard and the creator's
 /// self-hosting UI.
-abstract class ComputeWorkerInfo implements _i1.SerializableModel {
+abstract class ComputeWorkerInfo
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ComputeWorkerInfo._({
     required this.workerId,
     required this.mode,
@@ -32,50 +32,52 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
   });
 
   factory ComputeWorkerInfo({
-    required _i1.UuidValue workerId,
-    required _i2.ComputeMode mode,
+    required _isc.UuidValue workerId,
+    required _ij2201jp.ComputeMode mode,
     String? creatorFirebaseUid,
     String? hostname,
     String? version,
     required bool online,
     required DateTime startedAt,
     required DateTime lastSeenAt,
-    _i1.UuidValue? currentExecutionId,
+    _isc.UuidValue? currentExecutionId,
     List<String>? servedProjectIds,
   }) = _ComputeWorkerInfoImpl;
 
   factory ComputeWorkerInfo.fromJson(Map<String, dynamic> jsonSerialization) {
     return ComputeWorkerInfo(
-      workerId: _i1.UuidValueJsonExtension.fromJson(
+      workerId: _isc.UuidValueJsonExtension.fromJson(
         jsonSerialization['workerId'],
       ),
-      mode: _i2.ComputeMode.fromJson((jsonSerialization['mode'] as String)),
+      mode: _ij2201jp.ComputeMode.fromJson(
+        (jsonSerialization['mode'] as String),
+      ),
       creatorFirebaseUid: jsonSerialization['creatorFirebaseUid'] as String?,
       hostname: jsonSerialization['hostname'] as String?,
       version: jsonSerialization['version'] as String?,
-      online: _i1.BoolJsonExtension.fromJson(jsonSerialization['online']),
-      startedAt: _i1.DateTimeJsonExtension.fromJson(
+      online: _isc.BoolJsonExtension.fromJson(jsonSerialization['online']),
+      startedAt: _isc.DateTimeJsonExtension.fromJson(
         jsonSerialization['startedAt'],
       ),
-      lastSeenAt: _i1.DateTimeJsonExtension.fromJson(
+      lastSeenAt: _isc.DateTimeJsonExtension.fromJson(
         jsonSerialization['lastSeenAt'],
       ),
       currentExecutionId: jsonSerialization['currentExecutionId'] == null
           ? null
-          : _i1.UuidValueJsonExtension.fromJson(
+          : _isc.UuidValueJsonExtension.fromJson(
               jsonSerialization['currentExecutionId'],
             ),
       servedProjectIds: jsonSerialization['servedProjectIds'] == null
           ? null
-          : _i3.Protocol().deserialize<List<String>>(
+          : _iy9hkqa4.Protocol().deserialize<List<String>>(
               jsonSerialization['servedProjectIds'],
             ),
     );
   }
 
-  _i1.UuidValue workerId;
+  _isc.UuidValue workerId;
 
-  _i2.ComputeMode mode;
+  _ij2201jp.ComputeMode mode;
 
   String? creatorFirebaseUid;
 
@@ -89,7 +91,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
 
   DateTime lastSeenAt;
 
-  _i1.UuidValue? currentExecutionId;
+  _isc.UuidValue? currentExecutionId;
 
   /// Which of the creator's projects this machine is standing behind. Null
   /// where the machine has not said yet.
@@ -97,17 +99,17 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ComputeWorkerInfo]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ComputeWorkerInfo copyWith({
-    _i1.UuidValue? workerId,
-    _i2.ComputeMode? mode,
+    _isc.UuidValue? workerId,
+    _ij2201jp.ComputeMode? mode,
     String? creatorFirebaseUid,
     String? hostname,
     String? version,
     bool? online,
     DateTime? startedAt,
     DateTime? lastSeenAt,
-    _i1.UuidValue? currentExecutionId,
+    _isc.UuidValue? currentExecutionId,
     List<String>? servedProjectIds,
   });
   @override
@@ -130,8 +132,27 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ComputeWorkerInfo',
+      'workerId': workerId.toJson(),
+      'mode': mode.toJson(),
+      if (creatorFirebaseUid != null) 'creatorFirebaseUid': creatorFirebaseUid,
+      if (hostname != null) 'hostname': hostname,
+      if (version != null) 'version': version,
+      'online': online,
+      'startedAt': startedAt.toJson(),
+      'lastSeenAt': lastSeenAt.toJson(),
+      if (currentExecutionId != null)
+        'currentExecutionId': currentExecutionId?.toJson(),
+      if (servedProjectIds != null)
+        'servedProjectIds': servedProjectIds?.toJson(),
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -139,15 +160,15 @@ class _Undefined {}
 
 class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
   _ComputeWorkerInfoImpl({
-    required _i1.UuidValue workerId,
-    required _i2.ComputeMode mode,
+    required _isc.UuidValue workerId,
+    required _ij2201jp.ComputeMode mode,
     String? creatorFirebaseUid,
     String? hostname,
     String? version,
     required bool online,
     required DateTime startedAt,
     required DateTime lastSeenAt,
-    _i1.UuidValue? currentExecutionId,
+    _isc.UuidValue? currentExecutionId,
     List<String>? servedProjectIds,
   }) : super._(
          workerId: workerId,
@@ -164,11 +185,11 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
 
   /// Returns a shallow copy of this [ComputeWorkerInfo]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ComputeWorkerInfo copyWith({
-    _i1.UuidValue? workerId,
-    _i2.ComputeMode? mode,
+    _isc.UuidValue? workerId,
+    _ij2201jp.ComputeMode? mode,
     Object? creatorFirebaseUid = _Undefined,
     Object? hostname = _Undefined,
     Object? version = _Undefined,
@@ -189,7 +210,7 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
       online: online ?? this.online,
       startedAt: startedAt ?? this.startedAt,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
-      currentExecutionId: currentExecutionId is _i1.UuidValue?
+      currentExecutionId: currentExecutionId is _isc.UuidValue?
           ? currentExecutionId
           : this.currentExecutionId,
       servedProjectIds: servedProjectIds is List<String>?

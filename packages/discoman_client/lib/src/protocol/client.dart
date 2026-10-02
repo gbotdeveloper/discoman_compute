@@ -10,41 +10,40 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
-    as _i1;
-import 'package:serverpod_client/serverpod_client.dart' as _i2;
-import 'dart:async' as _i3;
-import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
-    as _i4;
-import 'package:discoman_client/src/protocol/execution/models/creator_compute_settings.dart'
-    as _i6;
-import 'package:discoman_client/src/protocol/execution/models/compute_mode.dart'
-    as _i7;
-import 'package:discoman_client/src/protocol/execution/models/compute_worker_info.dart'
-    as _i8;
-import 'package:discoman_client/src/protocol/execution/models/created_compute_client_credential.dart'
-    as _i9;
-import 'package:discoman_client/src/protocol/execution/models/compute_client_credential_info.dart'
-    as _i10;
-import 'package:discoman_client/src/protocol/execution/models/worker_registration.dart'
-    as _i11;
+import 'dart:async' as _ida;
 import 'package:discoman_client/src/protocol/execution/models/claimed_execution.dart'
-    as _i12;
-import 'package:discoman_client/src/protocol/execution/models/heartbeat_response.dart'
-    as _i13;
+    as _il9ps7wn;
+import 'package:discoman_client/src/protocol/execution/models/compute_client_credential_info.dart'
+    as _iywakebc;
+import 'package:discoman_client/src/protocol/execution/models/compute_mode.dart'
+    as _ibr0is37;
+import 'package:discoman_client/src/protocol/execution/models/compute_worker_info.dart'
+    as _iu3gutcn;
+import 'package:discoman_client/src/protocol/execution/models/created_compute_client_credential.dart'
+    as _iqpenjjc;
+import 'package:discoman_client/src/protocol/execution/models/creator_compute_settings.dart'
+    as _il57mzp3;
 import 'package:discoman_client/src/protocol/execution/models/execution_asset_ref.dart'
-    as _i14;
+    as _ioaawgzi;
 import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload.dart'
-    as _i15;
+    as _itmbcnyn;
 import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
-    as _i16;
-import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i26;
+    as _iftp3wwi;
+import 'package:discoman_client/src/protocol/execution/models/heartbeat_response.dart'
+    as _irjjqoev;
+import 'package:discoman_client/src/protocol/execution/models/worker_registration.dart'
+    as _inbbf50m;
 import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
-    as _i27;
-import 'package:http/http.dart' as _i29;
-import 'protocol.dart' as _i30;
+    as _idmvvsng;
+import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
+    as _i4qtshzf;
+import 'package:http/http.dart' as _i85jenna;
+import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
+    as _iacc;
+import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
+    as _iaic;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import 'protocol.dart' as _il2as5qe;
 
 /// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider
 /// endpoint is made available on the server.
@@ -55,22 +54,22 @@ import 'protocol.dart' as _i30;
 /// instead, so the backend authenticates against a session it owns — and can
 /// therefore revoke.
 /// {@category Endpoint}
-class EndpointFirebaseIdp extends _i1.EndpointFirebaseIdpBase {
-  EndpointFirebaseIdp(_i2.EndpointCaller caller) : super(caller);
+class EndpointFirebaseIdp extends _iaic.EndpointFirebaseIdpBase {
+  EndpointFirebaseIdp(_isc.EndpointCaller caller) : super(caller);
 
   @override
   String get name => 'firebaseIdp';
 
   @override
-  _i3.Future<_i4.AuthSuccess> login({required String idToken}) =>
-      caller.callServerEndpoint<_i4.AuthSuccess>(
+  _ida.Future<_iacc.AuthSuccess> login({required String idToken}) =>
+      caller.callServerEndpoint<_iacc.AuthSuccess>(
         'firebaseIdp',
         'login',
         {'idToken': idToken},
       );
 
   @override
-  _i3.Future<bool> hasAccount() => caller.callServerEndpoint<bool>(
+  _ida.Future<bool> hasAccount() => caller.callServerEndpoint<bool>(
     'firebaseIdp',
     'hasAccount',
     {},
@@ -80,13 +79,18 @@ class EndpointFirebaseIdp extends _i1.EndpointFirebaseIdpBase {
 /// By extending [RefreshJwtTokensEndpoint], the JWT token refresh endpoint
 /// is made available on the server and enables automatic token refresh on the client.
 /// {@category Endpoint}
-class EndpointJwtRefresh extends _i4.EndpointRefreshJwtTokens {
-  EndpointJwtRefresh(_i2.EndpointCaller caller) : super(caller);
+class EndpointJwtRefresh extends _iacc.EndpointRefreshJwtTokens {
+  EndpointJwtRefresh(_isc.EndpointCaller caller) : super(caller);
 
   @override
   String get name => 'jwtRefresh';
 
   /// Creates a new token pair for the given [refreshToken].
+  ///
+  /// If [refreshToken] is omitted, cookie-mode web clients fall back to the
+  /// configured HttpOnly refresh cookie. When neither source is present this
+  /// throws [RefreshTokenNotFoundException], the same public "no usable refresh
+  /// credential" exception used for unknown refresh tokens.
   ///
   /// Can throw the following exceptions:
   /// -[RefreshTokenMalformedException]: refresh token is malformed and could
@@ -105,30 +109,29 @@ class EndpointJwtRefresh extends _i4.EndpointRefreshJwtTokens {
   /// This endpoint is unauthenticated, meaning the client won't include any
   /// authentication information with the call.
   @override
-  _i3.Future<_i4.AuthSuccess> refreshAccessToken({
-    required String refreshToken,
-  }) => caller.callServerEndpoint<_i4.AuthSuccess>(
-    'jwtRefresh',
-    'refreshAccessToken',
-    {'refreshToken': refreshToken},
-    authenticated: false,
-  );
+  _ida.Future<_iacc.AuthSuccess> refreshAccessToken({String? refreshToken}) =>
+      caller.callServerEndpoint<_iacc.AuthSuccess>(
+        'jwtRefresh',
+        'refreshAccessToken',
+        {'refreshToken': refreshToken},
+        authenticated: false,
+      );
 }
 
 /// Creator-facing compute configuration: where their executions run (cloud or
 /// their own machine), their self-hosted limits, their live workers, and the
 /// machine credentials their compute clients authenticate with.
 /// {@category Endpoint}
-class EndpointComputeSettings extends _i2.EndpointRef {
-  EndpointComputeSettings(_i2.EndpointCaller caller) : super(caller);
+class EndpointComputeSettings extends _isc.EndpointRef {
+  EndpointComputeSettings(_isc.EndpointCaller caller) : super(caller);
 
   @override
   String get name => 'computeSettings';
 
   /// Returns the caller's compute settings, materializing the defaults on
   /// first read.
-  _i3.Future<_i6.CreatorComputeSettings> getMySettings() =>
-      caller.callServerEndpoint<_i6.CreatorComputeSettings>(
+  _ida.Future<_il57mzp3.CreatorComputeSettings> getMySettings() =>
+      caller.callServerEndpoint<_il57mzp3.CreatorComputeSettings>(
         'computeSettings',
         'getMySettings',
         {},
@@ -137,16 +140,17 @@ class EndpointComputeSettings extends _i2.EndpointRef {
   /// Switches the caller's executions between the cloud pool and their own
   /// machine. Applies to runs submitted from now on; queued runs keep the
   /// lane they were submitted in.
-  _i3.Future<_i6.CreatorComputeSettings> setComputeMode(_i7.ComputeMode mode) =>
-      caller.callServerEndpoint<_i6.CreatorComputeSettings>(
-        'computeSettings',
-        'setComputeMode',
-        {'mode': mode},
-      );
+  _ida.Future<_il57mzp3.CreatorComputeSettings> setComputeMode(
+    _ibr0is37.ComputeMode mode,
+  ) => caller.callServerEndpoint<_il57mzp3.CreatorComputeSettings>(
+    'computeSettings',
+    'setComputeMode',
+    {'mode': mode},
+  );
 
   /// The caller's own compute workers (self-hosted clients), newest first.
-  _i3.Future<List<_i8.ComputeWorkerInfo>> listMyWorkers() =>
-      caller.callServerEndpoint<List<_i8.ComputeWorkerInfo>>(
+  _ida.Future<List<_iu3gutcn.ComputeWorkerInfo>> listMyWorkers() =>
+      caller.callServerEndpoint<List<_iu3gutcn.ComputeWorkerInfo>>(
         'computeSettings',
         'listMyWorkers',
         {},
@@ -154,18 +158,18 @@ class EndpointComputeSettings extends _i2.EndpointRef {
 
   /// Mints a new machine credential for the caller's compute client. The
   /// plaintext token is returned exactly once; only its hash is stored.
-  _i3.Future<_i9.CreatedComputeClientCredential> createComputeClientCredential(
-    String name,
-  ) => caller.callServerEndpoint<_i9.CreatedComputeClientCredential>(
-    'computeSettings',
-    'createComputeClientCredential',
-    {'name': name},
-  );
+  _ida.Future<_iqpenjjc.CreatedComputeClientCredential>
+  createComputeClientCredential(String name) =>
+      caller.callServerEndpoint<_iqpenjjc.CreatedComputeClientCredential>(
+        'computeSettings',
+        'createComputeClientCredential',
+        {'name': name},
+      );
 
   /// The caller's machine credentials, newest first.
-  _i3.Future<List<_i10.ComputeClientCredentialInfo>>
+  _ida.Future<List<_iywakebc.ComputeClientCredentialInfo>>
   listComputeClientCredentials() =>
-      caller.callServerEndpoint<List<_i10.ComputeClientCredentialInfo>>(
+      caller.callServerEndpoint<List<_iywakebc.ComputeClientCredentialInfo>>(
         'computeSettings',
         'listComputeClientCredentials',
         {},
@@ -173,12 +177,13 @@ class EndpointComputeSettings extends _i2.EndpointRef {
 
   /// Revokes a machine credential and kills its live sessions (the JWT
   /// refresh tokens of its dedicated AuthUser).
-  _i3.Future<void> revokeComputeClientCredential(_i2.UuidValue credentialId) =>
-      caller.callServerEndpoint<void>(
-        'computeSettings',
-        'revokeComputeClientCredential',
-        {'credentialId': credentialId},
-      );
+  _ida.Future<void> revokeComputeClientCredential(
+    _isc.UuidValue credentialId,
+  ) => caller.callServerEndpoint<void>(
+    'computeSettings',
+    'revokeComputeClientCredential',
+    {'credentialId': credentialId},
+  );
 }
 
 /// The worker protocol, shared by the cloud Container App Job pool and the
@@ -188,18 +193,18 @@ class EndpointComputeSettings extends _i2.EndpointRef {
 /// Postgres is the source of truth throughout: claims are atomic row updates
 /// with a lease, and everything a worker sends is re-validated server-side.
 /// {@category Endpoint}
-class EndpointComputeWorker extends _i2.EndpointRef {
-  EndpointComputeWorker(_i2.EndpointCaller caller) : super(caller);
+class EndpointComputeWorker extends _isc.EndpointRef {
+  EndpointComputeWorker(_isc.EndpointCaller caller) : super(caller);
 
   @override
   String get name => 'computeWorker';
 
   /// Registers a worker process and returns the heartbeat/lease cadence it
   /// must follow.
-  _i3.Future<_i11.WorkerRegistration> register(
+  _ida.Future<_inbbf50m.WorkerRegistration> register(
     String? hostname,
     String? version,
-  ) => caller.callServerEndpoint<_i11.WorkerRegistration>(
+  ) => caller.callServerEndpoint<_inbbf50m.WorkerRegistration>(
     'computeWorker',
     'register',
     {
@@ -217,10 +222,10 @@ class EndpointComputeWorker extends _i2.EndpointRef {
   /// script on a second computer takes effect on its next poll with nothing to
   /// register or refresh. Ignored for cloud workers, which run whatever the
   /// row carries.
-  _i3.Future<_i12.ClaimedExecution?> claimNext(
-    _i2.UuidValue workerId,
+  _ida.Future<_il9ps7wn.ClaimedExecution?> claimNext(
+    _isc.UuidValue workerId,
     List<String> servedProjectIds,
-  ) => caller.callServerEndpoint<_i12.ClaimedExecution?>(
+  ) => caller.callServerEndpoint<_il9ps7wn.ClaimedExecution?>(
     'computeWorker',
     'claimNext',
     {
@@ -232,10 +237,10 @@ class EndpointComputeWorker extends _i2.EndpointRef {
   /// Worker liveness plus lease renewal for the execution it is running.
   /// `cancelRequested: true` also doubles as the stop signal when the lease
   /// was lost (the sweeper already gave the run away).
-  _i3.Future<_i13.HeartbeatResponse> heartbeat(
-    _i2.UuidValue workerId,
-    _i2.UuidValue? executionId,
-  ) => caller.callServerEndpoint<_i13.HeartbeatResponse>(
+  _ida.Future<_irjjqoev.HeartbeatResponse> heartbeat(
+    _isc.UuidValue workerId,
+    _isc.UuidValue? executionId,
+  ) => caller.callServerEndpoint<_irjjqoev.HeartbeatResponse>(
     'computeWorker',
     'heartbeat',
     {
@@ -249,11 +254,11 @@ class EndpointComputeWorker extends _i2.EndpointRef {
   ///
   /// Everything is enforced server-side: ownership, per-kind size caps,
   /// base64-length reconciliation, and per-execution asset count/byte caps.
-  _i3.Future<_i14.ExecutionAssetRef> uploadExecutionAsset(
-    _i2.UuidValue workerId,
-    _i2.UuidValue executionId,
-    _i15.ExecutionAssetUpload asset,
-  ) => caller.callServerEndpoint<_i14.ExecutionAssetRef>(
+  _ida.Future<_ioaawgzi.ExecutionAssetRef> uploadExecutionAsset(
+    _isc.UuidValue workerId,
+    _isc.UuidValue executionId,
+    _itmbcnyn.ExecutionAssetUpload asset,
+  ) => caller.callServerEndpoint<_ioaawgzi.ExecutionAssetRef>(
     'computeWorker',
     'uploadExecutionAsset',
     {
@@ -267,10 +272,10 @@ class EndpointComputeWorker extends _i2.EndpointRef {
   /// stale or duplicate reports are no-ops. On success of a published-app run
   /// the Firestore history/usage documents are written afterwards —
   /// best-effort, exactly as the legacy synchronous path did.
-  _i3.Future<void> reportResult(
-    _i2.UuidValue workerId,
-    _i2.UuidValue executionId,
-    _i16.ExecutionOutcome outcome,
+  _ida.Future<void> reportResult(
+    _isc.UuidValue workerId,
+    _isc.UuidValue executionId,
+    _iftp3wwi.ExecutionOutcome outcome,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'reportResult',
@@ -283,7 +288,7 @@ class EndpointComputeWorker extends _i2.EndpointRef {
 
   /// Marks the worker as stopped. Any execution it was still running is
   /// recovered by the sweeper via lease expiry.
-  _i3.Future<void> deregister(_i2.UuidValue workerId) =>
+  _ida.Future<void> deregister(_isc.UuidValue workerId) =>
       caller.callServerEndpoint<void>(
         'computeWorker',
         'deregister',
@@ -306,16 +311,16 @@ class EndpointComputeWorker extends _i2.EndpointRef {
 /// Both mint standard Serverpod JWT sessions via the auth-core token manager,
 /// so workers reuse the exact same client-side session plumbing as the apps.
 /// {@category Endpoint}
-class EndpointWorkerAuth extends _i2.EndpointRef {
-  EndpointWorkerAuth(_i2.EndpointCaller caller) : super(caller);
+class EndpointWorkerAuth extends _isc.EndpointRef {
+  EndpointWorkerAuth(_isc.EndpointCaller caller) : super(caller);
 
   @override
   String get name => 'workerAuth';
 
   /// Exchanges the shared cloud worker secret for a session carrying
   /// `discoman.computeWorker`.
-  _i3.Future<_i4.AuthSuccess> login(String workerSecret) =>
-      caller.callServerEndpoint<_i4.AuthSuccess>(
+  _ida.Future<_iacc.AuthSuccess> login(String workerSecret) =>
+      caller.callServerEndpoint<_iacc.AuthSuccess>(
         'workerAuth',
         'login',
         {'workerSecret': workerSecret},
@@ -323,8 +328,8 @@ class EndpointWorkerAuth extends _i2.EndpointRef {
 
   /// Exchanges a per-machine compute-client token for a session carrying
   /// `discoman.remoteWorker`, bound (via the credential row) to the creator.
-  _i3.Future<_i4.AuthSuccess> loginRemote(String clientToken) =>
-      caller.callServerEndpoint<_i4.AuthSuccess>(
+  _ida.Future<_iacc.AuthSuccess> loginRemote(String clientToken) =>
+      caller.callServerEndpoint<_iacc.AuthSuccess>(
         'workerAuth',
         'loginRemote',
         {'clientToken': clientToken},
@@ -338,15 +343,15 @@ class EndpointWorkerAuth extends _i2.EndpointRef {
 /// everything else: which projects they can link, and the contract that came
 /// out of the one they chose.
 /// {@category Endpoint}
-class EndpointCreatorScript extends _i2.EndpointRef {
-  EndpointCreatorScript(_i2.EndpointCaller caller) : super(caller);
+class EndpointCreatorScript extends _isc.EndpointRef {
+  EndpointCreatorScript(_isc.EndpointCaller caller) : super(caller);
 
   @override
   String get name => 'creatorScript';
 
   /// The creator's projects, newest first, for the client's project chooser.
-  _i3.Future<List<_i26.CreatorProjectSummary>> listProjects() =>
-      caller.callServerEndpoint<List<_i26.CreatorProjectSummary>>(
+  _ida.Future<List<_i4qtshzf.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i4qtshzf.CreatorProjectSummary>>(
         'creatorScript',
         'listProjects',
         {},
@@ -362,7 +367,7 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   /// for exactly that machine.
   ///
   /// Returns how many runs moved.
-  _i3.Future<int> migrateQueuedRunsToCloud(String projectId) =>
+  _ida.Future<int> migrateQueuedRunsToCloud(String projectId) =>
       caller.callServerEndpoint<int>(
         'creatorScript',
         'migrateQueuedRunsToCloud',
@@ -375,9 +380,9 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   /// [fingerprint] identifies the file the contract came from. It is stored but
   /// not yet enforced at run time — a creator who edits their script keeps the
   /// old contract until they publish again.
-  _i3.Future<void> publishContract(
+  _ida.Future<void> publishContract(
     String projectId,
-    _i27.ContractDraft draft,
+    _idmvvsng.ContractDraft draft,
     String fingerprint,
   ) => caller.callServerEndpoint<void>(
     'creatorScript',
@@ -392,37 +397,33 @@ class EndpointCreatorScript extends _i2.EndpointRef {
 
 class Modules {
   Modules(Client client) {
-    serverpod_auth_idp = _i1.Caller(client);
-    serverpod_auth_core = _i4.Caller(client);
+    serverpod_auth_idp = _iaic.Caller(client);
+    serverpod_auth_core = _iacc.Caller(client);
   }
 
-  late final _i1.Caller serverpod_auth_idp;
+  late final _iaic.Caller serverpod_auth_idp;
 
-  late final _i4.Caller serverpod_auth_core;
+  late final _iacc.Caller serverpod_auth_core;
 }
 
-class Client extends _i2.ServerpodClientShared {
+class Client extends _isc.ServerpodClientShared {
   Client(
     String host, {
     dynamic securityContext,
-    @Deprecated(
-      'Use authKeyProvider instead. This will be removed in future releases.',
-    )
-    super.authenticationKeyManager,
     Duration? streamingConnectionTimeout,
     Duration? connectionTimeout,
     Function(
-      _i2.MethodCallContext,
+      _isc.MethodCallContext,
       Object,
       StackTrace,
     )?
     onFailedCall,
-    Function(_i2.MethodCallContext)? onSucceededCall,
+    Function(_isc.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i29.Client? httpClientOverride,
+    _i85jenna.Client? httpClientOverride,
   }) : super(
          host,
-         _i30.Protocol(),
+         _il2as5qe.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -456,7 +457,7 @@ class Client extends _i2.ServerpodClientShared {
   late final Modules modules;
 
   @override
-  Map<String, _i2.EndpointRef> get endpointRefLookup => {
+  Map<String, _isc.EndpointRef> get endpointRefLookup => {
     'firebaseIdp': firebaseIdp,
     'jwtRefresh': jwtRefresh,
     'computeSettings': computeSettings,
@@ -466,7 +467,7 @@ class Client extends _i2.ServerpodClientShared {
   };
 
   @override
-  Map<String, _i2.ModuleEndpointCaller> get moduleLookup => {
+  Map<String, _isc.ModuleEndpointCaller> get moduleLookup => {
     'serverpod_auth_idp': modules.serverpod_auth_idp,
     'serverpod_auth_core': modules.serverpod_auth_core,
   };

@@ -10,16 +10,16 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import '../runtime/contract_input_field.dart' as _i2;
-import '../runtime/contract_output_field.dart' as _i3;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i4;
+import 'package:discoman_client/src/protocol/protocol.dart' as _iy9hkqa4;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import '../runtime/contract_input_field.dart' as _i8w5nnxk;
+import '../runtime/contract_output_field.dart' as _io5zd92x;
 
 /// The contract draft extracted by statically inspecting a Python script.
 /// Returned to the client, which persists it (e.g. to Firestore). Mirrors
 /// `ExtractionDraft` from the legacy `inspectPythonScript` Cloud Function.
-abstract class ContractDraft implements _i1.SerializableModel {
+abstract class ContractDraft
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ContractDraft._({
     required this.entrypointName,
     required this.inputFields,
@@ -30,8 +30,8 @@ abstract class ContractDraft implements _i1.SerializableModel {
 
   factory ContractDraft({
     required String entrypointName,
-    required List<_i2.ContractInputField> inputFields,
-    required List<_i3.ContractOutputField> outputFields,
+    required List<_i8w5nnxk.ContractInputField> inputFields,
+    required List<_io5zd92x.ContractOutputField> outputFields,
     required List<String> notes,
     required String summaryMessage,
   }) = _ContractDraftImpl;
@@ -39,13 +39,15 @@ abstract class ContractDraft implements _i1.SerializableModel {
   factory ContractDraft.fromJson(Map<String, dynamic> jsonSerialization) {
     return ContractDraft(
       entrypointName: jsonSerialization['entrypointName'] as String,
-      inputFields: _i4.Protocol().deserialize<List<_i2.ContractInputField>>(
-        jsonSerialization['inputFields'],
-      ),
-      outputFields: _i4.Protocol().deserialize<List<_i3.ContractOutputField>>(
-        jsonSerialization['outputFields'],
-      ),
-      notes: _i4.Protocol().deserialize<List<String>>(
+      inputFields: _iy9hkqa4.Protocol()
+          .deserialize<List<_i8w5nnxk.ContractInputField>>(
+            jsonSerialization['inputFields'],
+          ),
+      outputFields: _iy9hkqa4.Protocol()
+          .deserialize<List<_io5zd92x.ContractOutputField>>(
+            jsonSerialization['outputFields'],
+          ),
+      notes: _iy9hkqa4.Protocol().deserialize<List<String>>(
         jsonSerialization['notes'],
       ),
       summaryMessage: jsonSerialization['summaryMessage'] as String,
@@ -56,10 +58,10 @@ abstract class ContractDraft implements _i1.SerializableModel {
   String entrypointName;
 
   /// Inferred input parameters.
-  List<_i2.ContractInputField> inputFields;
+  List<_i8w5nnxk.ContractInputField> inputFields;
 
   /// Inferred output fields.
-  List<_i3.ContractOutputField> outputFields;
+  List<_io5zd92x.ContractOutputField> outputFields;
 
   /// Diagnostic notes about how the extraction was performed.
   List<String> notes;
@@ -69,11 +71,11 @@ abstract class ContractDraft implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ContractDraft]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ContractDraft copyWith({
     String? entrypointName,
-    List<_i2.ContractInputField>? inputFields,
-    List<_i3.ContractOutputField>? outputFields,
+    List<_i8w5nnxk.ContractInputField>? inputFields,
+    List<_io5zd92x.ContractOutputField>? outputFields,
     List<String>? notes,
     String? summaryMessage,
   });
@@ -90,16 +92,32 @@ abstract class ContractDraft implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ContractDraft',
+      'entrypointName': entrypointName,
+      'inputFields': inputFields.toJson(
+        valueToJson: (v) => v.toJsonForProtocol(),
+      ),
+      'outputFields': outputFields.toJson(
+        valueToJson: (v) => v.toJsonForProtocol(),
+      ),
+      'notes': notes.toJson(),
+      'summaryMessage': summaryMessage,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
 class _ContractDraftImpl extends ContractDraft {
   _ContractDraftImpl({
     required String entrypointName,
-    required List<_i2.ContractInputField> inputFields,
-    required List<_i3.ContractOutputField> outputFields,
+    required List<_i8w5nnxk.ContractInputField> inputFields,
+    required List<_io5zd92x.ContractOutputField> outputFields,
     required List<String> notes,
     required String summaryMessage,
   }) : super._(
@@ -112,12 +130,12 @@ class _ContractDraftImpl extends ContractDraft {
 
   /// Returns a shallow copy of this [ContractDraft]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ContractDraft copyWith({
     String? entrypointName,
-    List<_i2.ContractInputField>? inputFields,
-    List<_i3.ContractOutputField>? outputFields,
+    List<_i8w5nnxk.ContractInputField>? inputFields,
+    List<_io5zd92x.ContractOutputField>? outputFields,
     List<String>? notes,
     String? summaryMessage,
   }) {

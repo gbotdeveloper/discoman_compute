@@ -6,5 +6,5 @@ environment:
 
 
 dependencies:
-  serverpod_auth_idp_client: 4.0.0-beta.0
-  serverpod_client: 4.0.0-beta.0
+  serverpod_auth_idp_client: 4.0.3
+  serverpod_client: 4.0.3

@@ -10,14 +10,14 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import '../../execution/models/compute_mode.dart' as _i2;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import '../../execution/models/compute_mode.dart' as _ij2201jp;
 
 /// Per-creator execution routing. Lives in Postgres (not the publicly-gettable
 /// Firestore publish config) so it is server-trusted, flips without
 /// re-publishing, and is read atomically with the execution insert.
-abstract class CreatorComputeSettings implements _i1.SerializableModel {
+abstract class CreatorComputeSettings
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   CreatorComputeSettings._({
     this.id,
     required this.creatorFirebaseUid,
@@ -28,9 +28,9 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
   }) : updatedAt = updatedAt ?? DateTime.now();
 
   factory CreatorComputeSettings({
-    _i1.UuidValue? id,
+    _isc.UuidValue? id,
     required String creatorFirebaseUid,
-    required _i2.ComputeMode computeMode,
+    required _ij2201jp.ComputeMode computeMode,
     required int selfHostedTimeoutSeconds,
     required int selfHostedQueueDeadlineHours,
     DateTime? updatedAt,
@@ -42,9 +42,9 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
     return CreatorComputeSettings(
       id: jsonSerialization['id'] == null
           ? null
-          : _i1.UuidValueJsonExtension.fromJson(jsonSerialization['id']),
+          : _isc.UuidValueJsonExtension.fromJson(jsonSerialization['id']),
       creatorFirebaseUid: jsonSerialization['creatorFirebaseUid'] as String,
-      computeMode: _i2.ComputeMode.fromJson(
+      computeMode: _ij2201jp.ComputeMode.fromJson(
         (jsonSerialization['computeMode'] as String),
       ),
       selfHostedTimeoutSeconds:
@@ -53,18 +53,18 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
           jsonSerialization['selfHostedQueueDeadlineHours'] as int,
       updatedAt: jsonSerialization['updatedAt'] == null
           ? null
-          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['updatedAt']),
+          : _isc.DateTimeJsonExtension.fromJson(jsonSerialization['updatedAt']),
     );
   }
 
   /// The database id, set if the object has been inserted into the
   /// database or if it has been fetched from the database. Otherwise,
   /// the id will be null.
-  _i1.UuidValue? id;
+  _isc.UuidValue? id;
 
   String creatorFirebaseUid;
 
-  _i2.ComputeMode computeMode;
+  _ij2201jp.ComputeMode computeMode;
 
   /// Hard wall-clock limit for a self-hosted run.
   int selfHostedTimeoutSeconds;
@@ -77,11 +77,11 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [CreatorComputeSettings]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   CreatorComputeSettings copyWith({
-    _i1.UuidValue? id,
+    _isc.UuidValue? id,
     String? creatorFirebaseUid,
-    _i2.ComputeMode? computeMode,
+    _ij2201jp.ComputeMode? computeMode,
     int? selfHostedTimeoutSeconds,
     int? selfHostedQueueDeadlineHours,
     DateTime? updatedAt,
@@ -100,8 +100,21 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'CreatorComputeSettings',
+      if (id != null) 'id': id?.toJson(),
+      'creatorFirebaseUid': creatorFirebaseUid,
+      'computeMode': computeMode.toJson(),
+      'selfHostedTimeoutSeconds': selfHostedTimeoutSeconds,
+      'selfHostedQueueDeadlineHours': selfHostedQueueDeadlineHours,
+      'updatedAt': updatedAt.toJson(),
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -109,9 +122,9 @@ class _Undefined {}
 
 class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
   _CreatorComputeSettingsImpl({
-    _i1.UuidValue? id,
+    _isc.UuidValue? id,
     required String creatorFirebaseUid,
-    required _i2.ComputeMode computeMode,
+    required _ij2201jp.ComputeMode computeMode,
     required int selfHostedTimeoutSeconds,
     required int selfHostedQueueDeadlineHours,
     DateTime? updatedAt,
@@ -126,18 +139,18 @@ class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
 
   /// Returns a shallow copy of this [CreatorComputeSettings]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   CreatorComputeSettings copyWith({
     Object? id = _Undefined,
     String? creatorFirebaseUid,
-    _i2.ComputeMode? computeMode,
+    _ij2201jp.ComputeMode? computeMode,
     int? selfHostedTimeoutSeconds,
     int? selfHostedQueueDeadlineHours,
     DateTime? updatedAt,
   }) {
     return CreatorComputeSettings(
-      id: id is _i1.UuidValue? ? id : this.id,
+      id: id is _isc.UuidValue? ? id : this.id,
       creatorFirebaseUid: creatorFirebaseUid ?? this.creatorFirebaseUid,
       computeMode: computeMode ?? this.computeMode,
       selfHostedTimeoutSeconds:

@@ -10,14 +10,14 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i2;
+import 'package:discoman_client/src/protocol/protocol.dart' as _iy9hkqa4;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Final result a worker reports for a claimed execution. For asset outputs
 /// the values in [outputsJson] must already be storage references produced by
 /// uploadExecutionAsset.
-abstract class ExecutionOutcome implements _i1.SerializableModel {
+abstract class ExecutionOutcome
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ExecutionOutcome._({
     required this.success,
     this.outputsJson,
@@ -40,15 +40,17 @@ abstract class ExecutionOutcome implements _i1.SerializableModel {
 
   factory ExecutionOutcome.fromJson(Map<String, dynamic> jsonSerialization) {
     return ExecutionOutcome(
-      success: _i1.BoolJsonExtension.fromJson(jsonSerialization['success']),
+      success: _isc.BoolJsonExtension.fromJson(jsonSerialization['success']),
       outputsJson: jsonSerialization['outputsJson'] as String?,
       durationMs: jsonSerialization['durationMs'] as int?,
       errorReason: jsonSerialization['errorReason'] as String?,
       errorMessage: jsonSerialization['errorMessage'] as String?,
-      warnings: _i2.Protocol().deserialize<List<String>>(
+      warnings: _iy9hkqa4.Protocol().deserialize<List<String>>(
         jsonSerialization['warnings'],
       ),
-      logs: _i2.Protocol().deserialize<List<String>>(jsonSerialization['logs']),
+      logs: _iy9hkqa4.Protocol().deserialize<List<String>>(
+        jsonSerialization['logs'],
+      ),
     );
   }
 
@@ -69,7 +71,7 @@ abstract class ExecutionOutcome implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ExecutionOutcome]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ExecutionOutcome copyWith({
     bool? success,
     String? outputsJson,
@@ -94,8 +96,22 @@ abstract class ExecutionOutcome implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ExecutionOutcome',
+      'success': success,
+      if (outputsJson != null) 'outputsJson': outputsJson,
+      if (durationMs != null) 'durationMs': durationMs,
+      if (errorReason != null) 'errorReason': errorReason,
+      if (errorMessage != null) 'errorMessage': errorMessage,
+      'warnings': warnings.toJson(),
+      'logs': logs.toJson(),
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -122,7 +138,7 @@ class _ExecutionOutcomeImpl extends ExecutionOutcome {
 
   /// Returns a shallow copy of this [ExecutionOutcome]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ExecutionOutcome copyWith({
     bool? success,

@@ -10,11 +10,11 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Client-safe view of a compute-client credential (never the token or hash).
-abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
+abstract class ComputeClientCredentialInfo
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ComputeClientCredentialInfo._({
     required this.credentialId,
     required this.name,
@@ -24,7 +24,7 @@ abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
   });
 
   factory ComputeClientCredentialInfo({
-    required _i1.UuidValue credentialId,
+    required _isc.UuidValue credentialId,
     required String name,
     required DateTime createdAt,
     DateTime? lastUsedAt,
@@ -35,21 +35,23 @@ abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
     Map<String, dynamic> jsonSerialization,
   ) {
     return ComputeClientCredentialInfo(
-      credentialId: _i1.UuidValueJsonExtension.fromJson(
+      credentialId: _isc.UuidValueJsonExtension.fromJson(
         jsonSerialization['credentialId'],
       ),
       name: jsonSerialization['name'] as String,
-      createdAt: _i1.DateTimeJsonExtension.fromJson(
+      createdAt: _isc.DateTimeJsonExtension.fromJson(
         jsonSerialization['createdAt'],
       ),
       lastUsedAt: jsonSerialization['lastUsedAt'] == null
           ? null
-          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['lastUsedAt']),
-      revoked: _i1.BoolJsonExtension.fromJson(jsonSerialization['revoked']),
+          : _isc.DateTimeJsonExtension.fromJson(
+              jsonSerialization['lastUsedAt'],
+            ),
+      revoked: _isc.BoolJsonExtension.fromJson(jsonSerialization['revoked']),
     );
   }
 
-  _i1.UuidValue credentialId;
+  _isc.UuidValue credentialId;
 
   String name;
 
@@ -61,9 +63,9 @@ abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [ComputeClientCredentialInfo]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ComputeClientCredentialInfo copyWith({
-    _i1.UuidValue? credentialId,
+    _isc.UuidValue? credentialId,
     String? name,
     DateTime? createdAt,
     DateTime? lastUsedAt,
@@ -82,8 +84,20 @@ abstract class ComputeClientCredentialInfo implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ComputeClientCredentialInfo',
+      'credentialId': credentialId.toJson(),
+      'name': name,
+      'createdAt': createdAt.toJson(),
+      if (lastUsedAt != null) 'lastUsedAt': lastUsedAt?.toJson(),
+      'revoked': revoked,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -91,7 +105,7 @@ class _Undefined {}
 
 class _ComputeClientCredentialInfoImpl extends ComputeClientCredentialInfo {
   _ComputeClientCredentialInfoImpl({
-    required _i1.UuidValue credentialId,
+    required _isc.UuidValue credentialId,
     required String name,
     required DateTime createdAt,
     DateTime? lastUsedAt,
@@ -106,10 +120,10 @@ class _ComputeClientCredentialInfoImpl extends ComputeClientCredentialInfo {
 
   /// Returns a shallow copy of this [ComputeClientCredentialInfo]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ComputeClientCredentialInfo copyWith({
-    _i1.UuidValue? credentialId,
+    _isc.UuidValue? credentialId,
     String? name,
     DateTime? createdAt,
     Object? lastUsedAt = _Undefined,

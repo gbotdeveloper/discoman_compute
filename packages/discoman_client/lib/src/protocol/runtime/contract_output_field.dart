@@ -10,13 +10,13 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import '../runtime/python_field_type.dart' as _i2;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import '../runtime/python_field_type.dart' as _ithty5x6;
 
 /// A single output field inferred from a Python script's return value.
 /// Mirrors `ExtractedOutputField` from the legacy contract extraction.
-abstract class ContractOutputField implements _i1.SerializableModel {
+abstract class ContractOutputField
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   ContractOutputField._({
     required this.id,
     required this.outputKey,
@@ -29,7 +29,7 @@ abstract class ContractOutputField implements _i1.SerializableModel {
     required String id,
     required String outputKey,
     required String displayLabel,
-    required _i2.PythonFieldType type,
+    required _ithty5x6.PythonFieldType type,
     required String presentationHint,
   }) = _ContractOutputFieldImpl;
 
@@ -38,7 +38,9 @@ abstract class ContractOutputField implements _i1.SerializableModel {
       id: jsonSerialization['id'] as String,
       outputKey: jsonSerialization['outputKey'] as String,
       displayLabel: jsonSerialization['displayLabel'] as String,
-      type: _i2.PythonFieldType.fromJson((jsonSerialization['type'] as String)),
+      type: _ithty5x6.PythonFieldType.fromJson(
+        (jsonSerialization['type'] as String),
+      ),
       presentationHint: jsonSerialization['presentationHint'] as String,
     );
   }
@@ -53,19 +55,19 @@ abstract class ContractOutputField implements _i1.SerializableModel {
   String displayLabel;
 
   /// Inferred field type.
-  _i2.PythonFieldType type;
+  _ithty5x6.PythonFieldType type;
 
   /// Hint describing how this output was inferred / should be presented.
   String presentationHint;
 
   /// Returns a shallow copy of this [ContractOutputField]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ContractOutputField copyWith({
     String? id,
     String? outputKey,
     String? displayLabel,
-    _i2.PythonFieldType? type,
+    _ithty5x6.PythonFieldType? type,
     String? presentationHint,
   });
   @override
@@ -81,8 +83,20 @@ abstract class ContractOutputField implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'ContractOutputField',
+      'id': id,
+      'outputKey': outputKey,
+      'displayLabel': displayLabel,
+      'type': type.toJson(),
+      'presentationHint': presentationHint,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
@@ -91,7 +105,7 @@ class _ContractOutputFieldImpl extends ContractOutputField {
     required String id,
     required String outputKey,
     required String displayLabel,
-    required _i2.PythonFieldType type,
+    required _ithty5x6.PythonFieldType type,
     required String presentationHint,
   }) : super._(
          id: id,
@@ -103,13 +117,13 @@ class _ContractOutputFieldImpl extends ContractOutputField {
 
   /// Returns a shallow copy of this [ContractOutputField]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ContractOutputField copyWith({
     String? id,
     String? outputKey,
     String? displayLabel,
-    _i2.PythonFieldType? type,
+    _ithty5x6.PythonFieldType? type,
     String? presentationHint,
   }) {
     return ContractOutputField(

@@ -10,21 +10,22 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import '../../execution/models/compute_client_credential_info.dart' as _i2;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
+import 'package:discoman_client/src/protocol/protocol.dart' as _iy9hkqa4;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
+import '../../execution/models/compute_client_credential_info.dart'
+    as _ih9mej3u;
 
 /// Returned once from createComputeClientCredential: the only time the
 /// plaintext token is ever visible.
-abstract class CreatedComputeClientCredential implements _i1.SerializableModel {
+abstract class CreatedComputeClientCredential
+    implements _isc.SerializableModel, _isc.ProtocolSerialization {
   CreatedComputeClientCredential._({
     required this.info,
     required this.token,
   });
 
   factory CreatedComputeClientCredential({
-    required _i2.ComputeClientCredentialInfo info,
+    required _ih9mej3u.ComputeClientCredentialInfo info,
     required String token,
   }) = _CreatedComputeClientCredentialImpl;
 
@@ -32,14 +33,15 @@ abstract class CreatedComputeClientCredential implements _i1.SerializableModel {
     Map<String, dynamic> jsonSerialization,
   ) {
     return CreatedComputeClientCredential(
-      info: _i3.Protocol().deserialize<_i2.ComputeClientCredentialInfo>(
-        jsonSerialization['info'],
-      ),
+      info: _iy9hkqa4.Protocol()
+          .deserialize<_ih9mej3u.ComputeClientCredentialInfo>(
+            jsonSerialization['info'],
+          ),
       token: jsonSerialization['token'] as String,
     );
   }
 
-  _i2.ComputeClientCredentialInfo info;
+  _ih9mej3u.ComputeClientCredentialInfo info;
 
   /// Plaintext machine token — store it on the client machine; the server
   /// keeps only its hash.
@@ -47,9 +49,9 @@ abstract class CreatedComputeClientCredential implements _i1.SerializableModel {
 
   /// Returns a shallow copy of this [CreatedComputeClientCredential]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   CreatedComputeClientCredential copyWith({
-    _i2.ComputeClientCredentialInfo? info,
+    _ih9mej3u.ComputeClientCredentialInfo? info,
     String? token,
   });
   @override
@@ -62,15 +64,24 @@ abstract class CreatedComputeClientCredential implements _i1.SerializableModel {
   }
 
   @override
+  Map<String, dynamic> toJsonForProtocol() {
+    return {
+      '__className__': 'CreatedComputeClientCredential',
+      'info': info.toJsonForProtocol(),
+      'token': token,
+    };
+  }
+
+  @override
   String toString() {
-    return _i1.SerializationManager.encode(this);
+    return _isc.SerializationManager.encode(this);
   }
 }
 
 class _CreatedComputeClientCredentialImpl
     extends CreatedComputeClientCredential {
   _CreatedComputeClientCredentialImpl({
-    required _i2.ComputeClientCredentialInfo info,
+    required _ih9mej3u.ComputeClientCredentialInfo info,
     required String token,
   }) : super._(
          info: info,
@@ -79,10 +90,10 @@ class _CreatedComputeClientCredentialImpl
 
   /// Returns a shallow copy of this [CreatedComputeClientCredential]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   CreatedComputeClientCredential copyWith({
-    _i2.ComputeClientCredentialInfo? info,
+    _ih9mej3u.ComputeClientCredentialInfo? info,
     String? token,
   }) {
     return CreatedComputeClientCredential(

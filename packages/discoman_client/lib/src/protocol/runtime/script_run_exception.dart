@@ -10,14 +10,16 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _isc;
 
 /// Raised when running or inspecting a user Python script fails in a way the
 /// client should be able to display (validation errors, disallowed imports,
 /// executor errors, timeouts). The message is safe to show to the user.
 abstract class ScriptRunException
-    implements _i1.SerializableException, _i1.SerializableModel {
+    implements
+        _isc.SerializableException,
+        _isc.SerializableModel,
+        _isc.ProtocolSerialization {
   ScriptRunException._({
     required this.message,
     required this.reason,
@@ -44,13 +46,22 @@ abstract class ScriptRunException
 
   /// Returns a shallow copy of this [ScriptRunException]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   ScriptRunException copyWith({
     String? message,
     String? reason,
   });
   @override
   Map<String, dynamic> toJson() {
+    return {
+      '__className__': 'ScriptRunException',
+      'message': message,
+      'reason': reason,
+    };
+  }
+
+  @override
+  Map<String, dynamic> toJsonForProtocol() {
     return {
       '__className__': 'ScriptRunException',
       'message': message,
@@ -75,7 +86,7 @@ class _ScriptRunExceptionImpl extends ScriptRunException {
 
   /// Returns a shallow copy of this [ScriptRunException]
   /// with some or all fields replaced by the given arguments.
-  @_i1.useResult
+  @_isc.useResult
   @override
   ScriptRunException copyWith({
     String? message,
