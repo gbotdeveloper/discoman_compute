@@ -17,3 +17,6 @@ settings.json
 .flutter-plugins-dependencies
 *.iml
 .idea/
+
+# FVM Version Cache
+.fvm/

@@ -11,6 +11,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _ida;
+
 import 'package:discoman_client/src/protocol/execution/models/claimed_execution.dart'
     as _il9ps7wn;
 import 'package:discoman_client/src/protocol/execution/models/compute_client_credential_info.dart'
@@ -43,6 +44,7 @@ import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
     as _iaic;
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
+
 import 'protocol.dart' as _il2as5qe;
 
 /// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider

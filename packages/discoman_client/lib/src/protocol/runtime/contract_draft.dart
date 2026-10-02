@@ -12,6 +12,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:discoman_client/src/protocol/protocol.dart' as _iy9hkqa4;
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
+
 import '../runtime/contract_input_field.dart' as _i8w5nnxk;
 import '../runtime/contract_output_field.dart' as _io5zd92x;
 

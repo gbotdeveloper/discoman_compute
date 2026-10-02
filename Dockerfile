@@ -9,7 +9,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build the Dart worker.
 # ---------------------------------------------------------------------------
-FROM dart:3.11.4 AS dart_builder
+FROM dart:3.13.5 AS dart_builder
 
 # Only the worker package is built here. The repository root is the Flutter
 # desktop app, which this image has no SDK for and the cloud worker does not

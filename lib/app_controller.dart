@@ -33,9 +33,8 @@ class ScriptCandidate {
 /// audit, so every dependency it does not have is a dependency they do not
 /// have to trust.
 class AppController extends ChangeNotifier {
-  AppController({WorkerConfig? config, WorkerSettingsStore? settingsStore})
-    : config = config ?? WorkerConfig.resolve(modeArg: 'remote'),
-      _settingsStore = settingsStore;
+  AppController({WorkerConfig? config, this._settingsStore})
+    : config = config ?? WorkerConfig.resolve(modeArg: 'remote');
 
   /// Injectable so a test never writes to the creator's real home directory.
   final WorkerSettingsStore? _settingsStore;

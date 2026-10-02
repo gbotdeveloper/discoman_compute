@@ -11,6 +11,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
+
 import '../runtime/python_field_type.dart' as _ithty5x6;
 
 /// A single output field inferred from a Python script's return value.

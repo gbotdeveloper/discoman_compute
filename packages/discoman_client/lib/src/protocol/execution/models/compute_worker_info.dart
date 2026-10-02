@@ -12,6 +12,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:discoman_client/src/protocol/protocol.dart' as _iy9hkqa4;
 import 'package:serverpod_client/serverpod_client.dart' as _isc;
+
 import '../../execution/models/compute_mode.dart' as _ij2201jp;
 
 /// Client-safe view of a worker for the dashboard and the creator's
