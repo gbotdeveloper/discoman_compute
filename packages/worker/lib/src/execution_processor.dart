@@ -16,12 +16,14 @@ class ExecutionProcessor {
     required this.pythonRunner,
     required this.heartbeat,
     ScriptStore? scriptStore,
+    this.reportRetryDelay = const Duration(seconds: 1),
   }) : _injectedScriptStore = scriptStore;
 
   final Client client;
   final UuidValue workerId;
   final PythonRunner pythonRunner;
   final ExecutionHeartbeat heartbeat;
+  final Duration reportRetryDelay;
 
   final ScriptStore? _injectedScriptStore;
 
@@ -235,13 +237,21 @@ class ExecutionProcessor {
   }
 
   Future<void> _report(UuidValue executionId, ExecutionOutcome outcome) async {
-    try {
-      await client.computeWorker.reportResult(workerId, executionId, outcome);
-    } catch (error) {
-      // reportResult is exactly-once and idempotent server-side; if it fails
-      // (transient), the lease sweeper reclaims the run. Log and move on rather
-      // than crash the worker.
-      stderr.writeln('Failed to report result for $executionId: $error');
+    const attempts = 3;
+    for (var attempt = 1; ; attempt++) {
+      try {
+        await client.computeWorker.reportResult(workerId, executionId, outcome);
+        return;
+      } on ScriptRunException catch (error) {
+        stderr.writeln('Result for $executionId rejected: ${error.message}');
+        return;
+      } catch (error) {
+        if (attempt == attempts) {
+          stderr.writeln('Failed to report result for $executionId: $error');
+          return;
+        }
+        await Future<void>.delayed(reportRetryDelay * attempt);
+      }
     }
   }
 }

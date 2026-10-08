@@ -45,6 +45,7 @@ void main() {
         },
       }),
       heartbeat: heartbeat,
+      reportRetryDelay: Duration.zero,
     );
   });
 
@@ -86,6 +87,42 @@ void main() {
     expect(activeDuring, {'upload': true, 'report': true});
     expect(heartbeat.active, isFalse);
   });
+
+  test('retries a report that fails in transit', () async {
+    computeWorker.reportErrors.addAll([
+      Exception('connection reset'),
+      Exception('connection reset'),
+    ]);
+
+    await processor.process(claimed());
+
+    expect(computeWorker.reportCalls, 3);
+    expect(computeWorker.reports.single.success, isTrue);
+  });
+
+  test('gives up after three failed reports', () async {
+    computeWorker.reportErrors.addAll(
+      List.generate(5, (_) => Exception('connection reset')),
+    );
+
+    await processor.process(claimed());
+
+    expect(computeWorker.reportCalls, 3);
+    expect(computeWorker.reports, isEmpty);
+  });
+
+  test('does not retry a report the server rejected', () async {
+    computeWorker.reportErrors.add(
+      ScriptRunException(
+        message: 'This execution is not claimed by the calling worker.',
+        reason: 'forbidden',
+      ),
+    );
+
+    await processor.process(claimed());
+
+    expect(computeWorker.reportCalls, 1);
+  });
 }
 
 class _FakeClient extends Client {
@@ -103,6 +140,8 @@ class _FakeComputeWorker extends EndpointComputeWorker {
   Object? uploadError;
   void Function()? onUpload;
   void Function()? onReport;
+  final reportErrors = <Object>[];
+  var reportCalls = 0;
   final reports = <ExecutionOutcome>[];
 
   @override
@@ -132,7 +171,9 @@ class _FakeComputeWorker extends EndpointComputeWorker {
     UuidValue executionId,
     ExecutionOutcome outcome,
   ) async {
+    reportCalls++;
     onReport?.call();
+    if (reportErrors.isNotEmpty) throw reportErrors.removeAt(0);
     reports.add(outcome);
   }
 }
