@@ -101,10 +101,28 @@ class ExecutionProcessor {
       return;
     }
 
-    final outputs = await _uploadAssets(
-      claimed.executionId,
-      result.outputs ?? const {},
-    );
+    final Map<String, dynamic> outputs;
+    try {
+      outputs = await _uploadAssets(
+        claimed.executionId,
+        result.outputs ?? const {},
+      );
+    } catch (error) {
+      await _report(
+        claimed.executionId,
+        ExecutionOutcome(
+          success: false,
+          errorReason: 'outputUploadFailed',
+          errorMessage: error is ScriptRunException
+              ? error.message
+              : 'The run finished but its output files could not be saved.',
+          durationMs: result.durationMs,
+          warnings: const [],
+          logs: result.logs,
+        ),
+      );
+      return;
+    }
     await _report(
       claimed.executionId,
       ExecutionOutcome(
