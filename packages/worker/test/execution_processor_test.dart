@@ -23,12 +23,14 @@ void main() {
   );
 
   late _FakeComputeWorker computeWorker;
+  late _FakeHeartbeat heartbeat;
   late ExecutionProcessor processor;
 
   setUp(() {
     final client = _FakeClient();
     computeWorker = _FakeComputeWorker(client);
     client.fake = computeWorker;
+    heartbeat = _FakeHeartbeat(client, workerId);
     processor = ExecutionProcessor(
       client: client,
       workerId: workerId,
@@ -42,7 +44,7 @@ void main() {
           'base64': 'AAAA',
         },
       }),
-      heartbeat: ExecutionHeartbeat(client, workerId, 20),
+      heartbeat: heartbeat,
     );
   });
 
@@ -72,6 +74,18 @@ void main() {
     expect(outcome.success, isFalse);
     expect(outcome.errorReason, 'outputUploadFailed');
   });
+
+  test('keeps the lease alive until the result is reported', () async {
+    final activeDuring = <String, bool>{};
+    computeWorker
+      ..onUpload = (() => activeDuring['upload'] = heartbeat.active)
+      ..onReport = (() => activeDuring['report'] = heartbeat.active);
+
+    await processor.process(claimed());
+
+    expect(activeDuring, {'upload': true, 'report': true});
+    expect(heartbeat.active, isFalse);
+  });
 }
 
 class _FakeClient extends Client {
@@ -87,6 +101,8 @@ class _FakeComputeWorker extends EndpointComputeWorker {
   _FakeComputeWorker(super.caller);
 
   Object? uploadError;
+  void Function()? onUpload;
+  void Function()? onReport;
   final reports = <ExecutionOutcome>[];
 
   @override
@@ -95,6 +111,7 @@ class _FakeComputeWorker extends EndpointComputeWorker {
     UuidValue executionId,
     ExecutionAssetUpload asset,
   ) async {
+    onUpload?.call();
     final error = uploadError;
     if (error != null) throw error;
     return ExecutionAssetRef(
@@ -115,8 +132,22 @@ class _FakeComputeWorker extends EndpointComputeWorker {
     UuidValue executionId,
     ExecutionOutcome outcome,
   ) async {
+    onReport?.call();
     reports.add(outcome);
   }
+}
+
+class _FakeHeartbeat extends ExecutionHeartbeat {
+  _FakeHeartbeat(Client client, UuidValue workerId)
+    : super(client, workerId, 20);
+
+  bool active = false;
+
+  @override
+  void start(UuidValue executionId) => active = true;
+
+  @override
+  void stop() => active = false;
 }
 
 class _FakePythonRunner extends PythonRunner {

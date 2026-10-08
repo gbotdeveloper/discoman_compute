@@ -58,18 +58,25 @@ class ExecutionProcessor {
     final inputs = _decodeInputs(claimed.inputsJson);
 
     heartbeat.start(claimed.executionId);
-    PythonRunResult result;
     try {
-      result = await pythonRunner.run(
-        source: source,
-        entrypointName: claimed.entrypointName,
-        inputs: inputs,
-        timeoutSeconds: claimed.timeoutSeconds,
-        cancelRequested: () => heartbeat.cancelRequested,
-      );
+      await _runAndReport(claimed, source, inputs);
     } finally {
       heartbeat.stop();
     }
+  }
+
+  Future<void> _runAndReport(
+    ClaimedExecution claimed,
+    String source,
+    Map<String, dynamic> inputs,
+  ) async {
+    final result = await pythonRunner.run(
+      source: source,
+      entrypointName: claimed.entrypointName,
+      inputs: inputs,
+      timeoutSeconds: claimed.timeoutSeconds,
+      cancelRequested: () => heartbeat.cancelRequested,
+    );
 
     if (result.canceled) {
       await _report(
