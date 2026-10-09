@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:discoman_client/discoman_client.dart';
+import 'package:http/http.dart' as http;
 
 import 'heartbeat.dart';
 import 'python/python_runner.dart';
@@ -17,13 +18,17 @@ class ExecutionProcessor {
     required this.heartbeat,
     ScriptStore? scriptStore,
     this.reportRetryDelay = const Duration(seconds: 1),
-  }) : _injectedScriptStore = scriptStore;
+    http.Client? httpClient,
+  }) : _injectedScriptStore = scriptStore,
+       _http = httpClient ?? http.Client();
 
   final Client client;
   final UuidValue workerId;
   final PythonRunner pythonRunner;
   final ExecutionHeartbeat heartbeat;
   final Duration reportRetryDelay;
+  final http.Client _http;
+  bool _directUploads = true;
 
   final ScriptStore? _injectedScriptStore;
 
@@ -72,6 +77,22 @@ class ExecutionProcessor {
     String source,
     Map<String, dynamic> inputs,
   ) async {
+    try {
+      inputs = await _downloadInputFiles(inputs);
+    } catch (error) {
+      await _report(
+        claimed.executionId,
+        ExecutionOutcome(
+          success: false,
+          errorReason: 'inputDownloadFailed',
+          errorMessage: 'An input file could not be read: $error',
+          warnings: const [],
+          logs: const [],
+        ),
+      );
+      return;
+    }
+
     final result = await pythonRunner.run(
       source: source,
       entrypointName: claimed.entrypointName,
@@ -158,20 +179,10 @@ class ExecutionProcessor {
         result[entry.key] = value;
         continue;
       }
-      final asset = value as Map;
-      final ref = await client.computeWorker.uploadExecutionAsset(
-        workerId,
+      final ref = await _uploadAsset(
         executionId,
-        ExecutionAssetUpload(
-          outputKey: entry.key,
-          kind: asset['kind'] as String,
-          name: asset['name'] as String,
-          // The runner emits 'extension'; the upload DTO calls it fileExtension.
-          fileExtension: asset['extension'] as String,
-          mimeType: asset['mimeType'] as String,
-          sizeBytes: asset['sizeBytes'] as int,
-          base64: asset['base64'] as String,
-        ),
+        entry.key,
+        value as Map<dynamic, dynamic>,
       );
       // The history writer reads 'extension' (not 'fileExtension') from the
       // outputs map, so emit the descriptor with that key.
@@ -183,6 +194,99 @@ class ExecutionProcessor {
         'sizeBytes': ref.sizeBytes,
         'storagePath': ref.storagePath,
         'downloadUrl': ref.downloadUrl,
+      };
+    }
+    return result;
+  }
+
+  /// Uploads one output file straight to storage, or through the server when
+  /// it does not offer direct uploads.
+  Future<ExecutionAssetRef> _uploadAsset(
+    UuidValue executionId,
+    String outputKey,
+    Map<dynamic, dynamic> asset,
+  ) async {
+    if (_directUploads) {
+      try {
+        final ticket = await client.computeWorker.createOutputUpload(
+          workerId,
+          executionId,
+          ExecutionAssetUploadRequest(
+            outputKey: outputKey,
+            kind: asset['kind'] as String,
+            name: asset['name'] as String,
+            fileExtension: asset['extension'] as String,
+            mimeType: asset['mimeType'] as String,
+            sizeBytes: asset['sizeBytes'] as int,
+          ),
+        );
+        final response = await _http
+            .put(
+              Uri.parse(ticket.uploadUrl),
+              headers: {
+                'x-ms-blob-type': 'BlockBlob',
+                'Content-Type': asset['mimeType'] as String,
+              },
+              body: base64Decode(asset['base64'] as String),
+            )
+            .timeout(const Duration(minutes: 2));
+        if (response.statusCode != 201) {
+          throw StateError(
+            'Output upload failed (HTTP ${response.statusCode}).',
+          );
+        }
+        return ticket.asset;
+      } on ScriptRunException catch (error) {
+        if (error.reason != 'blobNotConfigured') rethrow;
+        _directUploads = false;
+      }
+    }
+
+    return client.computeWorker.uploadExecutionAsset(
+      workerId,
+      executionId,
+      ExecutionAssetUpload(
+        outputKey: outputKey,
+        kind: asset['kind'] as String,
+        name: asset['name'] as String,
+        // The runner emits 'extension'; the upload DTO calls it fileExtension.
+        fileExtension: asset['extension'] as String,
+        mimeType: asset['mimeType'] as String,
+        sizeBytes: asset['sizeBytes'] as int,
+        base64: asset['base64'] as String,
+      ),
+    );
+  }
+
+  /// Input files arrive as links to storage; Python receives them inline, as
+  /// before.
+  Future<Map<String, dynamic>> _downloadInputFiles(
+    Map<String, dynamic> inputs,
+  ) async {
+    final result = <String, dynamic>{};
+    for (final entry in inputs.entries) {
+      final value = entry.value;
+      final url = value is Map ? value['downloadUrl'] : null;
+      if (value is! Map ||
+          (value['kind'] != 'image' && value['kind'] != 'file') ||
+          value['base64'] is String ||
+          url is! String) {
+        result[entry.key] = value;
+        continue;
+      }
+      final response = await _http
+          .get(Uri.parse(url))
+          .timeout(const Duration(minutes: 2));
+      if (response.statusCode != 200) {
+        throw StateError('"${entry.key}" (HTTP ${response.statusCode})');
+      }
+      result[entry.key] = {
+        'kind': value['kind'],
+        'name': value['name'],
+        'extension': value['extension'],
+        'mimeType': value['mimeType'],
+        'sizeBytes': response.bodyBytes.length,
+        'base64': base64Encode(response.bodyBytes),
       };
     }
     return result;
