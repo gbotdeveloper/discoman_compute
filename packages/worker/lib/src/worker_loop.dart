@@ -10,6 +10,7 @@ import 'execution_processor.dart';
 import 'heartbeat.dart';
 import 'python/python_runner.dart';
 import 'remote_worker.dart';
+import 'wake_up_consumer.dart';
 import 'worker_config.dart';
 
 /// Runs the worker in the mode selected by [config], returning the process exit
@@ -48,6 +49,7 @@ Future<int> _runCloudWorker(WorkerConfig config) async {
 
   final workerId = registration.workerId;
   final processor = _buildProcessor(session, registration, config);
+  final wakeUps = WakeUpConsumer.fromEnvironment();
 
   final startedAt = DateTime.now();
   // Reserve enough headroom for one in-flight job below the replica timeout.
@@ -71,6 +73,8 @@ Future<int> _runCloudWorker(WorkerConfig config) async {
       );
       if (claimed == null) {
         stdout.writeln('Queue empty; drain complete.');
+        // Timeout and error exits keep it, so KEDA starts a replacement.
+        await wakeUps?.consumeOne();
         break;
       }
       if (claimed.timeoutSeconds > reservedSeconds) {
@@ -83,6 +87,7 @@ Future<int> _runCloudWorker(WorkerConfig config) async {
     exitCode = 1;
   }
 
+  wakeUps?.close();
   await _safeDeregister(session.client, workerId);
   session.client.close();
   return exitCode;

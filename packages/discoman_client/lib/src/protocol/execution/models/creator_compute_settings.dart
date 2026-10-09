@@ -24,6 +24,7 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
     required this.computeMode,
     required this.selfHostedTimeoutSeconds,
     required this.selfHostedQueueDeadlineHours,
+    this.cloudConcurrencyCap,
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? DateTime.now();
 
@@ -33,6 +34,7 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
     required _i2.ComputeMode computeMode,
     required int selfHostedTimeoutSeconds,
     required int selfHostedQueueDeadlineHours,
+    int? cloudConcurrencyCap,
     DateTime? updatedAt,
   }) = _CreatorComputeSettingsImpl;
 
@@ -51,6 +53,7 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
           jsonSerialization['selfHostedTimeoutSeconds'] as int,
       selfHostedQueueDeadlineHours:
           jsonSerialization['selfHostedQueueDeadlineHours'] as int,
+      cloudConcurrencyCap: jsonSerialization['cloudConcurrencyCap'] as int?,
       updatedAt: jsonSerialization['updatedAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['updatedAt']),
@@ -73,6 +76,9 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
   /// before failing with computeOffline. Distinct from the run timeout.
   int selfHostedQueueDeadlineHours;
 
+  /// Cloud runs allowed at once; null uses the server default.
+  int? cloudConcurrencyCap;
+
   DateTime updatedAt;
 
   /// Returns a shallow copy of this [CreatorComputeSettings]
@@ -84,6 +90,7 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
     _i2.ComputeMode? computeMode,
     int? selfHostedTimeoutSeconds,
     int? selfHostedQueueDeadlineHours,
+    int? cloudConcurrencyCap,
     DateTime? updatedAt,
   });
   @override
@@ -95,6 +102,8 @@ abstract class CreatorComputeSettings implements _i1.SerializableModel {
       'computeMode': computeMode.toJson(),
       'selfHostedTimeoutSeconds': selfHostedTimeoutSeconds,
       'selfHostedQueueDeadlineHours': selfHostedQueueDeadlineHours,
+      if (cloudConcurrencyCap != null)
+        'cloudConcurrencyCap': cloudConcurrencyCap,
       'updatedAt': updatedAt.toJson(),
     };
   }
@@ -114,6 +123,7 @@ class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
     required _i2.ComputeMode computeMode,
     required int selfHostedTimeoutSeconds,
     required int selfHostedQueueDeadlineHours,
+    int? cloudConcurrencyCap,
     DateTime? updatedAt,
   }) : super._(
          id: id,
@@ -121,6 +131,7 @@ class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
          computeMode: computeMode,
          selfHostedTimeoutSeconds: selfHostedTimeoutSeconds,
          selfHostedQueueDeadlineHours: selfHostedQueueDeadlineHours,
+         cloudConcurrencyCap: cloudConcurrencyCap,
          updatedAt: updatedAt,
        );
 
@@ -134,6 +145,7 @@ class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
     _i2.ComputeMode? computeMode,
     int? selfHostedTimeoutSeconds,
     int? selfHostedQueueDeadlineHours,
+    Object? cloudConcurrencyCap = _Undefined,
     DateTime? updatedAt,
   }) {
     return CreatorComputeSettings(
@@ -144,6 +156,9 @@ class _CreatorComputeSettingsImpl extends CreatorComputeSettings {
           selfHostedTimeoutSeconds ?? this.selfHostedTimeoutSeconds,
       selfHostedQueueDeadlineHours:
           selfHostedQueueDeadlineHours ?? this.selfHostedQueueDeadlineHours,
+      cloudConcurrencyCap: cloudConcurrencyCap is int?
+          ? cloudConcurrencyCap
+          : this.cloudConcurrencyCap,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

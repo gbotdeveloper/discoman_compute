@@ -16,12 +16,14 @@ class ExecutionProcessor {
     required this.pythonRunner,
     required this.heartbeat,
     ScriptStore? scriptStore,
+    this.reportRetryDelay = const Duration(seconds: 1),
   }) : _injectedScriptStore = scriptStore;
 
   final Client client;
   final UuidValue workerId;
   final PythonRunner pythonRunner;
   final ExecutionHeartbeat heartbeat;
+  final Duration reportRetryDelay;
 
   final ScriptStore? _injectedScriptStore;
 
@@ -58,18 +60,25 @@ class ExecutionProcessor {
     final inputs = _decodeInputs(claimed.inputsJson);
 
     heartbeat.start(claimed.executionId);
-    PythonRunResult result;
     try {
-      result = await pythonRunner.run(
-        source: source,
-        entrypointName: claimed.entrypointName,
-        inputs: inputs,
-        timeoutSeconds: claimed.timeoutSeconds,
-        cancelRequested: () => heartbeat.cancelRequested,
-      );
+      await _runAndReport(claimed, source, inputs);
     } finally {
       heartbeat.stop();
     }
+  }
+
+  Future<void> _runAndReport(
+    ClaimedExecution claimed,
+    String source,
+    Map<String, dynamic> inputs,
+  ) async {
+    final result = await pythonRunner.run(
+      source: source,
+      entrypointName: claimed.entrypointName,
+      inputs: inputs,
+      timeoutSeconds: claimed.timeoutSeconds,
+      cancelRequested: () => heartbeat.cancelRequested,
+    );
 
     if (result.canceled) {
       await _report(
@@ -101,10 +110,28 @@ class ExecutionProcessor {
       return;
     }
 
-    final outputs = await _uploadAssets(
-      claimed.executionId,
-      result.outputs ?? const {},
-    );
+    final Map<String, dynamic> outputs;
+    try {
+      outputs = await _uploadAssets(
+        claimed.executionId,
+        result.outputs ?? const {},
+      );
+    } catch (error) {
+      await _report(
+        claimed.executionId,
+        ExecutionOutcome(
+          success: false,
+          errorReason: 'outputUploadFailed',
+          errorMessage: error is ScriptRunException
+              ? error.message
+              : 'The run finished but its output files could not be saved.',
+          durationMs: result.durationMs,
+          warnings: const [],
+          logs: result.logs,
+        ),
+      );
+      return;
+    }
     await _report(
       claimed.executionId,
       ExecutionOutcome(
@@ -210,13 +237,21 @@ class ExecutionProcessor {
   }
 
   Future<void> _report(UuidValue executionId, ExecutionOutcome outcome) async {
-    try {
-      await client.computeWorker.reportResult(workerId, executionId, outcome);
-    } catch (error) {
-      // reportResult is exactly-once and idempotent server-side; if it fails
-      // (transient), the lease sweeper reclaims the run. Log and move on rather
-      // than crash the worker.
-      stderr.writeln('Failed to report result for $executionId: $error');
+    const attempts = 3;
+    for (var attempt = 1; ; attempt++) {
+      try {
+        await client.computeWorker.reportResult(workerId, executionId, outcome);
+        return;
+      } on ScriptRunException catch (error) {
+        stderr.writeln('Result for $executionId rejected: ${error.message}');
+        return;
+      } catch (error) {
+        if (attempt == attempts) {
+          stderr.writeln('Failed to report result for $executionId: $error');
+          return;
+        }
+        await Future<void>.delayed(reportRetryDelay * attempt);
+      }
     }
   }
 }
