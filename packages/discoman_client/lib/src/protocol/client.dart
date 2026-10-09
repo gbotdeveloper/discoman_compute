@@ -37,14 +37,18 @@ import 'package:discoman_client/src/protocol/execution/models/execution_asset_re
     as _i14;
 import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload.dart'
     as _i15;
-import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_ticket.dart'
     as _i16;
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_request.dart'
+    as _i17;
+import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
+    as _i18;
 import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i26;
+    as _i30;
 import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
-    as _i27;
-import 'package:http/http.dart' as _i29;
-import 'protocol.dart' as _i30;
+    as _i31;
+import 'package:http/http.dart' as _i33;
+import 'protocol.dart' as _i34;
 
 /// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider
 /// endpoint is made available on the server.
@@ -244,8 +248,9 @@ class EndpointComputeWorker extends _i2.EndpointRef {
     },
   );
 
-  /// Stores one output asset for the claimed execution in Firebase Storage
-  /// and returns the reference the worker must substitute into its outputs.
+  /// Stores one output asset sent through the server and returns the
+  /// reference the worker must substitute into its outputs. Workers that
+  /// upload directly use [createOutputUpload]; this remains for older ones.
   ///
   /// Everything is enforced server-side: ownership, per-kind size caps,
   /// base64-length reconciliation, and per-execution asset count/byte caps.
@@ -263,6 +268,22 @@ class EndpointComputeWorker extends _i2.EndpointRef {
     },
   );
 
+  /// Reserves one output file and returns a short-lived link the worker
+  /// uploads it to directly, so its bytes never pass through the server.
+  _i3.Future<_i16.ExecutionAssetUploadTicket> createOutputUpload(
+    _i2.UuidValue workerId,
+    _i2.UuidValue executionId,
+    _i17.ExecutionAssetUploadRequest asset,
+  ) => caller.callServerEndpoint<_i16.ExecutionAssetUploadTicket>(
+    'computeWorker',
+    'createOutputUpload',
+    {
+      'workerId': workerId,
+      'executionId': executionId,
+      'asset': asset,
+    },
+  );
+
   /// Finalizes a claimed execution with the worker's outcome. Exactly-once:
   /// stale or duplicate reports are no-ops. On success of a published-app run
   /// the Firestore history/usage documents are written afterwards —
@@ -270,7 +291,7 @@ class EndpointComputeWorker extends _i2.EndpointRef {
   _i3.Future<void> reportResult(
     _i2.UuidValue workerId,
     _i2.UuidValue executionId,
-    _i16.ExecutionOutcome outcome,
+    _i18.ExecutionOutcome outcome,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'reportResult',
@@ -345,8 +366,8 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   String get name => 'creatorScript';
 
   /// The creator's projects, newest first, for the client's project chooser.
-  _i3.Future<List<_i26.CreatorProjectSummary>> listProjects() =>
-      caller.callServerEndpoint<List<_i26.CreatorProjectSummary>>(
+  _i3.Future<List<_i30.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i30.CreatorProjectSummary>>(
         'creatorScript',
         'listProjects',
         {},
@@ -377,7 +398,7 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   /// old contract until they publish again.
   _i3.Future<void> publishContract(
     String projectId,
-    _i27.ContractDraft draft,
+    _i31.ContractDraft draft,
     String fingerprint,
   ) => caller.callServerEndpoint<void>(
     'creatorScript',
@@ -419,10 +440,10 @@ class Client extends _i2.ServerpodClientShared {
     onFailedCall,
     Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i29.Client? httpClientOverride,
+    _i33.Client? httpClientOverride,
   }) : super(
          host,
-         _i30.Protocol(),
+         _i34.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
