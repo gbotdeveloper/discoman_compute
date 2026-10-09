@@ -59,9 +59,9 @@ class ProjectsPanel extends StatelessWidget {
                 if (runsInCloud.isNotEmpty) ...[
                   if (runsHere.isNotEmpty) const SizedBox(height: 20),
                   const _GroupHeading(
-                    title: "Runs in GBot's cloud",
+                    title: "Runs in Discoman's cloud",
                     detail:
-                        'Move one to your own computers in GBot, and it will '
+                        'Move one to your own computers in Discoman, and it will '
                         'appear above.',
                   ),
                   for (final project in runsInCloud)
@@ -131,7 +131,7 @@ class _EmptyProjects extends StatelessWidget {
     return Text(
       isBusy
           ? 'Loading…'
-          : 'No projects yet. Create one in GBot, then refresh this list.',
+          : 'No projects yet. Create one in Discoman, then refresh this list.',
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
@@ -201,7 +201,7 @@ class ProjectRow extends StatelessWidget {
     final (icon, label, colour) = switch (state) {
       _ProjectState.inCloud => (
         Icons.cloud_outlined,
-        'Its script is uploaded to GBot',
+        'Its script is uploaded to Discoman',
         colorScheme.onSurfaceVariant,
       ),
       _ProjectState.scriptMissing => (
