@@ -79,8 +79,8 @@ void main() {
     expect(find.text('Link a script').hitTestable(), findsNothing);
     expect(find.text('Replace script').hitTestable(), findsNothing);
     expect(find.byType(Switch).hitTestable(), findsNothing);
-    expect(find.text('Its script is uploaded to GBot'), findsOneWidget);
-    expect(find.text("Runs in GBot's cloud"), findsOneWidget);
+    expect(find.text('Its script is uploaded to Discoman'), findsOneWidget);
+    expect(find.text("Runs in Discoman's cloud"), findsOneWidget);
   });
 
   testWidgets('a project that runs here can be given a script', (tester) async {
