@@ -123,6 +123,41 @@ void main() {
     });
   });
 
+  test('hands Python a list of input files in order', () async {
+    storageResponse = (request) async =>
+        http.Response.bytes(utf8.encode(request.url.pathSegments.last), 200);
+    Map<String, dynamic> linked(String name) => {
+      'kind': 'image',
+      'name': name,
+      'extension': 'png',
+      'mimeType': 'image/png',
+      'sizeBytes': 1,
+      'storagePath': 'inputs/published/x/$name',
+      'downloadUrl': 'https://blob.test/inputs/published/x/$name',
+    };
+
+    await processor.process(
+      claimed(
+        inputsJson: jsonEncode({
+          'photos': [linked('a.png'), linked('b.png')],
+          'tags': ['x', 'y'],
+        }),
+      ),
+    );
+
+    final photos = (pythonRunner.lastInputs!['photos'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(photos.map((photo) => photo['name']), ['a.png', 'b.png']);
+    expect(
+      photos.map(
+        (photo) => utf8.decode(base64Decode(photo['base64'] as String)),
+      ),
+      ['a.png', 'b.png'],
+    );
+    expect(photos.every((photo) => !photo.containsKey('downloadUrl')), isTrue);
+    expect(pythonRunner.lastInputs!['tags'], ['x', 'y']);
+  });
+
   test('fails the run when an input file cannot be downloaded', () async {
     storageResponse = (request) async => http.Response('', 404);
 
