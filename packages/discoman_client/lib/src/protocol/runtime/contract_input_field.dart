@@ -27,7 +27,9 @@ abstract class ContractInputField implements _i1.SerializableModel {
     required this.controlHint,
     required this.validationHint,
     required this.options,
-  });
+    bool? multiple,
+    this.maxItems,
+  }) : multiple = multiple ?? false;
 
   factory ContractInputField({
     required String id,
@@ -38,6 +40,8 @@ abstract class ContractInputField implements _i1.SerializableModel {
     required String controlHint,
     required String validationHint,
     required List<String> options,
+    bool? multiple,
+    int? maxItems,
   }) = _ContractInputFieldImpl;
 
   factory ContractInputField.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -54,6 +58,10 @@ abstract class ContractInputField implements _i1.SerializableModel {
       options: _i3.Protocol().deserialize<List<String>>(
         jsonSerialization['options'],
       ),
+      multiple: jsonSerialization['multiple'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(jsonSerialization['multiple']),
+      maxItems: jsonSerialization['maxItems'] as int?,
     );
   }
 
@@ -81,6 +89,12 @@ abstract class ContractInputField implements _i1.SerializableModel {
   /// Category/dropdown options when the type is `category`.
   List<String> options;
 
+  /// Whether the parameter takes a list of `type` values.
+  bool multiple;
+
+  /// Upper bound on the list length when `multiple`; null means no bound.
+  int? maxItems;
+
   /// Returns a shallow copy of this [ContractInputField]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -93,6 +107,8 @@ abstract class ContractInputField implements _i1.SerializableModel {
     String? controlHint,
     String? validationHint,
     List<String>? options,
+    bool? multiple,
+    int? maxItems,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -106,6 +122,8 @@ abstract class ContractInputField implements _i1.SerializableModel {
       'controlHint': controlHint,
       'validationHint': validationHint,
       'options': options.toJson(),
+      'multiple': multiple,
+      if (maxItems != null) 'maxItems': maxItems,
     };
   }
 
@@ -114,6 +132,8 @@ abstract class ContractInputField implements _i1.SerializableModel {
     return _i1.SerializationManager.encode(this);
   }
 }
+
+class _Undefined {}
 
 class _ContractInputFieldImpl extends ContractInputField {
   _ContractInputFieldImpl({
@@ -125,6 +145,8 @@ class _ContractInputFieldImpl extends ContractInputField {
     required String controlHint,
     required String validationHint,
     required List<String> options,
+    bool? multiple,
+    int? maxItems,
   }) : super._(
          id: id,
          parameterName: parameterName,
@@ -134,6 +156,8 @@ class _ContractInputFieldImpl extends ContractInputField {
          controlHint: controlHint,
          validationHint: validationHint,
          options: options,
+         multiple: multiple,
+         maxItems: maxItems,
        );
 
   /// Returns a shallow copy of this [ContractInputField]
@@ -149,6 +173,8 @@ class _ContractInputFieldImpl extends ContractInputField {
     String? controlHint,
     String? validationHint,
     List<String>? options,
+    bool? multiple,
+    Object? maxItems = _Undefined,
   }) {
     return ContractInputField(
       id: id ?? this.id,
@@ -159,6 +185,8 @@ class _ContractInputFieldImpl extends ContractInputField {
       controlHint: controlHint ?? this.controlHint,
       validationHint: validationHint ?? this.validationHint,
       options: options ?? this.options.map((e0) => e0).toList(),
+      multiple: multiple ?? this.multiple,
+      maxItems: maxItems is int? ? maxItems : this.maxItems,
     );
   }
 }

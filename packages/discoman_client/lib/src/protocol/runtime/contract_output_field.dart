@@ -23,7 +23,8 @@ abstract class ContractOutputField implements _i1.SerializableModel {
     required this.displayLabel,
     required this.type,
     required this.presentationHint,
-  });
+    bool? multiple,
+  }) : multiple = multiple ?? false;
 
   factory ContractOutputField({
     required String id,
@@ -31,6 +32,7 @@ abstract class ContractOutputField implements _i1.SerializableModel {
     required String displayLabel,
     required _i2.PythonFieldType type,
     required String presentationHint,
+    bool? multiple,
   }) = _ContractOutputFieldImpl;
 
   factory ContractOutputField.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -40,6 +42,9 @@ abstract class ContractOutputField implements _i1.SerializableModel {
       displayLabel: jsonSerialization['displayLabel'] as String,
       type: _i2.PythonFieldType.fromJson((jsonSerialization['type'] as String)),
       presentationHint: jsonSerialization['presentationHint'] as String,
+      multiple: jsonSerialization['multiple'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(jsonSerialization['multiple']),
     );
   }
 
@@ -58,6 +63,9 @@ abstract class ContractOutputField implements _i1.SerializableModel {
   /// Hint describing how this output was inferred / should be presented.
   String presentationHint;
 
+  /// Whether the output is a list of `type` values.
+  bool multiple;
+
   /// Returns a shallow copy of this [ContractOutputField]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -67,6 +75,7 @@ abstract class ContractOutputField implements _i1.SerializableModel {
     String? displayLabel,
     _i2.PythonFieldType? type,
     String? presentationHint,
+    bool? multiple,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -77,6 +86,7 @@ abstract class ContractOutputField implements _i1.SerializableModel {
       'displayLabel': displayLabel,
       'type': type.toJson(),
       'presentationHint': presentationHint,
+      'multiple': multiple,
     };
   }
 
@@ -93,12 +103,14 @@ class _ContractOutputFieldImpl extends ContractOutputField {
     required String displayLabel,
     required _i2.PythonFieldType type,
     required String presentationHint,
+    bool? multiple,
   }) : super._(
          id: id,
          outputKey: outputKey,
          displayLabel: displayLabel,
          type: type,
          presentationHint: presentationHint,
+         multiple: multiple,
        );
 
   /// Returns a shallow copy of this [ContractOutputField]
@@ -111,6 +123,7 @@ class _ContractOutputFieldImpl extends ContractOutputField {
     String? displayLabel,
     _i2.PythonFieldType? type,
     String? presentationHint,
+    bool? multiple,
   }) {
     return ContractOutputField(
       id: id ?? this.id,
@@ -118,6 +131,7 @@ class _ContractOutputFieldImpl extends ContractOutputField {
       displayLabel: displayLabel ?? this.displayLabel,
       type: type ?? this.type,
       presentationHint: presentationHint ?? this.presentationHint,
+      multiple: multiple ?? this.multiple,
     );
   }
 }
