@@ -17,12 +17,14 @@ MAX_FILE_BYTES = 5242880
 import base64
 import binascii
 import contextlib
+import datetime
 import importlib.util
 import io
 import json
 import os
 import sys
 import traceback
+import typing
 from pathlib import Path
 
 SOURCE_FILE = Path("user_script.py")
@@ -405,6 +407,46 @@ def _normalize_output_value(output_key, value):
     return _to_json_compatible(value)
 
 
+def _annotation_target(annotation):
+    # Optional[X] and X | None coerce like X.
+    args = [
+        arg
+        for arg in getattr(annotation, "__args__", None) or ()
+        if arg is not type(None)
+    ]
+    is_union = (
+        getattr(annotation, "__origin__", None) is typing.Union
+        or type(annotation).__name__ == "UnionType"
+    )
+    return args[0] if is_union and len(args) == 1 else annotation
+
+
+def _coerce_input(annotation, value):
+    # Dates arrive as ISO text; hand the script the type it asked for.
+    target = _annotation_target(annotation)
+    if not isinstance(value, str):
+        return value
+    try:
+        if target is datetime.datetime:
+            return datetime.datetime.fromisoformat(value)
+        if target is datetime.date:
+            return datetime.date.fromisoformat(value)
+    except ValueError:
+        return value
+    return value
+
+
+def _coerce_inputs(entrypoint, inputs):
+    try:
+        hints = typing.get_type_hints(entrypoint)
+    except Exception:
+        return inputs
+    return {
+        key: _coerce_input(hints[key], value) if key in hints else value
+        for key, value in inputs.items()
+    }
+
+
 def _load_module():
     spec = importlib.util.spec_from_file_location("user_script", SOURCE_FILE)
     if spec is None or spec.loader is None:
@@ -438,7 +480,7 @@ def main():
                 f"Entrypoint '{entrypoint_name}' is not callable."
             )
 
-        result = entrypoint(**inputs)
+        result = entrypoint(**_coerce_inputs(entrypoint, inputs))
         if isinstance(result, dict) and not _looks_like_runtime_image_payload(result) and not _looks_like_runtime_file_payload(result):
             outputs = {
                 str(key): _normalize_output_value(str(key), value)

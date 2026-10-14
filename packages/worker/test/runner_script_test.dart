@@ -11,6 +11,7 @@ const _png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
 Future<Map<String, dynamic>> _run(
   String script, {
   Map<String, String> modules = const {},
+  Map<String, Object?> inputs = const {},
 }) async {
   final dir = await Directory.systemTemp.createTemp('runner_test');
   addTearDown(() => dir.delete(recursive: true));
@@ -25,7 +26,7 @@ Future<Map<String, dynamic>> _run(
   final process = await Process.start('python3', [
     'runner.py',
   ], workingDirectory: dir.path);
-  process.stdin.write(jsonEncode({'entrypointName': 'run', 'inputs': {}}));
+  process.stdin.write(jsonEncode({'entrypointName': 'run', 'inputs': inputs}));
   await process.stdin.close();
   final stderr = await process.stderr.transform(utf8.decoder).join();
   final exitCode = await process.exitCode;
@@ -100,6 +101,40 @@ def run():
 ''');
 
       expect(outputs['values'], [1, 2.5, 'x']);
+    },
+    skip: hasPython ? false : 'python3 is not installed',
+  );
+
+  test(
+    'hands a date parameter a date and leaves other text alone',
+    () async {
+      final outputs = await _run(
+        '''
+import datetime
+from typing import Optional
+
+def run(start: datetime.date, at: Optional[datetime.datetime], note: str, bad: datetime.date):
+    return {
+        "start": type(start).__name__ + ":" + start.isoformat(),
+        "at": type(at).__name__ + ":" + at.isoformat(),
+        "note": note,
+        "bad": bad,
+    }
+''',
+        inputs: {
+          'start': '2026-10-15',
+          'at': '2026-10-15T08:30:00',
+          'note': '2026-10-15',
+          'bad': 'not a date',
+        },
+      );
+
+      expect(outputs, {
+        'start': 'date:2026-10-15',
+        'at': 'datetime:2026-10-15T08:30:00',
+        'note': '2026-10-15',
+        'bad': 'not a date',
+      });
     },
     skip: hasPython ? false : 'python3 is not installed',
   );
