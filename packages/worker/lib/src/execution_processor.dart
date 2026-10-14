@@ -166,8 +166,9 @@ class ExecutionProcessor {
   }
 
   /// Uploads every asset-shaped output value and replaces it with the storage
-  /// reference descriptor the history writer expects. Non-asset values pass
-  /// through unchanged.
+  /// reference descriptor the history writer expects. A list of files is
+  /// uploaded file by file, each named after the key and its position.
+  /// Non-asset values pass through unchanged.
   Future<Map<String, dynamic>> _uploadAssets(
     UuidValue executionId,
     Map<String, dynamic> outputs,
@@ -175,28 +176,47 @@ class ExecutionProcessor {
     final result = <String, dynamic>{};
     for (final entry in outputs.entries) {
       final value = entry.value;
-      if (!_isAssetOutput(value)) {
+      if (_isAssetOutput(value)) {
+        result[entry.key] = await _uploadedDescriptor(
+          executionId,
+          entry.key,
+          value as Map<dynamic, dynamic>,
+        );
+      } else if (value is List &&
+          value.isNotEmpty &&
+          value.every(_isAssetOutput)) {
+        result[entry.key] = [
+          for (var i = 0; i < value.length; i++)
+            await _uploadedDescriptor(
+              executionId,
+              '${entry.key}_${i + 1}',
+              value[i] as Map<dynamic, dynamic>,
+            ),
+        ];
+      } else {
         result[entry.key] = value;
-        continue;
       }
-      final ref = await _uploadAsset(
-        executionId,
-        entry.key,
-        value as Map<dynamic, dynamic>,
-      );
-      // The history writer reads 'extension' (not 'fileExtension') from the
-      // outputs map, so emit the descriptor with that key.
-      result[entry.key] = {
-        'kind': ref.kind,
-        'name': ref.name,
-        'extension': ref.fileExtension,
-        'mimeType': ref.mimeType,
-        'sizeBytes': ref.sizeBytes,
-        'storagePath': ref.storagePath,
-        'downloadUrl': ref.downloadUrl,
-      };
     }
     return result;
+  }
+
+  Future<Map<String, dynamic>> _uploadedDescriptor(
+    UuidValue executionId,
+    String outputKey,
+    Map<dynamic, dynamic> asset,
+  ) async {
+    final ref = await _uploadAsset(executionId, outputKey, asset);
+    // The history writer reads 'extension' (not 'fileExtension') from the
+    // outputs map, so emit the descriptor with that key.
+    return {
+      'kind': ref.kind,
+      'name': ref.name,
+      'extension': ref.fileExtension,
+      'mimeType': ref.mimeType,
+      'sizeBytes': ref.sizeBytes,
+      'storagePath': ref.storagePath,
+      'downloadUrl': ref.downloadUrl,
+    };
   }
 
   /// Uploads one output file straight to storage, or through the server when

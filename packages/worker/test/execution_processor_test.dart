@@ -80,6 +80,30 @@ void main() {
     },
   );
 
+  test('uploads each file of an output list under its position', () async {
+    computeWorker.directUploads = true;
+    final chart = pythonRunner.outputs['chart'];
+    pythonRunner.outputs
+      ..clear()
+      ..addAll({
+        'charts': [chart, chart],
+        'total': 3,
+      });
+
+    await processor.process(claimed());
+
+    expect(requests.map((request) => request.method), ['PUT', 'PUT']);
+    final outputs =
+        jsonDecode(computeWorker.reports.single.outputsJson!) as Map;
+    final charts = (outputs['charts'] as List).cast<Map<String, dynamic>>();
+    expect(charts.map((chart) => chart['storagePath']), [
+      'outputs/published/x/charts_1.png',
+      'outputs/published/x/charts_2.png',
+    ]);
+    expect(charts.every((chart) => !chart.containsKey('base64')), isTrue);
+    expect(outputs['total'], 3);
+  });
+
   test('reports a failed direct upload as a failed run', () async {
     computeWorker.directUploads = true;
     storageResponse = (request) async => http.Response('', 403);
