@@ -107,5 +107,41 @@ def run(w: float, h: float):
       expect(outputs.single.outputKey, 'result');
       expect(outputs.single.type, PythonFieldType.text);
     });
+
+    test('types an annotation by its outermost type', () {
+      const cases = {
+        'list[int]': PythonFieldType.list,
+        'List[float]': PythonFieldType.list,
+        'tuple[int, int]': PythonFieldType.list,
+        'dict[str, int]': PythonFieldType.table,
+        'typing.Dict[str, float]': PythonFieldType.table,
+        'Optional[int]': PythonFieldType.integer,
+        'int | None': PythonFieldType.integer,
+        'Union[float, None]': PythonFieldType.decimal,
+        'Optional[dict[str, Any]]': PythonFieldType.table,
+        "Annotated[int, 'meters']": PythonFieldType.integer,
+        'int | float': PythonFieldType.decimal,
+        'int | str': PythonFieldType.text,
+        'Point': PythonFieldType.text,
+        'Optional[Point]': PythonFieldType.text,
+        'Printer': PythonFieldType.text,
+        "'int'": PythonFieldType.integer,
+      };
+      for (final entry in cases.entries) {
+        final source = 'def run(value: ${entry.key}):\n    return {"r": 1}';
+        expect(
+          extractContractDraft(source).inputFields.single.type,
+          entry.value,
+          reason: entry.key,
+        );
+      }
+    });
+
+    test('reads an optional dict input as an image from its name', () {
+      const source =
+          'def run(photo: Optional[dict[str, Any]]):\n    return {"r": 1}';
+      final field = extractContractDraft(source).inputFields.single;
+      expect(field.type, PythonFieldType.image);
+    });
   });
 }

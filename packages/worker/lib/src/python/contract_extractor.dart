@@ -174,8 +174,8 @@ String _resolveInputFieldType(
   String? docstringBody,
   List<String> notes,
 ) {
-  final normalized = annotation?.toLowerCase().trim() ?? '';
-  if (normalized.contains('dict') || normalized.contains('mapping')) {
+  final annotatedType = _mapAnnotationToFieldType(annotation);
+  if (annotatedType == 'table') {
     final docstringHint = _inferAssetPayloadTypeFromDocstringHints(
       docstringBody,
       parameterName,
@@ -194,7 +194,7 @@ String _resolveInputFieldType(
       return nameHint;
     }
   }
-  return _mapAnnotationToFieldType(annotation);
+  return annotatedType;
 }
 
 // --- Outputs --------------------------------------------------------------
@@ -548,18 +548,88 @@ List<String> _splitParameters(String parametersSource) {
   return parts;
 }
 
+const _annotationTypeNames = {
+  'literal': 'category',
+  'bool': 'boolean',
+  'int': 'integer',
+  'float': 'decimal',
+  'decimal': 'decimal',
+  'dict': 'table',
+  'mapping': 'table',
+  'list': 'list',
+  'tuple': 'list',
+  'sequence': 'list',
+  'str': 'text',
+};
+
+/// Maps an annotation by its outermost type, so `list[int]` is a list and not
+/// an integer. `Optional[X]`, `X | None` and `Union[X, None]` resolve to `X`.
 String _mapAnnotationToFieldType(String? annotation) {
-  final n = annotation?.toLowerCase().trim() ?? '';
-  if (n.contains('literal[')) return 'category';
-  if (n.contains('bool')) return 'boolean';
-  if (n.contains('int')) return 'integer';
-  if (n.contains('float') || n.contains('decimal')) return 'decimal';
-  if (n.contains('dict') || n.contains('mapping')) return 'table';
-  if (n.contains('list') || n.contains('tuple') || n.contains('sequence')) {
-    return 'list';
+  final normalized = (annotation ?? '')
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), '')
+      .replaceAll(RegExp(r'''^["']|["']$'''), '');
+  if (normalized.isEmpty) return 'text';
+
+  final members = _splitTopLevel(normalized, '|');
+  if (members.length > 1) return _mapUnionMembersToFieldType(members);
+
+  final bracketIndex = normalized.indexOf('[');
+  final head = bracketIndex == -1
+      ? normalized
+      : normalized.substring(0, bracketIndex);
+  final headName = head.substring(head.lastIndexOf('.') + 1);
+  final args = bracketIndex != -1 && normalized.endsWith(']')
+      ? _splitParameters(
+          normalized.substring(bracketIndex + 1, normalized.length - 1),
+        )
+      : const <String>[];
+
+  if (headName == 'optional' && args.length == 1) {
+    return _mapAnnotationToFieldType(args.first);
   }
-  if (n.contains('str')) return 'text';
+  if (headName == 'annotated' && args.isNotEmpty) {
+    return _mapAnnotationToFieldType(args.first);
+  }
+  if (headName == 'union' && args.isNotEmpty) {
+    return _mapUnionMembersToFieldType(args);
+  }
+  return _annotationTypeNames[headName] ?? 'text';
+}
+
+String _mapUnionMembersToFieldType(List<String> members) {
+  final types = {
+    for (final member in members)
+      if (member != 'none') _mapAnnotationToFieldType(member),
+  };
+  if (types.length == 1) return types.first;
+  if (types.length == 2 &&
+      types.contains('integer') &&
+      types.contains('decimal')) {
+    return 'decimal';
+  }
   return 'text';
+}
+
+List<String> _splitTopLevel(String source, String separator) {
+  final parts = <String>[];
+  final buffer = StringBuffer();
+  var depth = 0;
+  for (final character in source.split('')) {
+    if (character == separator && depth == 0) {
+      parts.add(buffer.toString());
+      buffer.clear();
+      continue;
+    }
+    if (character == '(' || character == '[' || character == '{') {
+      depth += 1;
+    } else if (character == ')' || character == ']' || character == '}') {
+      depth = depth > 0 ? depth - 1 : 0;
+    }
+    buffer.write(character);
+  }
+  parts.add(buffer.toString());
+  return parts;
 }
 
 String? _inferAssetPayloadTypeFromDocstringHints(
