@@ -261,5 +261,36 @@ def run(start: date, end: datetime.date, at: Optional[datetime], when: str):
       ]);
       expect(fields.first.controlHint, 'Date picker');
     });
+
+    test('reads pandas DataFrames as tables', () {
+      const source = '''
+import pandas as pd
+
+def run(rows: pd.DataFrame, photos_df: pd.DataFrame) -> pd.DataFrame:
+    summary = pd.DataFrame(rows)
+    return {
+        "summary": summary,
+        "raw": pd.read_csv("x.csv"),
+    }
+''';
+      final draft = extractContractDraft(source);
+      expect(draft.inputFields.map((f) => f.type), [
+        PythonFieldType.table,
+        PythonFieldType.table,
+      ]);
+      expect(draft.outputFields.map((f) => [f.outputKey, f.type]), [
+        ['summary', PythonFieldType.table],
+        ['raw', PythonFieldType.table],
+      ]);
+    });
+
+    test('reads a DataFrame return annotation as a table result', () {
+      const source = 'def run(x: int) -> pd.DataFrame:\n    return make(x)';
+      final output = extractContractDraft(source).outputFields.single;
+      expect(
+        [output.outputKey, output.type],
+        ['result', PythonFieldType.table],
+      );
+    });
   });
 }

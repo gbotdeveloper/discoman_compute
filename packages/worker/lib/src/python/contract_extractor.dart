@@ -208,7 +208,9 @@ String _resolveInputFieldType(
   List<String> notes,
 ) {
   final annotatedType = _mapAnnotationToFieldType(annotation);
-  if (annotatedType == 'table') {
+  // A DataFrame is a table of rows, never an uploaded file.
+  final isDataFrame = (annotation ?? '').toLowerCase().contains('dataframe');
+  if (annotatedType == 'table' && !isDataFrame) {
     final docstringHint = _inferAssetPayloadTypeFromDocstringHints(
       docstringBody,
       parameterName,
@@ -461,6 +463,7 @@ String? _inferAssignmentExpressionType(String expr, Map<String, String> hints) {
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
+  if (_isDataFrameExpression(expr)) return 'table';
   final assetList = _inferAssetListExpressionType(expr, hints);
   if (assetList != null) return assetList;
   return _inferNumericExpressionType(expr, hints);
@@ -471,6 +474,7 @@ String? _inferLiteralReturnValueType(String expr, Map<String, String> hints) {
   if (asset != null) return asset;
   final assetList = _inferAssetListExpressionType(expr, hints);
   if (assetList != null) return assetList;
+  if (_isDataFrameExpression(expr)) return 'table';
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
@@ -531,6 +535,10 @@ String? _inferNumericExpressionType(
   }
   return null;
 }
+
+bool _isDataFrameExpression(String e) => RegExp(
+  r'^\s*(?:pd|pandas)\.(?:DataFrame|read_csv|read_excel|read_json|concat)\s*\(',
+).hasMatch(e);
 
 bool _isMatplotlibSubplotsExpression(String e) =>
     RegExp(r'\b(?:plt|pyplot|matplotlib\.pyplot)\.subplots\s*\(').hasMatch(e);
@@ -681,6 +689,7 @@ const _annotationTypeNames = {
   'str': 'text',
   'date': 'date',
   'datetime': 'date',
+  'dataframe': 'table',
 };
 
 /// Maps an annotation by its outermost type, so `list[int]` is a list and not
