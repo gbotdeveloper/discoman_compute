@@ -138,4 +138,35 @@ def run(start: datetime.date, at: Optional[datetime.datetime], note: str, bad: d
     },
     skip: hasPython ? false : 'python3 is not installed',
   );
+
+  test(
+    'hands a DataFrame parameter its rows as a DataFrame',
+    () async {
+      final outputs = await _run(
+        '''
+from pandas import DataFrame
+
+def run(rows: DataFrame, raw: list):
+    return {"rows": type(rows).__name__, "count": rows.count, "raw": type(raw).__name__}
+''',
+        modules: {
+          'pandas/__init__.py': '''
+class DataFrame:
+    def __init__(self, data):
+        self.count = len(data)
+''',
+        },
+        inputs: {
+          'rows': [
+            {'a': 1},
+            {'a': 2},
+          ],
+          'raw': [1],
+        },
+      );
+
+      expect(outputs, {'rows': 'DataFrame', 'count': 2, 'raw': 'list'});
+    },
+    skip: hasPython ? false : 'python3 is not installed',
+  );
 }

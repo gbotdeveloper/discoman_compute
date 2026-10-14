@@ -422,8 +422,15 @@ def _annotation_target(annotation):
 
 
 def _coerce_input(annotation, value):
-    # Dates arrive as ISO text; hand the script the type it asked for.
+    # Dates arrive as ISO text and tables as rows; hand the script the
+    # type it asked for.
     target = _annotation_target(annotation)
+    if (
+        isinstance(value, (list, dict))
+        and getattr(target, "__name__", None) == "DataFrame"
+        and getattr(target, "__module__", "").startswith("pandas")
+    ):
+        return target(value)
     if not isinstance(value, str):
         return value
     try:
