@@ -403,6 +403,10 @@ String? _inferNumericExpressionType(
 ) {
   final trimmed = expression.trim();
   if (hints[trimmed] == 'decimal') return 'decimal';
+  if (RegExp(r'^[-+]?\d+$').hasMatch(trimmed) ||
+      RegExp(r'^(?:int|len)\s*\(').hasMatch(trimmed)) {
+    return 'integer';
+  }
   if (_isNumericLiteralExpression(trimmed)) return 'decimal';
   if (RegExp(r'^(?:round|sum)\s*\(').hasMatch(trimmed)) return 'decimal';
   if (_containsStringLiteral(trimmed)) return null;

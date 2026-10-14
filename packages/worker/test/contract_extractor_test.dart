@@ -137,6 +137,26 @@ def run(w: float, h: float):
       }
     });
 
+    test('infers integer outputs from int(), len() and integer literals', () {
+      const source = '''
+def run(samples: list[float]):
+    score = int(min(100, max(0, round(sum(samples)))))
+    return {
+        'score': score,
+        'count': len(samples),
+        'version': 2,
+        'ratio': 0.5,
+    }
+''';
+      final outputs = extractContractDraft(source).outputFields;
+      expect(outputs.map((f) => [f.outputKey, f.type]), [
+        ['score', PythonFieldType.integer],
+        ['count', PythonFieldType.integer],
+        ['version', PythonFieldType.integer],
+        ['ratio', PythonFieldType.decimal],
+      ]);
+    });
+
     test('reads an optional dict input as an image from its name', () {
       const source =
           'def run(photo: Optional[dict[str, Any]]):\n    return {"r": 1}';
