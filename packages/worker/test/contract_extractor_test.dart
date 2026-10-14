@@ -110,8 +110,8 @@ def run(w: float, h: float):
 
     test('types an annotation by its outermost type', () {
       const cases = {
-        'list[int]': PythonFieldType.list,
-        'List[float]': PythonFieldType.list,
+        'list[Any]': PythonFieldType.list,
+        'List[Point]': PythonFieldType.list,
         'tuple[int, int]': PythonFieldType.list,
         'dict[str, int]': PythonFieldType.table,
         'typing.Dict[str, float]': PythonFieldType.table,
@@ -162,6 +162,89 @@ def run(samples: list[float]):
           'def run(photo: Optional[dict[str, Any]]):\n    return {"r": 1}';
       final field = extractContractDraft(source).inputFields.single;
       expect(field.type, PythonFieldType.image);
+    });
+
+    test('reads list annotations as multiple values of their item type', () {
+      const source = '''
+def run(
+    counts: list[int],
+    weights: Sequence[float],
+    names: list[str],
+    modes: list[Literal["fast", "slow"]],
+    photos: list[dict],
+    attachments: Optional[list[dict[str, Any]]] = None,
+    rows: list[dict],
+    points: list[Point],
+    anything: list,
+    pair: tuple[int, int],
+):
+    return {"r": 1}
+''';
+      final fields = extractContractDraft(source).inputFields;
+      expect(fields.map((f) => [f.parameterName, f.type, f.multiple]), [
+        ['counts', PythonFieldType.integer, true],
+        ['weights', PythonFieldType.decimal, true],
+        ['names', PythonFieldType.text, true],
+        ['modes', PythonFieldType.category, true],
+        ['photos', PythonFieldType.image, true],
+        ['attachments', PythonFieldType.file, true],
+        ['rows', PythonFieldType.table, false],
+        ['points', PythonFieldType.list, false],
+        ['anything', PythonFieldType.list, false],
+        ['pair', PythonFieldType.list, false],
+      ]);
+      expect(fields[3].options, ['fast', 'slow']);
+      expect(fields[4].controlHint, 'Image upload field (multiple)');
+      expect(fields.every((f) => f.maxItems == null), isTrue);
+    });
+
+    test('reads a bare list named after files as a list of files', () {
+      const source = 'def run(images: list):\n    return {"r": 1}';
+      final field = extractContractDraft(source).inputFields.single;
+      expect([field.type, field.multiple], [PythonFieldType.image, true]);
+    });
+
+    test('reads a docstring image[] hint as a list of images', () {
+      const source = '''
+def run(scans):
+    """Compares scans.
+
+    - scans -> image[]
+    """
+    return {"r": 1}
+''';
+      final field = extractContractDraft(source).inputFields.single;
+      expect([field.type, field.multiple], [PythonFieldType.image, true]);
+    });
+
+    test('keeps single values single', () {
+      const source = 'def run(photo: dict, count: int):\n    return {"r": 1}';
+      final fields = extractContractDraft(source).inputFields;
+      expect(fields.map((f) => f.multiple), [false, false]);
+    });
+
+    test('marks a returned list of figures as multiple images', () {
+      const source = '''
+import matplotlib.pyplot as plt
+
+def run(values: list[float]):
+    fig, ax = plt.subplots()
+    other = plt.figure()
+    pages = [fig, other]
+    return {
+        "charts": [fig, other],
+        "pages": pages,
+        "total": sum(values),
+        "values": [1, 2],
+    }
+''';
+      final outputs = extractContractDraft(source).outputFields;
+      expect(outputs.map((f) => [f.outputKey, f.type, f.multiple]), [
+        ['charts', PythonFieldType.image, true],
+        ['pages', PythonFieldType.image, true],
+        ['total', PythonFieldType.decimal, false],
+        ['values', PythonFieldType.text, false],
+      ]);
     });
   });
 }

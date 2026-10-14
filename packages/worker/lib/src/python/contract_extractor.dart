@@ -135,20 +135,50 @@ List<ContractInputField> _buildInputFields(
     final parameterName = match.group(1)!;
     final annotation = match.group(2)?.trim();
     final defaultValue = match.group(3)?.trim();
+    final itemAnnotation = _listItemAnnotation(annotation);
     final categoryResolution = _resolveCategoryOptionsFromAnnotation(
-      annotation,
+      itemAnnotation ?? annotation,
       enumExtraction,
     );
-    final type = categoryResolution.options.isNotEmpty
+    var type = categoryResolution.options.isNotEmpty
         ? 'category'
         : _resolveInputFieldType(
             parameterName,
-            annotation,
+            itemAnnotation ?? annotation,
             docstringBody,
             notes,
           );
     if (categoryResolution.note != null) {
       notes.add(categoryResolution.note!);
+    }
+
+    var multiple = false;
+    final listedAsset = _inferAssetListFromDocstringHints(
+      docstringBody,
+      parameterName,
+    );
+    if (listedAsset != null) {
+      type = listedAsset;
+      multiple = true;
+      notes.add(
+        'Inferred "$parameterName" as a list of $listedAsset from inline '
+        'script guidance.',
+      );
+    } else if (itemAnnotation != null) {
+      multiple =
+          _multipleItemTypes.contains(type) ||
+          (type == 'text' && _isStrAnnotation(itemAnnotation));
+      if (!multiple && type != 'table') type = 'list';
+    } else if (type == 'list') {
+      final nameHint = _inferAssetPayloadTypeFromParameterName(parameterName);
+      if (nameHint != null) {
+        type = nameHint;
+        multiple = true;
+        notes.add(
+          'Inferred "$parameterName" as a list of $nameHint from the '
+          'parameter name.',
+        );
+      }
     }
 
     fields.add(
@@ -158,9 +188,12 @@ List<ContractInputField> _buildInputFields(
         label: _titleize(parameterName),
         type: _fieldType(type),
         isRequired: defaultValue == null,
-        controlHint: _buildControlHint(type),
+        controlHint: multiple
+            ? '${_buildControlHint(type)} (multiple)'
+            : _buildControlHint(type),
         validationHint: '',
         options: categoryResolution.options,
+        multiple: multiple,
       ),
     );
   }
@@ -197,6 +230,51 @@ String _resolveInputFieldType(
   return annotatedType;
 }
 
+/// Item types a list input can collect one control at a time.
+const _multipleItemTypes = {'integer', 'decimal', 'category', 'image', 'file'};
+
+const _listAnnotationNames = {
+  'list',
+  'sequence',
+  'tuple',
+  'set',
+  'frozenset',
+  'iterable',
+};
+
+/// The item annotation of `list[X]`, `Sequence[X]` or `tuple[X, ...]`, kept in
+/// its original case so Literal options survive. Null for anything else.
+String? _listItemAnnotation(String? annotation) {
+  final compact = (annotation ?? '').replaceAll(RegExp(r'\s+'), '');
+  final members = _splitTopLevel(
+    compact,
+    '|',
+  ).where((member) => member.toLowerCase() != 'none').toList();
+  if (members.length != 1) return null;
+  final member = members.single;
+  final bracketIndex = member.indexOf('[');
+  if (bracketIndex == -1 || !member.endsWith(']')) return null;
+  final head = member.substring(0, bracketIndex).toLowerCase();
+  final headName = head.substring(head.lastIndexOf('.') + 1);
+  final args = _splitParameters(
+    member.substring(bracketIndex + 1, member.length - 1),
+  );
+  if ((headName == 'optional' || headName == 'annotated') && args.isNotEmpty) {
+    return _listItemAnnotation(args.first);
+  }
+  if (!_listAnnotationNames.contains(headName)) return null;
+  if (args.length == 1) return args.single;
+  if (headName == 'tuple' && args.length == 2 && args.last == '...') {
+    return args.first;
+  }
+  return null;
+}
+
+bool _isStrAnnotation(String annotation) {
+  final lower = annotation.toLowerCase();
+  return lower.substring(lower.lastIndexOf('.') + 1) == 'str';
+}
+
 // --- Outputs --------------------------------------------------------------
 
 List<ContractOutputField> _buildOutputFields(
@@ -208,14 +286,7 @@ List<ContractOutputField> _buildOutputFields(
   if (literal.keys.isNotEmpty) {
     return [
       for (var i = 0; i < literal.keys.length; i++)
-        ContractOutputField(
-          id: 'draft-output-${i + 1}',
-          outputKey: literal.keys[i],
-          displayLabel: _titleize(literal.keys[i]),
-          type: _fieldType(literal.typeHints[literal.keys[i]] ?? 'text'),
-          presentationHint:
-              'Result field inferred from a literal return dictionary key.',
-        ),
+        _literalOutputField(i, literal.keys[i], literal.typeHints),
     ];
   }
 
@@ -249,6 +320,26 @@ List<ContractOutputField> _buildOutputFields(
           'found.',
     ),
   ];
+}
+
+/// An output from a literal return key. A `[]` suffix on its type hint marks a
+/// list of files.
+ContractOutputField _literalOutputField(
+  int index,
+  String key,
+  Map<String, String> typeHints,
+) {
+  final hint = typeHints[key] ?? 'text';
+  final multiple = hint.endsWith('[]');
+  return ContractOutputField(
+    id: 'draft-output-${index + 1}',
+    outputKey: key,
+    displayLabel: _titleize(key),
+    type: _fieldType(multiple ? hint.substring(0, hint.length - 2) : hint),
+    presentationHint:
+        'Result field inferred from a literal return dictionary key.',
+    multiple: multiple,
+  );
 }
 
 class _ReturnLiteral {
@@ -370,16 +461,40 @@ String? _inferAssignmentExpressionType(String expr, Map<String, String> hints) {
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
+  final assetList = _inferAssetListExpressionType(expr, hints);
+  if (assetList != null) return assetList;
   return _inferNumericExpressionType(expr, hints);
 }
 
 String? _inferLiteralReturnValueType(String expr, Map<String, String> hints) {
   final asset = _inferCanonicalAssetPayloadType(expr);
   if (asset != null) return asset;
+  final assetList = _inferAssetListExpressionType(expr, hints);
+  if (assetList != null) return assetList;
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
   return _inferNumericExpressionType(expr, hints);
+}
+
+/// `image[]` or `file[]` for a list literal whose items are all images or all
+/// files, such as `[fig, other_fig]`.
+String? _inferAssetListExpressionType(String expr, Map<String, String> hints) {
+  final trimmed = expr.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return null;
+  final items = _splitTopLevelCommaSegments(
+    trimmed.substring(1, trimmed.length - 1),
+  ).map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+  if (items.isEmpty) return null;
+  final types = {
+    for (final item in items)
+      _inferCanonicalAssetPayloadType(item) ??
+          hints[item] ??
+          (_isMatplotlibFigureExpression(item) ? 'image' : null),
+  };
+  if (types.length != 1) return null;
+  final type = types.single;
+  return type == 'image' || type == 'file' ? '$type[]' : null;
 }
 
 String? _inferCanonicalAssetPayloadType(String expression) {
@@ -651,8 +766,29 @@ String? _inferAssetPayloadTypeFromDocstringHints(
   return match.group(1)!.toLowerCase() == 'image' ? 'image' : 'file';
 }
 
+/// Reads a `- name -> image[]` line, which declares a list of files.
+String? _inferAssetListFromDocstringHints(
+  String? docstringBody,
+  String parameterName,
+) {
+  if (docstringBody == null) return null;
+  final pattern = RegExp(
+    '^\\s*[-*]\\s*${_escapeRegExp(parameterName)}\\s*->\\s*(image|file)\\[\\]',
+    multiLine: true,
+    caseSensitive: false,
+  );
+  final match = pattern.firstMatch(docstringBody);
+  if (match == null) return null;
+  return match.group(1)!.toLowerCase();
+}
+
 String? _inferAssetPayloadTypeFromParameterName(String parameterName) {
-  final words = _tokenizeIdentifier(parameterName);
+  final words = [
+    for (final word in _tokenizeIdentifier(parameterName))
+      word.length > 1 && word.endsWith('s')
+          ? word.substring(0, word.length - 1)
+          : word,
+  ];
   if (words.any(imagePayloadWords.contains)) return 'image';
   if (words.any(filePayloadWords.contains)) return 'file';
   return null;
