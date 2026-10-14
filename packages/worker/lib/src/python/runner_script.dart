@@ -324,7 +324,44 @@ def _to_json_compatible(value):
     )
 
 
+def _is_pil_image(value):
+    return (
+        value.__class__.__module__.startswith("PIL.")
+        and hasattr(value, "save")
+        and hasattr(value, "mode")
+    )
+
+
+def _pil_image_to_png_bytes(value):
+    buffer = io.BytesIO()
+    value.save(buffer, format="PNG")
+    raw_bytes = buffer.getvalue()
+    buffer.close()
+    return raw_bytes
+
+
+def _is_file_output(value):
+    return (
+        _looks_like_runtime_image_payload(value)
+        or _looks_like_runtime_file_payload(value)
+        or isinstance(value, (bytes, bytearray))
+        or _is_matplotlib_figure(value)
+        or _is_pil_image(value)
+    )
+
+
 def _normalize_output_value(output_key, value):
+    # A list of files becomes a list of payloads, named by position.
+    if (
+        isinstance(value, (list, tuple))
+        and value
+        and all(_is_file_output(item) for item in value)
+    ):
+        return [
+            _normalize_output_value(f"{output_key}_{index + 1}", item)
+            for index, item in enumerate(value)
+        ]
+
     if _looks_like_runtime_image_payload(value):
         return _normalize_runtime_image_payload(output_key, value)
 
@@ -353,6 +390,14 @@ def _normalize_output_value(output_key, value):
         return _build_image_payload(
             output_key,
             raw_bytes,
+            "png",
+            "image/png",
+        )
+
+    if _is_pil_image(value):
+        return _build_image_payload(
+            output_key,
+            _pil_image_to_png_bytes(value),
             "png",
             "image/png",
         )
