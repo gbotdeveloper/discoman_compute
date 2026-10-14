@@ -679,6 +679,8 @@ const _annotationTypeNames = {
   'tuple': 'list',
   'sequence': 'list',
   'str': 'text',
+  'date': 'date',
+  'datetime': 'date',
 };
 
 /// Maps an annotation by its outermost type, so `list[int]` is a list and not
@@ -824,6 +826,8 @@ String _buildControlHint(String type) {
       return 'Image upload field';
     case 'file':
       return 'File upload field';
+    case 'date':
+      return 'Date picker';
     case 'text':
     default:
       return 'Single-line text input';

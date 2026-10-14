@@ -246,5 +246,20 @@ def run(values: list[float]):
         ['values', PythonFieldType.text, false],
       ]);
     });
+
+    test('reads date annotations as dates', () {
+      const source = '''
+def run(start: date, end: datetime.date, at: Optional[datetime], when: str):
+    return {"r": 1}
+''';
+      final fields = extractContractDraft(source).inputFields;
+      expect(fields.map((f) => f.type), [
+        PythonFieldType.date,
+        PythonFieldType.date,
+        PythonFieldType.date,
+        PythonFieldType.text,
+      ]);
+      expect(fields.first.controlHint, 'Date picker');
+    });
   });
 }
