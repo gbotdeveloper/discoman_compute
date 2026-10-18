@@ -80,6 +80,30 @@ void main() {
     },
   );
 
+  test('uploads each file of an output list under its position', () async {
+    computeWorker.directUploads = true;
+    final chart = pythonRunner.outputs['chart'];
+    pythonRunner.outputs
+      ..clear()
+      ..addAll({
+        'charts': [chart, chart],
+        'total': 3,
+      });
+
+    await processor.process(claimed());
+
+    expect(requests.map((request) => request.method), ['PUT', 'PUT']);
+    final outputs =
+        jsonDecode(computeWorker.reports.single.outputsJson!) as Map;
+    final charts = (outputs['charts'] as List).cast<Map<String, dynamic>>();
+    expect(charts.map((chart) => chart['storagePath']), [
+      'outputs/published/x/charts_1.png',
+      'outputs/published/x/charts_2.png',
+    ]);
+    expect(charts.every((chart) => !chart.containsKey('base64')), isTrue);
+    expect(outputs['total'], 3);
+  });
+
   test('reports a failed direct upload as a failed run', () async {
     computeWorker.directUploads = true;
     storageResponse = (request) async => http.Response('', 403);
@@ -121,6 +145,41 @@ void main() {
       },
       'count': 2,
     });
+  });
+
+  test('hands Python a list of input files in order', () async {
+    storageResponse = (request) async =>
+        http.Response.bytes(utf8.encode(request.url.pathSegments.last), 200);
+    Map<String, dynamic> linked(String name) => {
+      'kind': 'image',
+      'name': name,
+      'extension': 'png',
+      'mimeType': 'image/png',
+      'sizeBytes': 1,
+      'storagePath': 'inputs/published/x/$name',
+      'downloadUrl': 'https://blob.test/inputs/published/x/$name',
+    };
+
+    await processor.process(
+      claimed(
+        inputsJson: jsonEncode({
+          'photos': [linked('a.png'), linked('b.png')],
+          'tags': ['x', 'y'],
+        }),
+      ),
+    );
+
+    final photos = (pythonRunner.lastInputs!['photos'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(photos.map((photo) => photo['name']), ['a.png', 'b.png']);
+    expect(
+      photos.map(
+        (photo) => utf8.decode(base64Decode(photo['base64'] as String)),
+      ),
+      ['a.png', 'b.png'],
+    );
+    expect(photos.every((photo) => !photo.containsKey('downloadUrl')), isTrue);
+    expect(pythonRunner.lastInputs!['tags'], ['x', 'y']);
   });
 
   test('fails the run when an input file cannot be downloaded', () async {

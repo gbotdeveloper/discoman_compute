@@ -166,8 +166,9 @@ class ExecutionProcessor {
   }
 
   /// Uploads every asset-shaped output value and replaces it with the storage
-  /// reference descriptor the history writer expects. Non-asset values pass
-  /// through unchanged.
+  /// reference descriptor the history writer expects. A list of files is
+  /// uploaded file by file, each named after the key and its position.
+  /// Non-asset values pass through unchanged.
   Future<Map<String, dynamic>> _uploadAssets(
     UuidValue executionId,
     Map<String, dynamic> outputs,
@@ -175,28 +176,47 @@ class ExecutionProcessor {
     final result = <String, dynamic>{};
     for (final entry in outputs.entries) {
       final value = entry.value;
-      if (!_isAssetOutput(value)) {
+      if (_isAssetOutput(value)) {
+        result[entry.key] = await _uploadedDescriptor(
+          executionId,
+          entry.key,
+          value as Map<dynamic, dynamic>,
+        );
+      } else if (value is List &&
+          value.isNotEmpty &&
+          value.every(_isAssetOutput)) {
+        result[entry.key] = [
+          for (var i = 0; i < value.length; i++)
+            await _uploadedDescriptor(
+              executionId,
+              '${entry.key}_${i + 1}',
+              value[i] as Map<dynamic, dynamic>,
+            ),
+        ];
+      } else {
         result[entry.key] = value;
-        continue;
       }
-      final ref = await _uploadAsset(
-        executionId,
-        entry.key,
-        value as Map<dynamic, dynamic>,
-      );
-      // The history writer reads 'extension' (not 'fileExtension') from the
-      // outputs map, so emit the descriptor with that key.
-      result[entry.key] = {
-        'kind': ref.kind,
-        'name': ref.name,
-        'extension': ref.fileExtension,
-        'mimeType': ref.mimeType,
-        'sizeBytes': ref.sizeBytes,
-        'storagePath': ref.storagePath,
-        'downloadUrl': ref.downloadUrl,
-      };
     }
     return result;
+  }
+
+  Future<Map<String, dynamic>> _uploadedDescriptor(
+    UuidValue executionId,
+    String outputKey,
+    Map<dynamic, dynamic> asset,
+  ) async {
+    final ref = await _uploadAsset(executionId, outputKey, asset);
+    // The history writer reads 'extension' (not 'fileExtension') from the
+    // outputs map, so emit the descriptor with that key.
+    return {
+      'kind': ref.kind,
+      'name': ref.name,
+      'extension': ref.fileExtension,
+      'mimeType': ref.mimeType,
+      'sizeBytes': ref.sizeBytes,
+      'storagePath': ref.storagePath,
+      'downloadUrl': ref.downloadUrl,
+    };
   }
 
   /// Uploads one output file straight to storage, or through the server when
@@ -259,37 +279,56 @@ class ExecutionProcessor {
   }
 
   /// Input files arrive as links to storage; Python receives them inline, as
-  /// before.
+  /// before. A list of files is downloaded file by file.
   Future<Map<String, dynamic>> _downloadInputFiles(
     Map<String, dynamic> inputs,
   ) async {
     final result = <String, dynamic>{};
     for (final entry in inputs.entries) {
       final value = entry.value;
-      final url = value is Map ? value['downloadUrl'] : null;
-      if (value is! Map ||
-          (value['kind'] != 'image' && value['kind'] != 'file') ||
-          value['base64'] is String ||
-          url is! String) {
+      if (_isLinkedInputFile(value)) {
+        result[entry.key] = await _downloadInputFile(
+          entry.key,
+          value as Map<dynamic, dynamic>,
+        );
+      } else if (value is List &&
+          value.isNotEmpty &&
+          value.every(_isLinkedInputFile)) {
+        result[entry.key] = [
+          for (final item in value)
+            await _downloadInputFile(entry.key, item as Map<dynamic, dynamic>),
+        ];
+      } else {
         result[entry.key] = value;
-        continue;
       }
-      final response = await _http
-          .get(Uri.parse(url))
-          .timeout(const Duration(minutes: 2));
-      if (response.statusCode != 200) {
-        throw StateError('"${entry.key}" (HTTP ${response.statusCode})');
-      }
-      result[entry.key] = {
-        'kind': value['kind'],
-        'name': value['name'],
-        'extension': value['extension'],
-        'mimeType': value['mimeType'],
-        'sizeBytes': response.bodyBytes.length,
-        'base64': base64Encode(response.bodyBytes),
-      };
     }
     return result;
+  }
+
+  bool _isLinkedInputFile(dynamic value) =>
+      value is Map &&
+      (value['kind'] == 'image' || value['kind'] == 'file') &&
+      value['base64'] is! String &&
+      value['downloadUrl'] is String;
+
+  Future<Map<String, dynamic>> _downloadInputFile(
+    String key,
+    Map<dynamic, dynamic> value,
+  ) async {
+    final response = await _http
+        .get(Uri.parse(value['downloadUrl'] as String))
+        .timeout(const Duration(minutes: 2));
+    if (response.statusCode != 200) {
+      throw StateError('"$key" (HTTP ${response.statusCode})');
+    }
+    return {
+      'kind': value['kind'],
+      'name': value['name'],
+      'extension': value['extension'],
+      'mimeType': value['mimeType'],
+      'sizeBytes': response.bodyBytes.length,
+      'base64': base64Encode(response.bodyBytes),
+    };
   }
 
   bool _isAssetOutput(dynamic value) {

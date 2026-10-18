@@ -135,20 +135,50 @@ List<ContractInputField> _buildInputFields(
     final parameterName = match.group(1)!;
     final annotation = match.group(2)?.trim();
     final defaultValue = match.group(3)?.trim();
+    final itemAnnotation = _listItemAnnotation(annotation);
     final categoryResolution = _resolveCategoryOptionsFromAnnotation(
-      annotation,
+      itemAnnotation ?? annotation,
       enumExtraction,
     );
-    final type = categoryResolution.options.isNotEmpty
+    var type = categoryResolution.options.isNotEmpty
         ? 'category'
         : _resolveInputFieldType(
             parameterName,
-            annotation,
+            itemAnnotation ?? annotation,
             docstringBody,
             notes,
           );
     if (categoryResolution.note != null) {
       notes.add(categoryResolution.note!);
+    }
+
+    var multiple = false;
+    final listedAsset = _inferAssetListFromDocstringHints(
+      docstringBody,
+      parameterName,
+    );
+    if (listedAsset != null) {
+      type = listedAsset;
+      multiple = true;
+      notes.add(
+        'Inferred "$parameterName" as a list of $listedAsset from inline '
+        'script guidance.',
+      );
+    } else if (itemAnnotation != null) {
+      multiple =
+          _multipleItemTypes.contains(type) ||
+          (type == 'text' && _isStrAnnotation(itemAnnotation));
+      if (!multiple && type != 'table') type = 'list';
+    } else if (type == 'list') {
+      final nameHint = _inferAssetPayloadTypeFromParameterName(parameterName);
+      if (nameHint != null) {
+        type = nameHint;
+        multiple = true;
+        notes.add(
+          'Inferred "$parameterName" as a list of $nameHint from the '
+          'parameter name.',
+        );
+      }
     }
 
     fields.add(
@@ -158,9 +188,12 @@ List<ContractInputField> _buildInputFields(
         label: _titleize(parameterName),
         type: _fieldType(type),
         isRequired: defaultValue == null,
-        controlHint: _buildControlHint(type),
+        controlHint: multiple
+            ? '${_buildControlHint(type)} (multiple)'
+            : _buildControlHint(type),
         validationHint: '',
         options: categoryResolution.options,
+        multiple: multiple,
       ),
     );
   }
@@ -174,8 +207,10 @@ String _resolveInputFieldType(
   String? docstringBody,
   List<String> notes,
 ) {
-  final normalized = annotation?.toLowerCase().trim() ?? '';
-  if (normalized.contains('dict') || normalized.contains('mapping')) {
+  final annotatedType = _mapAnnotationToFieldType(annotation);
+  // A DataFrame is a table of rows, never an uploaded file.
+  final isDataFrame = (annotation ?? '').toLowerCase().contains('dataframe');
+  if (annotatedType == 'table' && !isDataFrame) {
     final docstringHint = _inferAssetPayloadTypeFromDocstringHints(
       docstringBody,
       parameterName,
@@ -194,7 +229,52 @@ String _resolveInputFieldType(
       return nameHint;
     }
   }
-  return _mapAnnotationToFieldType(annotation);
+  return annotatedType;
+}
+
+/// Item types a list input can collect one control at a time.
+const _multipleItemTypes = {'integer', 'decimal', 'category', 'image', 'file'};
+
+const _listAnnotationNames = {
+  'list',
+  'sequence',
+  'tuple',
+  'set',
+  'frozenset',
+  'iterable',
+};
+
+/// The item annotation of `list[X]`, `Sequence[X]` or `tuple[X, ...]`, kept in
+/// its original case so Literal options survive. Null for anything else.
+String? _listItemAnnotation(String? annotation) {
+  final compact = (annotation ?? '').replaceAll(RegExp(r'\s+'), '');
+  final members = _splitTopLevel(
+    compact,
+    '|',
+  ).where((member) => member.toLowerCase() != 'none').toList();
+  if (members.length != 1) return null;
+  final member = members.single;
+  final bracketIndex = member.indexOf('[');
+  if (bracketIndex == -1 || !member.endsWith(']')) return null;
+  final head = member.substring(0, bracketIndex).toLowerCase();
+  final headName = head.substring(head.lastIndexOf('.') + 1);
+  final args = _splitParameters(
+    member.substring(bracketIndex + 1, member.length - 1),
+  );
+  if ((headName == 'optional' || headName == 'annotated') && args.isNotEmpty) {
+    return _listItemAnnotation(args.first);
+  }
+  if (!_listAnnotationNames.contains(headName)) return null;
+  if (args.length == 1) return args.single;
+  if (headName == 'tuple' && args.length == 2 && args.last == '...') {
+    return args.first;
+  }
+  return null;
+}
+
+bool _isStrAnnotation(String annotation) {
+  final lower = annotation.toLowerCase();
+  return lower.substring(lower.lastIndexOf('.') + 1) == 'str';
 }
 
 // --- Outputs --------------------------------------------------------------
@@ -208,14 +288,7 @@ List<ContractOutputField> _buildOutputFields(
   if (literal.keys.isNotEmpty) {
     return [
       for (var i = 0; i < literal.keys.length; i++)
-        ContractOutputField(
-          id: 'draft-output-${i + 1}',
-          outputKey: literal.keys[i],
-          displayLabel: _titleize(literal.keys[i]),
-          type: _fieldType(literal.typeHints[literal.keys[i]] ?? 'text'),
-          presentationHint:
-              'Result field inferred from a literal return dictionary key.',
-        ),
+        _literalOutputField(i, literal.keys[i], literal.typeHints),
     ];
   }
 
@@ -249,6 +322,26 @@ List<ContractOutputField> _buildOutputFields(
           'found.',
     ),
   ];
+}
+
+/// An output from a literal return key. A `[]` suffix on its type hint marks a
+/// list of files.
+ContractOutputField _literalOutputField(
+  int index,
+  String key,
+  Map<String, String> typeHints,
+) {
+  final hint = typeHints[key] ?? 'text';
+  final multiple = hint.endsWith('[]');
+  return ContractOutputField(
+    id: 'draft-output-${index + 1}',
+    outputKey: key,
+    displayLabel: _titleize(key),
+    type: _fieldType(multiple ? hint.substring(0, hint.length - 2) : hint),
+    presentationHint:
+        'Result field inferred from a literal return dictionary key.',
+    multiple: multiple,
+  );
 }
 
 class _ReturnLiteral {
@@ -370,16 +463,42 @@ String? _inferAssignmentExpressionType(String expr, Map<String, String> hints) {
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
+  if (_isDataFrameExpression(expr)) return 'table';
+  final assetList = _inferAssetListExpressionType(expr, hints);
+  if (assetList != null) return assetList;
   return _inferNumericExpressionType(expr, hints);
 }
 
 String? _inferLiteralReturnValueType(String expr, Map<String, String> hints) {
   final asset = _inferCanonicalAssetPayloadType(expr);
   if (asset != null) return asset;
+  final assetList = _inferAssetListExpressionType(expr, hints);
+  if (assetList != null) return assetList;
+  if (_isDataFrameExpression(expr)) return 'table';
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
   return _inferNumericExpressionType(expr, hints);
+}
+
+/// `image[]` or `file[]` for a list literal whose items are all images or all
+/// files, such as `[fig, other_fig]`.
+String? _inferAssetListExpressionType(String expr, Map<String, String> hints) {
+  final trimmed = expr.trim();
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return null;
+  final items = _splitTopLevelCommaSegments(
+    trimmed.substring(1, trimmed.length - 1),
+  ).map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+  if (items.isEmpty) return null;
+  final types = {
+    for (final item in items)
+      _inferCanonicalAssetPayloadType(item) ??
+          hints[item] ??
+          (_isMatplotlibFigureExpression(item) ? 'image' : null),
+  };
+  if (types.length != 1) return null;
+  final type = types.single;
+  return type == 'image' || type == 'file' ? '$type[]' : null;
 }
 
 String? _inferCanonicalAssetPayloadType(String expression) {
@@ -403,6 +522,10 @@ String? _inferNumericExpressionType(
 ) {
   final trimmed = expression.trim();
   if (hints[trimmed] == 'decimal') return 'decimal';
+  if (RegExp(r'^[-+]?\d+$').hasMatch(trimmed) ||
+      RegExp(r'^(?:int|len)\s*\(').hasMatch(trimmed)) {
+    return 'integer';
+  }
   if (_isNumericLiteralExpression(trimmed)) return 'decimal';
   if (RegExp(r'^(?:round|sum)\s*\(').hasMatch(trimmed)) return 'decimal';
   if (_containsStringLiteral(trimmed)) return null;
@@ -412,6 +535,10 @@ String? _inferNumericExpressionType(
   }
   return null;
 }
+
+bool _isDataFrameExpression(String e) => RegExp(
+  r'^\s*(?:pd|pandas)\.(?:DataFrame|read_csv|read_excel|read_json|concat)\s*\(',
+).hasMatch(e);
 
 bool _isMatplotlibSubplotsExpression(String e) =>
     RegExp(r'\b(?:plt|pyplot|matplotlib\.pyplot)\.subplots\s*\(').hasMatch(e);
@@ -548,18 +675,91 @@ List<String> _splitParameters(String parametersSource) {
   return parts;
 }
 
+const _annotationTypeNames = {
+  'literal': 'category',
+  'bool': 'boolean',
+  'int': 'integer',
+  'float': 'decimal',
+  'decimal': 'decimal',
+  'dict': 'table',
+  'mapping': 'table',
+  'list': 'list',
+  'tuple': 'list',
+  'sequence': 'list',
+  'str': 'text',
+  'date': 'date',
+  'datetime': 'date',
+  'dataframe': 'table',
+};
+
+/// Maps an annotation by its outermost type, so `list[int]` is a list and not
+/// an integer. `Optional[X]`, `X | None` and `Union[X, None]` resolve to `X`.
 String _mapAnnotationToFieldType(String? annotation) {
-  final n = annotation?.toLowerCase().trim() ?? '';
-  if (n.contains('literal[')) return 'category';
-  if (n.contains('bool')) return 'boolean';
-  if (n.contains('int')) return 'integer';
-  if (n.contains('float') || n.contains('decimal')) return 'decimal';
-  if (n.contains('dict') || n.contains('mapping')) return 'table';
-  if (n.contains('list') || n.contains('tuple') || n.contains('sequence')) {
-    return 'list';
+  final normalized = (annotation ?? '')
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), '')
+      .replaceAll(RegExp(r'''^["']|["']$'''), '');
+  if (normalized.isEmpty) return 'text';
+
+  final members = _splitTopLevel(normalized, '|');
+  if (members.length > 1) return _mapUnionMembersToFieldType(members);
+
+  final bracketIndex = normalized.indexOf('[');
+  final head = bracketIndex == -1
+      ? normalized
+      : normalized.substring(0, bracketIndex);
+  final headName = head.substring(head.lastIndexOf('.') + 1);
+  final args = bracketIndex != -1 && normalized.endsWith(']')
+      ? _splitParameters(
+          normalized.substring(bracketIndex + 1, normalized.length - 1),
+        )
+      : const <String>[];
+
+  if (headName == 'optional' && args.length == 1) {
+    return _mapAnnotationToFieldType(args.first);
   }
-  if (n.contains('str')) return 'text';
+  if (headName == 'annotated' && args.isNotEmpty) {
+    return _mapAnnotationToFieldType(args.first);
+  }
+  if (headName == 'union' && args.isNotEmpty) {
+    return _mapUnionMembersToFieldType(args);
+  }
+  return _annotationTypeNames[headName] ?? 'text';
+}
+
+String _mapUnionMembersToFieldType(List<String> members) {
+  final types = {
+    for (final member in members)
+      if (member != 'none') _mapAnnotationToFieldType(member),
+  };
+  if (types.length == 1) return types.first;
+  if (types.length == 2 &&
+      types.contains('integer') &&
+      types.contains('decimal')) {
+    return 'decimal';
+  }
   return 'text';
+}
+
+List<String> _splitTopLevel(String source, String separator) {
+  final parts = <String>[];
+  final buffer = StringBuffer();
+  var depth = 0;
+  for (final character in source.split('')) {
+    if (character == separator && depth == 0) {
+      parts.add(buffer.toString());
+      buffer.clear();
+      continue;
+    }
+    if (character == '(' || character == '[' || character == '{') {
+      depth += 1;
+    } else if (character == ')' || character == ']' || character == '}') {
+      depth = depth > 0 ? depth - 1 : 0;
+    }
+    buffer.write(character);
+  }
+  parts.add(buffer.toString());
+  return parts;
 }
 
 String? _inferAssetPayloadTypeFromDocstringHints(
@@ -577,8 +777,29 @@ String? _inferAssetPayloadTypeFromDocstringHints(
   return match.group(1)!.toLowerCase() == 'image' ? 'image' : 'file';
 }
 
+/// Reads a `- name -> image[]` line, which declares a list of files.
+String? _inferAssetListFromDocstringHints(
+  String? docstringBody,
+  String parameterName,
+) {
+  if (docstringBody == null) return null;
+  final pattern = RegExp(
+    '^\\s*[-*]\\s*${_escapeRegExp(parameterName)}\\s*->\\s*(image|file)\\[\\]',
+    multiLine: true,
+    caseSensitive: false,
+  );
+  final match = pattern.firstMatch(docstringBody);
+  if (match == null) return null;
+  return match.group(1)!.toLowerCase();
+}
+
 String? _inferAssetPayloadTypeFromParameterName(String parameterName) {
-  final words = _tokenizeIdentifier(parameterName);
+  final words = [
+    for (final word in _tokenizeIdentifier(parameterName))
+      word.length > 1 && word.endsWith('s')
+          ? word.substring(0, word.length - 1)
+          : word,
+  ];
   if (words.any(imagePayloadWords.contains)) return 'image';
   if (words.any(filePayloadWords.contains)) return 'file';
   return null;
@@ -614,6 +835,8 @@ String _buildControlHint(String type) {
       return 'Image upload field';
     case 'file':
       return 'File upload field';
+    case 'date':
+      return 'Date picker';
     case 'text':
     default:
       return 'Single-line text input';

@@ -24,7 +24,8 @@ enum PythonFieldType implements _i1.SerializableModel {
   table,
   category,
   image,
-  file
+  file,
+  date
   ;
 
   static PythonFieldType fromJson(String name) {
@@ -47,6 +48,8 @@ enum PythonFieldType implements _i1.SerializableModel {
         return PythonFieldType.image;
       case 'file':
         return PythonFieldType.file;
+      case 'date':
+        return PythonFieldType.date;
       default:
         throw ArgumentError(
           'Value "$name" cannot be converted to "PythonFieldType"',
