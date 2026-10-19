@@ -6,6 +6,7 @@ import 'auth/remote_auth.dart';
 import 'auth/session.dart';
 import 'execution_processor.dart';
 import 'heartbeat.dart';
+import 'machine_check.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
 import 'settings/worker_settings.dart';
@@ -173,7 +174,13 @@ class RemoteWorker {
           // Idle: heartbeat (no execution) to stay marked online, then back
           // off before asking again.
           try {
-            await session.client.computeWorker.heartbeat(workerId, null);
+            final beat = await session.client.computeWorker.heartbeat(
+              workerId,
+              null,
+            );
+            if (beat.machineCheckRequested ?? false) {
+              await _answerMachineCheck(session, workerId);
+            }
           } catch (_) {
             // Transient; retry on the next tick.
           }
@@ -189,6 +196,30 @@ class RemoteWorker {
       _log.add('The worker stopped with an error: $error');
       await _shutDown(RemoteWorkerState.failed);
     }
+  }
+
+  /// Checks this machine for the dashboard and reports what it found.
+  Future<void> _answerMachineCheck(
+    WorkerSession session,
+    UuidValue workerId,
+  ) async {
+    final claimed = await session.client.computeWorker.claimMachineCheck(
+      workerId,
+    );
+    if (claimed == null) return;
+    _log.add('Checking this machine for the dashboard.');
+    final result = await runMachineCheck(
+      pythonPath: _config.pythonPath,
+      scriptStore: scriptStore,
+      settings: settingsStore.load(),
+      expectedScripts: claimed.expectedScripts,
+    );
+    await session.client.computeWorker.reportMachineCheck(
+      workerId,
+      claimed.checkId,
+      result,
+    );
+    _log.add('Machine check sent.');
   }
 
   /// Deregisters and closes, best effort — a machine that cannot say goodbye
