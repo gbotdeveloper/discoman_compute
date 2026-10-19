@@ -13,7 +13,8 @@
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../../execution/models/compute_mode.dart' as _i2;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
+import '../../execution/models/worker_last_run.dart' as _i3;
+import 'package:discoman_client/src/protocol/protocol.dart' as _i4;
 
 /// Client-safe view of a worker for the dashboard and the creator's
 /// self-hosting UI.
@@ -29,6 +30,8 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     required this.lastSeenAt,
     this.currentExecutionId,
     this.servedProjectIds,
+    this.servedProjectNames,
+    this.lastRun,
   });
 
   factory ComputeWorkerInfo({
@@ -42,6 +45,8 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     required DateTime lastSeenAt,
     _i1.UuidValue? currentExecutionId,
     List<String>? servedProjectIds,
+    Map<String, String>? servedProjectNames,
+    _i3.WorkerLastRun? lastRun,
   }) = _ComputeWorkerInfoImpl;
 
   factory ComputeWorkerInfo.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -67,8 +72,18 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
             ),
       servedProjectIds: jsonSerialization['servedProjectIds'] == null
           ? null
-          : _i3.Protocol().deserialize<List<String>>(
+          : _i4.Protocol().deserialize<List<String>>(
               jsonSerialization['servedProjectIds'],
+            ),
+      servedProjectNames: jsonSerialization['servedProjectNames'] == null
+          ? null
+          : _i4.Protocol().deserialize<Map<String, String>>(
+              jsonSerialization['servedProjectNames'],
+            ),
+      lastRun: jsonSerialization['lastRun'] == null
+          ? null
+          : _i4.Protocol().deserialize<_i3.WorkerLastRun>(
+              jsonSerialization['lastRun'],
             ),
     );
   }
@@ -95,6 +110,13 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
   /// where the machine has not said yet.
   List<String>? servedProjectIds;
 
+  /// Names of the projects in [servedProjectIds], where they could be looked
+  /// up.
+  Map<String, String>? servedProjectNames;
+
+  /// The last run this machine finished. Null when it has finished none.
+  _i3.WorkerLastRun? lastRun;
+
   /// Returns a shallow copy of this [ComputeWorkerInfo]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -109,6 +131,8 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     DateTime? lastSeenAt,
     _i1.UuidValue? currentExecutionId,
     List<String>? servedProjectIds,
+    Map<String, String>? servedProjectNames,
+    _i3.WorkerLastRun? lastRun,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -126,6 +150,9 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
         'currentExecutionId': currentExecutionId?.toJson(),
       if (servedProjectIds != null)
         'servedProjectIds': servedProjectIds?.toJson(),
+      if (servedProjectNames != null)
+        'servedProjectNames': servedProjectNames?.toJson(),
+      if (lastRun != null) 'lastRun': lastRun?.toJson(),
     };
   }
 
@@ -149,6 +176,8 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
     required DateTime lastSeenAt,
     _i1.UuidValue? currentExecutionId,
     List<String>? servedProjectIds,
+    Map<String, String>? servedProjectNames,
+    _i3.WorkerLastRun? lastRun,
   }) : super._(
          workerId: workerId,
          mode: mode,
@@ -160,6 +189,8 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
          lastSeenAt: lastSeenAt,
          currentExecutionId: currentExecutionId,
          servedProjectIds: servedProjectIds,
+         servedProjectNames: servedProjectNames,
+         lastRun: lastRun,
        );
 
   /// Returns a shallow copy of this [ComputeWorkerInfo]
@@ -177,6 +208,8 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
     DateTime? lastSeenAt,
     Object? currentExecutionId = _Undefined,
     Object? servedProjectIds = _Undefined,
+    Object? servedProjectNames = _Undefined,
+    Object? lastRun = _Undefined,
   }) {
     return ComputeWorkerInfo(
       workerId: workerId ?? this.workerId,
@@ -195,6 +228,20 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
       servedProjectIds: servedProjectIds is List<String>?
           ? servedProjectIds
           : this.servedProjectIds?.map((e0) => e0).toList(),
+      servedProjectNames: servedProjectNames is Map<String, String>?
+          ? servedProjectNames
+          : this.servedProjectNames?.map(
+              (
+                key0,
+                value0,
+              ) => MapEntry(
+                key0,
+                value0,
+              ),
+            ),
+      lastRun: lastRun is _i3.WorkerLastRun?
+          ? lastRun
+          : this.lastRun?.copyWith(),
     );
   }
 }
