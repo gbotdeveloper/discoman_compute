@@ -15,16 +15,26 @@ import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
 /// Returned by computeWorker.heartbeat.
 abstract class HeartbeatResponse implements _i1.SerializableModel {
-  HeartbeatResponse._({required this.cancelRequested});
+  HeartbeatResponse._({
+    required this.cancelRequested,
+    this.machineCheckRequested,
+  });
 
-  factory HeartbeatResponse({required bool cancelRequested}) =
-      _HeartbeatResponseImpl;
+  factory HeartbeatResponse({
+    required bool cancelRequested,
+    bool? machineCheckRequested,
+  }) = _HeartbeatResponseImpl;
 
   factory HeartbeatResponse.fromJson(Map<String, dynamic> jsonSerialization) {
     return HeartbeatResponse(
       cancelRequested: _i1.BoolJsonExtension.fromJson(
         jsonSerialization['cancelRequested'],
       ),
+      machineCheckRequested: jsonSerialization['machineCheckRequested'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(
+              jsonSerialization['machineCheckRequested'],
+            ),
     );
   }
 
@@ -32,15 +42,24 @@ abstract class HeartbeatResponse implements _i1.SerializableModel {
   /// and report a canceled outcome.
   bool cancelRequested;
 
+  /// True when the dashboard asked this worker to check itself; the worker
+  /// then calls computeWorker.claimMachineCheck. Null from older servers.
+  bool? machineCheckRequested;
+
   /// Returns a shallow copy of this [HeartbeatResponse]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  HeartbeatResponse copyWith({bool? cancelRequested});
+  HeartbeatResponse copyWith({
+    bool? cancelRequested,
+    bool? machineCheckRequested,
+  });
   @override
   Map<String, dynamic> toJson() {
     return {
       '__className__': 'HeartbeatResponse',
       'cancelRequested': cancelRequested,
+      if (machineCheckRequested != null)
+        'machineCheckRequested': machineCheckRequested,
     };
   }
 
@@ -50,17 +69,30 @@ abstract class HeartbeatResponse implements _i1.SerializableModel {
   }
 }
 
+class _Undefined {}
+
 class _HeartbeatResponseImpl extends HeartbeatResponse {
-  _HeartbeatResponseImpl({required bool cancelRequested})
-    : super._(cancelRequested: cancelRequested);
+  _HeartbeatResponseImpl({
+    required bool cancelRequested,
+    bool? machineCheckRequested,
+  }) : super._(
+         cancelRequested: cancelRequested,
+         machineCheckRequested: machineCheckRequested,
+       );
 
   /// Returns a shallow copy of this [HeartbeatResponse]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   @override
-  HeartbeatResponse copyWith({bool? cancelRequested}) {
+  HeartbeatResponse copyWith({
+    bool? cancelRequested,
+    Object? machineCheckRequested = _Undefined,
+  }) {
     return HeartbeatResponse(
       cancelRequested: cancelRequested ?? this.cancelRequested,
+      machineCheckRequested: machineCheckRequested is bool?
+          ? machineCheckRequested
+          : this.machineCheckRequested,
     );
   }
 }

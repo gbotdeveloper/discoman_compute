@@ -14,7 +14,8 @@
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../../execution/models/compute_mode.dart' as _i2;
 import '../../execution/models/worker_last_run.dart' as _i3;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i4;
+import '../../execution/models/machine_check_view.dart' as _i4;
+import 'package:discoman_client/src/protocol/protocol.dart' as _i5;
 
 /// Client-safe view of a worker for the dashboard and the creator's
 /// self-hosting UI.
@@ -32,6 +33,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     this.servedProjectIds,
     this.servedProjectNames,
     this.lastRun,
+    this.lastCheck,
   });
 
   factory ComputeWorkerInfo({
@@ -47,6 +49,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     List<String>? servedProjectIds,
     Map<String, String>? servedProjectNames,
     _i3.WorkerLastRun? lastRun,
+    _i4.MachineCheckView? lastCheck,
   }) = _ComputeWorkerInfoImpl;
 
   factory ComputeWorkerInfo.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -72,18 +75,23 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
             ),
       servedProjectIds: jsonSerialization['servedProjectIds'] == null
           ? null
-          : _i4.Protocol().deserialize<List<String>>(
+          : _i5.Protocol().deserialize<List<String>>(
               jsonSerialization['servedProjectIds'],
             ),
       servedProjectNames: jsonSerialization['servedProjectNames'] == null
           ? null
-          : _i4.Protocol().deserialize<Map<String, String>>(
+          : _i5.Protocol().deserialize<Map<String, String>>(
               jsonSerialization['servedProjectNames'],
             ),
       lastRun: jsonSerialization['lastRun'] == null
           ? null
-          : _i4.Protocol().deserialize<_i3.WorkerLastRun>(
+          : _i5.Protocol().deserialize<_i3.WorkerLastRun>(
               jsonSerialization['lastRun'],
+            ),
+      lastCheck: jsonSerialization['lastCheck'] == null
+          ? null
+          : _i5.Protocol().deserialize<_i4.MachineCheckView>(
+              jsonSerialization['lastCheck'],
             ),
     );
   }
@@ -110,12 +118,15 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
   /// where the machine has not said yet.
   List<String>? servedProjectIds;
 
-  /// Names of the projects in [servedProjectIds], where they could be looked
-  /// up.
+  /// Names of the projects this worker serves or last checked, where they
+  /// could be looked up.
   Map<String, String>? servedProjectNames;
 
   /// The last run this machine finished. Null when it has finished none.
   _i3.WorkerLastRun? lastRun;
+
+  /// The latest machine check of this worker, if one was ever asked for.
+  _i4.MachineCheckView? lastCheck;
 
   /// Returns a shallow copy of this [ComputeWorkerInfo]
   /// with some or all fields replaced by the given arguments.
@@ -133,6 +144,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
     List<String>? servedProjectIds,
     Map<String, String>? servedProjectNames,
     _i3.WorkerLastRun? lastRun,
+    _i4.MachineCheckView? lastCheck,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -153,6 +165,7 @@ abstract class ComputeWorkerInfo implements _i1.SerializableModel {
       if (servedProjectNames != null)
         'servedProjectNames': servedProjectNames?.toJson(),
       if (lastRun != null) 'lastRun': lastRun?.toJson(),
+      if (lastCheck != null) 'lastCheck': lastCheck?.toJson(),
     };
   }
 
@@ -178,6 +191,7 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
     List<String>? servedProjectIds,
     Map<String, String>? servedProjectNames,
     _i3.WorkerLastRun? lastRun,
+    _i4.MachineCheckView? lastCheck,
   }) : super._(
          workerId: workerId,
          mode: mode,
@@ -191,6 +205,7 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
          servedProjectIds: servedProjectIds,
          servedProjectNames: servedProjectNames,
          lastRun: lastRun,
+         lastCheck: lastCheck,
        );
 
   /// Returns a shallow copy of this [ComputeWorkerInfo]
@@ -210,6 +225,7 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
     Object? servedProjectIds = _Undefined,
     Object? servedProjectNames = _Undefined,
     Object? lastRun = _Undefined,
+    Object? lastCheck = _Undefined,
   }) {
     return ComputeWorkerInfo(
       workerId: workerId ?? this.workerId,
@@ -242,6 +258,9 @@ class _ComputeWorkerInfoImpl extends ComputeWorkerInfo {
       lastRun: lastRun is _i3.WorkerLastRun?
           ? lastRun
           : this.lastRun?.copyWith(),
+      lastCheck: lastCheck is _i4.MachineCheckView?
+          ? lastCheck
+          : this.lastCheck?.copyWith(),
     );
   }
 }
