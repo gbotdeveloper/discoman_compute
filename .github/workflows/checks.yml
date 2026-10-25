@@ -55,3 +55,29 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  # Downloads and installs the real Python on the two platforms the desktop app
+  # ships for, since its archive layout and paths differ between them.
+  python-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+
+      - name: Install dependencies
+        working-directory: packages/worker
+        run: dart pub get
+
+      - name: Install Python
+        working-directory: packages/worker
+        env:
+          DISCOMAN_LIVE_PYTHON_INSTALL: '1'
+        run: dart test test/python_installer_live_test.dart
