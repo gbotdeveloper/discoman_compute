@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../home_path.dart';
 import 'interpreter_check.dart';
 import 'packages.dart';
+import 'pip_names.dart';
 
 /// One downloadable Python from python-build-standalone.
 class PythonBuild {
@@ -73,6 +74,19 @@ class PythonInstallProgress {
   final String? line;
 }
 
+class PythonInstallResult {
+  const PythonInstallResult({
+    required this.path,
+    this.unavailablePackages = const [],
+  });
+
+  /// The new interpreter.
+  final String path;
+
+  /// Packages the scripts need that pip could not install.
+  final List<String> unavailablePackages;
+}
+
 class PythonInstallException implements Exception {
   const PythonInstallException(this.message);
 
@@ -95,14 +109,14 @@ class PythonInstaller {
     this.retryDelay = const Duration(seconds: 2),
   }) : _home = home,
        _build = build ?? _builds[Abi.current()],
-       _http = httpClient ?? http.Client(),
+       _injectedHttp = httpClient,
        _startProcess = startProcess,
        _runProcess = runProcess,
        _isWindows = isWindows ?? Platform.isWindows;
 
   final Directory? _home;
   final PythonBuild? _build;
-  final http.Client _http;
+  final http.Client? _injectedHttp;
   final StartProcess? _startProcess;
   final RunProcess? _runProcess;
   final bool _isWindows;
@@ -123,11 +137,15 @@ class PythonInstaller {
 
   bool get isInstalled => File(executablePath).existsSync();
 
-  /// Installs Python and [packages] on top of [basePythonPackages], and
-  /// returns the path of the new interpreter. A Python installed earlier is
-  /// replaced.
-  Future<String> install({
+  /// Installs Python with [basePythonPackages], [packages], and whatever
+  /// of [modules] the new Python cannot import yet. A Python installed
+  /// earlier is replaced, and put back if the new one fails to set up.
+  ///
+  /// Packages beyond the base that pip cannot install are listed in the
+  /// result rather than failing the install.
+  Future<PythonInstallResult> install({
     List<String> packages = const [],
+    List<String> modules = const [],
     required void Function(PythonInstallProgress progress) onProgress,
   }) async {
     final build = _build;
@@ -140,8 +158,11 @@ class PythonInstaller {
     _root.createSync(recursive: true);
     final archive = File(_join(_root.path, 'python-download.tar.gz'));
     final staging = Directory(_join(_root.path, 'python.partial'));
+    final previous = Directory(_join(_root.path, 'python.previous'));
+    final client = _injectedHttp ?? http.Client();
+    var swapped = false;
     try {
-      await _download(build.url, archive, onProgress);
+      await _download(client, build.url, archive, onProgress);
 
       onProgress(const PythonInstallProgress(PythonInstallStep.verify));
       final digest = await sha256.bind(archive.openRead()).first;
@@ -165,23 +186,66 @@ class PythonInstaller {
           'Could not unpack Python: ${'${unpacked.stderr}'.trim()}',
         );
       }
-      if (directory.existsSync()) directory.deleteSync(recursive: true);
-      Directory(_join(staging.path, 'python')).renameSync(directory.path);
+      try {
+        if (previous.existsSync()) previous.deleteSync(recursive: true);
+        if (directory.existsSync()) directory.renameSync(previous.path);
+        Directory(_join(staging.path, 'python')).renameSync(directory.path);
+      } on FileSystemException catch (error) {
+        throw PythonInstallException(
+          'Could not replace the Python in ${directory.path}. Stop anything '
+          'running with it, such as the Discoman Compute worker, and try '
+          'again. (${error.message})',
+        );
+      }
+      swapped = true;
 
       onProgress(const PythonInstallProgress(PythonInstallStep.packages));
-      final installed = await installPackages(
+      void pipLine(String line) => onProgress(
+        PythonInstallProgress(PythonInstallStep.packages, line: line),
+      );
+      final base = await installPackages(
         executablePath,
-        {...basePythonPackages, ...packages}.toList(),
-        onOutput: (line) => onProgress(
-          PythonInstallProgress(PythonInstallStep.packages, line: line),
-        ),
+        basePythonPackages,
+        onOutput: pipLine,
         startProcess: _startProcess,
       );
-      if (!installed.success) {
+      if (!base.success) {
         throw const PythonInstallException(
           'Python is installed, but its packages could not be. '
           'See what pip said above.',
         );
+      }
+
+      final missing = await findMissingModules(
+        executablePath,
+        modules,
+        runProcess: _runProcess,
+      );
+      final extras = {
+        ...packages,
+        ...pipPackagesFor(modules.where(missing.contains)),
+      }.where((name) => !basePythonPackages.contains(name)).toList();
+      final unavailable = <String>[];
+      if (extras.isNotEmpty) {
+        final all = await installPackages(
+          executablePath,
+          extras,
+          onOutput: pipLine,
+          startProcess: _startProcess,
+        );
+        // One name pip does not know fails the whole batch, so the rest are
+        // tried on their own.
+        if (!all.success) {
+          for (final name in extras) {
+            final one = await installPackages(
+              executablePath,
+              [name],
+              onOutput: pipLine,
+              startProcess: _startProcess,
+            );
+            if (!one.success) unavailable.add(name);
+          }
+        }
       }
 
       onProgress(const PythonInstallProgress(PythonInstallStep.check));
@@ -190,14 +254,33 @@ class PythonInstaller {
         runProcess: _runProcess,
       );
       if (!check.isUsable) throw PythonInstallException(check.message);
-      return executablePath;
+
+      if (previous.existsSync()) previous.deleteSync(recursive: true);
+      swapped = false;
+      return PythonInstallResult(
+        path: executablePath,
+        unavailablePackages: unavailable,
+      );
     } finally {
+      if (swapped) _restore(previous);
+      if (_injectedHttp == null) client.close();
       if (archive.existsSync()) archive.deleteSync();
       if (staging.existsSync()) staging.deleteSync(recursive: true);
     }
   }
 
+  /// Puts back the Python that was there before a failed install.
+  void _restore(Directory previous) {
+    try {
+      if (directory.existsSync()) directory.deleteSync(recursive: true);
+      if (previous.existsSync()) previous.renameSync(directory.path);
+    } on FileSystemException {
+      // Nothing more can be done; the next install starts over.
+    }
+  }
+
   Future<void> _download(
+    http.Client client,
     String url,
     File target,
     void Function(PythonInstallProgress progress) onProgress,
@@ -207,8 +290,9 @@ class PythonInstaller {
         const PythonInstallProgress(PythonInstallStep.download, fraction: 0),
       );
       try {
-        final response = await _http.send(http.Request('GET', Uri.parse(url)));
+        final response = await client.send(http.Request('GET', Uri.parse(url)));
         if (response.statusCode != 200) {
+          await response.stream.drain<void>();
           throw PythonInstallException(
             'The download failed with HTTP ${response.statusCode}.',
           );

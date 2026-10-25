@@ -14,12 +14,14 @@ export 'src/external_code.dart'
     show ExternalCodeSource, readExternalCode, readExternalCodeVersion;
 export 'src/home_path.dart' show expandHomePath;
 export 'src/python/contract_extractor.dart' show extractContractDraft;
+export 'src/python/imports.dart' show importedModules;
 export 'src/python/interpreter_check.dart'
     show InterpreterCheck, InterpreterProblem, checkInterpreter;
 export 'src/python/python_installer.dart'
     show
         PythonInstallException,
         PythonInstallProgress,
+        PythonInstallResult,
         PythonInstallStep,
         PythonInstaller,
         managedPythonVersion;

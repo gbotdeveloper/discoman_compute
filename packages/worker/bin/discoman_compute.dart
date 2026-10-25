@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:discoman_worker/src/auth/remote_auth.dart';
+import 'package:discoman_worker/src/python/imports.dart';
 import 'package:discoman_worker/src/python/python_installer.dart';
 import 'package:discoman_worker/src/scripts/link_script.dart';
+import 'package:discoman_worker/src/scripts/script_store.dart';
 import 'package:discoman_worker/src/settings/worker_settings.dart';
 import 'package:discoman_worker/src/worker_config.dart';
 import 'package:discoman_worker/src/worker_loop.dart';
@@ -180,10 +182,15 @@ class InstallPythonCommand extends Command<int> {
   @override
   Future<int> run() async {
     final installer = PythonInstaller();
+    final scripts = ScriptStore.defaultLocation();
     PythonInstallStep? step;
     try {
-      final path = await installer.install(
+      final result = await installer.install(
         packages: argResults?['package'] as List<String>? ?? const [],
+        modules: {
+          for (final id in scripts.linkedProjectIds())
+            ...importedModules(scripts.fileFor(id).readAsStringSync()),
+        }.toList(),
         onProgress: (progress) {
           if (progress.step != step) {
             step = progress.step;
@@ -193,11 +200,20 @@ class InstallPythonCommand extends Command<int> {
         },
       );
       final store = WorkerSettingsStore.defaultLocation();
-      store.save(store.load().copyWith(pythonPath: path));
-      stdout.writeln('Done. Remote runs now use $path');
+      store.save(store.load().copyWith(pythonPath: result.path));
+      stdout.writeln('Done. Remote runs now use ${result.path}');
+      if (result.unavailablePackages.isNotEmpty) {
+        stdout.writeln(
+          'pip could not install ${result.unavailablePackages.join(', ')}. '
+          'Install them yourself if your scripts need them.',
+        );
+      }
       return 0;
     } on PythonInstallException catch (error) {
       stderr.writeln(error.message);
+      return 1;
+    } catch (error) {
+      stderr.writeln('Installing Python failed: $error');
       return 1;
     }
   }

@@ -29,6 +29,7 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
   PythonInstallStep? _step;
   double? _downloaded;
   String? _error;
+  List<String> _unavailable = const [];
   final List<String> _pipLines = [];
 
   Future<void> _install() async {
@@ -40,7 +41,7 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
       _pipLines.clear();
     });
     try {
-      await widget.controller.installPython((progress) {
+      final result = await widget.controller.installPython((progress) {
         if (!mounted) return;
         setState(() {
           _step = progress.step;
@@ -48,7 +49,11 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
           if (progress.line != null) _pipLines.add(progress.line!);
         });
       }, installer: widget.installer);
-      if (mounted) setState(() => _phase = _Phase.done);
+      if (!mounted) return;
+      setState(() {
+        _phase = _Phase.done;
+        _unavailable = result.unavailablePackages;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -131,6 +136,17 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
                   'Done. This computer now runs your scripts with it.',
                   style: textTheme.bodyMedium?.copyWith(
                     color: colorScheme.primary,
+                  ),
+                ),
+              ],
+              if (_unavailable.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'pip could not install ${_unavailable.join(', ')}. If one '
+                  'of these is your own module rather than a package, that '
+                  'is expected; otherwise install it yourself.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.error,
                   ),
                 ),
               ],

@@ -14,13 +14,13 @@ void main() {
       final home = Directory.systemTemp.createTempSync('discoman_live');
       addTearDown(() => home.deleteSync(recursive: true));
 
-      final path = await PythonInstaller(home: home).install(
+      final result = await PythonInstaller(home: home).install(
         onProgress: (progress) {
           if (progress.line != null) print(progress.line);
         },
       );
 
-      final imports = Process.runSync(path, [
+      final imports = Process.runSync(result.path, [
         '-c',
         'import numpy, pandas, matplotlib, PIL; print("ok")',
       ]);

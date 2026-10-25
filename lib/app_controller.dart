@@ -297,18 +297,22 @@ class AppController extends ChangeNotifier {
   /// Downloads Discoman's own Python with the packages the linked scripts
   /// need, and switches this computer to it. Throws a
   /// [PythonInstallException] when it fails.
-  Future<void> installPython(
+  Future<PythonInstallResult> installPython(
     void Function(PythonInstallProgress progress) onProgress, {
     PythonInstaller? installer,
   }) async {
-    final packages = {
-      for (final missing in missingPackagesByProject.values) ...missing,
+    final store = ScriptStore.defaultLocation();
+    final modules = {
+      for (final projectId in linkedProjectIds)
+        if (store.fileFor(projectId).existsSync())
+          ...importedModules(store.fileFor(projectId).readAsStringSync()),
     }.toList();
-    final path = await (installer ?? PythonInstaller()).install(
-      packages: packages,
+    final result = await (installer ?? PythonInstaller()).install(
+      modules: modules,
       onProgress: onProgress,
     );
-    await setPythonPath(path);
+    await setPythonPath(result.path);
+    return result;
   }
 
   /// Saves the Python interpreter the creator picked.

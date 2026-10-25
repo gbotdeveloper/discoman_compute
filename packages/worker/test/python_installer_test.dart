@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -31,6 +32,8 @@ void main() {
     required http.Client client,
     String? sha,
     List<List<String>>? pipCalls,
+    Set<String> pipFails = const {},
+    List<String> missingModules = const [],
   }) {
     return PythonInstaller(
       home: Directory('${temp.path}/home'),
@@ -43,12 +46,27 @@ void main() {
       retryDelay: Duration.zero,
       startProcess: (executable, arguments) {
         pipCalls?.add(arguments);
-        return Process.start('sh', ['-c', 'echo Successfully installed']);
+        final fails = arguments.any(pipFails.contains);
+        return Process.start('sh', [
+          '-c',
+          fails
+              ? 'echo No matching distribution; exit 1'
+              : 'echo Successfully installed',
+        ]);
       },
-      runProcess: (executable, arguments) async =>
-          ProcessResult(0, 0, 'Python 3.11.17', ''),
+      runProcess: (executable, arguments) async => arguments.first == '-c'
+          ? ProcessResult(0, 0, jsonEncode(missingModules), '')
+          : ProcessResult(0, 0, 'Python 3.11.17', ''),
     );
   }
+
+  List<String> pipArgs(List<String> packages) => [
+    '-m',
+    'pip',
+    'install',
+    '--disable-pip-version-check',
+    ...packages,
+  ];
 
   test('downloads, unpacks and sets up Python with packages', () async {
     final pipCalls = <List<String>>[];
@@ -57,31 +75,68 @@ void main() {
     final python = installer(
       client: MockClient((_) async => http.Response.bytes(archive, 200)),
       pipCalls: pipCalls,
+      missingModules: ['cv2'],
     );
 
-    final path = await python.install(
-      packages: ['opencv-python', 'numpy'],
+    final result = await python.install(
+      packages: ['numpy'],
+      modules: ['cv2', 'json', 'numpy'],
       onProgress: (progress) {
         steps.add(progress.step);
         if (progress.line != null) lines.add(progress.line!);
       },
     );
 
-    expect(path, '${temp.path}/home/python/bin/python3');
-    expect(File(path).existsSync(), isTrue);
+    expect(result.path, '${temp.path}/home/python/bin/python3');
+    expect(result.unavailablePackages, isEmpty);
+    expect(File(result.path).existsSync(), isTrue);
     expect(steps, PythonInstallStep.values.toSet());
-    expect(pipCalls.single, [
-      '-m',
-      'pip',
-      'install',
-      '--disable-pip-version-check',
-      'numpy',
-      'pandas',
-      'matplotlib',
-      'Pillow',
-      'opencv-python',
+    expect(pipCalls, [
+      pipArgs(basePythonPackages),
+      pipArgs(['opencv-python']),
     ]);
     expect(lines, contains('Successfully installed'));
+    expect(
+      Directory('${temp.path}/home').listSync().map(
+        (e) => e.uri.pathSegments.where((s) => s.isNotEmpty).last,
+      ),
+      ['python'],
+    );
+  });
+
+  test('lists a package pip cannot install instead of failing', () async {
+    final pipCalls = <List<String>>[];
+    final python = installer(
+      client: MockClient((_) async => http.Response.bytes(archive, 200)),
+      pipCalls: pipCalls,
+      pipFails: {'helpers'},
+      missingModules: ['cv2', 'helpers'],
+    );
+
+    final result = await python.install(
+      modules: ['cv2', 'helpers'],
+      onProgress: (_) {},
+    );
+
+    expect(result.unavailablePackages, ['helpers']);
+    expect(pipCalls.last, pipArgs(['helpers']));
+    expect(pipCalls, anyElement(equals(pipArgs(['opencv-python']))));
+    expect(python.isInstalled, isTrue);
+  });
+
+  test('puts the previous Python back when a reinstall fails', () async {
+    final client = MockClient((_) async => http.Response.bytes(archive, 200));
+    final first = installer(client: client);
+    await first.install(onProgress: (_) {});
+    File('${first.directory.path}/marker').writeAsStringSync('old');
+
+    final second = installer(client: client, pipFails: {'numpy'});
+    await expectLater(
+      second.install(onProgress: (_) {}),
+      throwsA(isA<PythonInstallException>()),
+    );
+
+    expect(File('${first.directory.path}/marker').readAsStringSync(), 'old');
     expect(
       Directory('${temp.path}/home').listSync().map(
         (e) => e.uri.pathSegments.where((s) => s.isNotEmpty).last,

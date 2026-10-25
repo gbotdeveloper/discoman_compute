@@ -11,14 +11,15 @@ class _FakeInstaller extends PythonInstaller {
   _FakeInstaller({this.fail = false});
 
   final bool fail;
-  List<String>? packages;
+  List<String>? modules;
 
   @override
-  Future<String> install({
+  Future<PythonInstallResult> install({
     List<String> packages = const [],
+    List<String> modules = const [],
     required void Function(PythonInstallProgress progress) onProgress,
   }) async {
-    this.packages = packages;
+    this.modules = modules;
     onProgress(
       const PythonInstallProgress(PythonInstallStep.download, fraction: 0.5),
     );
@@ -31,7 +32,10 @@ class _FakeInstaller extends PythonInstaller {
         line: 'Successfully installed numpy',
       ),
     );
-    return '/home/me/.discoman/python/bin/python3';
+    return const PythonInstallResult(
+      path: '/home/me/.discoman/python/bin/python3',
+      unavailablePackages: ['helpers'],
+    );
   }
 }
 
@@ -40,6 +44,9 @@ void main() {
     WidgetTester tester,
     PythonInstaller installer,
   ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final temp = Directory.systemTemp.createTempSync('install_python_test');
     addTearDown(() => temp.deleteSync(recursive: true));
     final controller =
@@ -76,7 +83,11 @@ void main() {
     await tester.tap(find.text('Install'));
     await tester.pumpAndSettle();
 
-    expect(installer.packages, ['opencv-python']);
+    expect(installer.modules, isEmpty);
+    expect(
+      find.textContaining('pip could not install helpers'),
+      findsOneWidget,
+    );
     expect(find.text('Successfully installed numpy'), findsOneWidget);
     expect(
       find.text('Done. This computer now runs your scripts with it.'),
