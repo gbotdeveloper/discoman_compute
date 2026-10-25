@@ -17,11 +17,15 @@ class ScriptCandidate {
     required this.path,
     required this.source,
     required this.draft,
+    this.missingPackages = const [],
   });
 
   final String path;
   final String source;
   final ContractDraft draft;
+
+  /// Pip packages the script imports that this computer's Python lacks.
+  final List<String> missingPackages;
 
   String get fileName => path.split(Platform.pathSeparator).last;
 }
@@ -84,6 +88,16 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Pip packages each linked script needs that this computer's Python
+  /// lacks. Projects missing nothing are left out.
+  Map<String, List<String>> missingPackagesByProject = const {};
+
+  /// Whether a pip install is running.
+  bool isInstalling = false;
+
+  /// What the running or last pip install printed.
+  final List<String> installLog = [];
+
   /// The most recent worker log lines, oldest first.
   final List<String> log = [];
 
@@ -131,6 +145,46 @@ class AppController extends ChangeNotifier {
     if (session == null) return;
     projects = await session.client.creatorScript.listProjects();
     _refreshLinkedProjects();
+    await refreshMissingPackages();
+  }
+
+  /// Re-reads which packages the linked scripts need and Python lacks.
+  Future<void> refreshMissingPackages() async {
+    final store = ScriptStore.defaultLocation();
+    final missing = <String, List<String>>{};
+    for (final projectId in linkedProjectIds) {
+      final file = store.fileFor(projectId);
+      if (!file.existsSync()) continue;
+      final packages = await missingPackagesFor(
+        config.pythonPath,
+        file.readAsStringSync(),
+      );
+      if (packages.isNotEmpty) missing[projectId] = packages;
+    }
+    missingPackagesByProject = missing;
+    _notify();
+  }
+
+  /// Installs [packages] into this computer's Python with pip.
+  Future<PackageInstallResult> installMissingPackages(
+    List<String> packages,
+  ) async {
+    isInstalling = true;
+    installLog.clear();
+    _notify();
+    try {
+      return await installPackages(
+        config.pythonPath,
+        packages,
+        onOutput: (line) {
+          installLog.add(line);
+          _notify();
+        },
+      );
+    } finally {
+      isInstalling = false;
+      await refreshMissingPackages();
+    }
   }
 
   /// Re-reads which projects have a script on this machine.
@@ -165,6 +219,7 @@ class AppController extends ChangeNotifier {
         path: path,
         source: source,
         draft: extractContractDraft(source),
+        missingPackages: await missingPackagesFor(config.pythonPath, source),
       );
     });
   }
@@ -209,6 +264,7 @@ class AppController extends ChangeNotifier {
       final store = settingsStore;
       store.save(store.load().copyWith(pythonPath: path));
       config = WorkerConfig.resolve(modeArg: 'remote');
+      await refreshMissingPackages();
     });
   }
 

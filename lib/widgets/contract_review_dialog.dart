@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../app_controller.dart';
 import 'action_button.dart';
 
+/// What the creator chose in [ContractReviewDialog].
+enum LinkChoice { link, linkAndInstall }
+
 /// Shows what was read from the picked script, and asks before sending it.
 ///
 /// This is the point of the whole flow: the creator sees the exact list that
@@ -23,6 +26,7 @@ class ContractReviewDialog extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final draft = candidate.draft;
+    final missing = candidate.missingPackages;
 
     return Dialog(
       child: ConstrainedBox(
@@ -53,10 +57,7 @@ class ContractReviewDialog extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _Field(
-                        label: 'Entrypoint',
-                        value: draft.entrypointName,
-                      ),
+                      _Field(label: 'Entrypoint', value: draft.entrypointName),
                       const SizedBox(height: 16),
                       _FieldList(
                         title: 'Inputs',
@@ -82,6 +83,10 @@ class ContractReviewDialog extends StatelessWidget {
                   ),
                 ),
               ),
+              if (missing.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                MissingPackagesNotice(packages: missing),
+              ],
               const SizedBox(height: 18),
               Text(
                 'Only what you see above is sent. The script itself is copied '
@@ -92,19 +97,27 @@ class ContractReviewDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
                   ActionButton(
                     label: 'Cancel',
                     isPrimary: false,
-                    onPressed: () => Navigator.of(context).pop(false),
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
-                  const SizedBox(width: 10),
                   ActionButton(
-                    label: 'Link it',
-                    onPressed: () => Navigator.of(context).pop(true),
+                    label: missing.isEmpty ? 'Link it' : 'Link only',
+                    isPrimary: missing.isEmpty,
+                    onPressed: () => Navigator.of(context).pop(LinkChoice.link),
                   ),
+                  if (missing.isNotEmpty)
+                    ActionButton(
+                      label: 'Link and install',
+                      onPressed: () =>
+                          Navigator.of(context).pop(LinkChoice.linkAndInstall),
+                    ),
                 ],
               ),
             ],
@@ -177,6 +190,49 @@ class _FieldList extends StatelessWidget {
               child: SelectableText(entry, style: textTheme.bodyMedium),
             ),
       ],
+    );
+  }
+}
+
+/// Says which packages this computer's Python lacks for a script.
+class MissingPackagesNotice extends StatelessWidget {
+  const MissingPackagesNotice({required this.packages, super.key});
+
+  final List<String> packages;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 18,
+              color: colorScheme.onErrorContainer,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "This computer's Python is missing ${packages.join(', ')}. "
+                'Runs fail until they are installed.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onErrorContainer,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

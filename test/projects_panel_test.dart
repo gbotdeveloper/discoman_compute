@@ -9,33 +9,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  CreatorProjectSummary project(
-    String name, {
-    required ScriptLocation where,
-  }) {
+  CreatorProjectSummary project(String name, {required ScriptLocation where}) {
     return CreatorProjectSummary(
       projectId: name.toLowerCase(),
       name: name,
       scriptLocation: where,
       hasContract: false,
     );
-    }
+  }
 
   Future<void> pump(
     WidgetTester tester,
     List<CreatorProjectSummary> projects, {
     Set<String> linked = const {},
+    Map<String, List<String>> missing = const {},
+    ValueChanged<List<String>>? onInstall,
   }) async {
     // Its own settings file: the controller writes switch changes through to
     // disk, and a test must never touch the creator's real home directory.
     final temp = Directory.systemTemp.createTempSync('panel_test');
     addTearDown(() => temp.deleteSync(recursive: true));
 
-    final controller = AppController(
-      settingsStore: WorkerSettingsStore(File('${temp.path}/settings.json')),
-    )
-      ..projects = projects
-      ..linkedProjectIds = linked.toSet();
+    final controller =
+        AppController(
+            settingsStore: WorkerSettingsStore(
+              File('${temp.path}/settings.json'),
+            ),
+          )
+          ..projects = projects
+          ..linkedProjectIds = linked.toSet()
+          ..missingPackagesByProject = missing;
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
@@ -47,8 +50,11 @@ void main() {
             // so the test has to as well or nothing redraws on a tap.
             child: ListenableBuilder(
               listenable: controller,
-              builder: (_, _) =>
-                  ProjectsPanel(controller: controller, onLink: (_) {}),
+              builder: (_, _) => ProjectsPanel(
+                controller: controller,
+                onLink: (_) {},
+                onInstall: onInstall,
+              ),
             ),
           ),
         ),
@@ -150,4 +156,25 @@ void main() {
     expect(heights, hasLength(1));
   });
 
+  testWidgets('a linked script missing packages offers to install them', (
+    tester,
+  ) async {
+    List<String>? installed;
+    await pump(
+      tester,
+      [project('Mine', where: ScriptLocation.creatorMachine)],
+      linked: {'mine'},
+      missing: {
+        'mine': ['Pillow', 'opencv-python'],
+      },
+      onInstall: (packages) => installed = packages,
+    );
+
+    expect(
+      find.text('Missing packages: Pillow, opencv-python'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Install'));
+    expect(installed, ['Pillow', 'opencv-python']);
+  });
 }

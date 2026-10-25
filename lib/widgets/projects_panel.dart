@@ -10,6 +10,7 @@ class ProjectsPanel extends StatelessWidget {
   const ProjectsPanel({
     required this.controller,
     required this.onLink,
+    this.onInstall,
     super.key,
   });
 
@@ -17,6 +18,9 @@ class ProjectsPanel extends StatelessWidget {
 
   /// Called with the project the creator wants to attach a script to.
   final ValueChanged<CreatorProjectSummary> onLink;
+
+  /// Called with the pip packages a linked script still needs.
+  final ValueChanged<List<String>>? onInstall;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +83,14 @@ class ProjectsPanel extends StatelessWidget {
       isBusy: controller.isBusy,
       isLinkedHere: controller.linkedProjectIds.contains(project.projectId),
       isServed: !controller.pausedProjectIds.contains(project.projectId),
+      missingPackages:
+          controller.missingPackagesByProject[project.projectId] ?? const [],
       onLink: () => onLink(project),
+      onInstall: onInstall == null
+          ? null
+          : () => onInstall!(
+              controller.missingPackagesByProject[project.projectId]!,
+            ),
       onServedChanged: (served) =>
           controller.setProjectServed(project.projectId, served: served),
     );
@@ -164,6 +175,8 @@ class ProjectRow extends StatelessWidget {
     required this.isServed,
     required this.onLink,
     required this.onServedChanged,
+    this.missingPackages = const [],
+    this.onInstall,
     super.key,
   });
 
@@ -185,6 +198,10 @@ class ProjectRow extends StatelessWidget {
 
   final VoidCallback onLink;
   final ValueChanged<bool> onServedChanged;
+
+  /// Pip packages this project's script needs and this computer lacks.
+  final List<String> missingPackages;
+  final VoidCallback? onInstall;
 
   _ProjectState get _state {
     if (!runsHere) return _ProjectState.inCloud;
@@ -250,9 +267,7 @@ class ProjectRow extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      project.name.isEmpty
-                          ? 'Untitled project'
-                          : project.name,
+                      project.name.isEmpty ? 'Untitled project' : project.name,
                       style: textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -298,6 +313,33 @@ class ProjectRow extends StatelessWidget {
                   ),
                 ],
               ),
+              if (canClaim && missingPackages.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: iconSize,
+                      color: colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Missing packages: ${missingPackages.join(', ')}',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.error,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    ActionButton(
+                      label: 'Install',
+                      isPrimary: false,
+                      onPressed: isBusy ? null : onInstall,
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

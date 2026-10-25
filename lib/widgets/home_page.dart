@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app_controller.dart';
 import 'contract_review_dialog.dart';
 import 'error_banner.dart';
+import 'install_packages_dialog.dart';
 import 'projects_panel.dart';
 import 'worker_panel.dart';
 
@@ -27,19 +28,29 @@ class HomePage extends StatelessWidget {
     final candidate = controller.candidate;
     if (candidate == null || !context.mounted) return;
 
-    final confirmed = await showDialog<bool>(
+    final choice = await showDialog<LinkChoice>(
       context: context,
-      builder: (context) => ContractReviewDialog(
-        candidate: candidate,
-        projectName: project.name,
-      ),
+      builder: (context) =>
+          ContractReviewDialog(candidate: candidate, projectName: project.name),
     );
 
-    if (confirmed ?? false) {
-      await controller.linkTo(project.projectId);
-    } else {
+    if (choice == null) {
       controller.clearCandidate();
+      return;
     }
+    await controller.linkTo(project.projectId);
+    if (choice == LinkChoice.linkAndInstall && context.mounted) {
+      await _install(context, candidate.missingPackages);
+    }
+  }
+
+  Future<void> _install(BuildContext context, List<String> packages) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          InstallPackagesDialog(controller: controller, packages: packages),
+    );
   }
 
   @override
@@ -69,6 +80,7 @@ class HomePage extends StatelessWidget {
           ProjectsPanel(
             controller: controller,
             onLink: (project) => _link(context, project),
+            onInstall: (packages) => _install(context, packages),
           ),
         ],
       ),
