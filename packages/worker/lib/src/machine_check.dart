@@ -1,16 +1,11 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:discoman_client/discoman_client.dart';
 
 import 'python/imports.dart';
 import 'python/interpreter_check.dart';
+import 'python/packages.dart';
 import 'python/pip_names.dart';
 import 'scripts/script_store.dart';
 import 'settings/worker_settings.dart';
-
-typedef RunProcess =
-    Future<ProcessResult> Function(String executable, List<String> arguments);
 
 /// Checks this machine's Python and scripts without running any script.
 ///
@@ -44,9 +39,9 @@ Future<MachineCheckResult> runMachineCheck({
       entry.key: importedModules(entry.value),
   };
   final missing = interpreter.isUsable
-      ? await _missingModules(pythonPath, {
+      ? await findMissingModules(pythonPath, {
           for (final modules in modulesByProject.values) ...modules,
-        }, runProcess ?? (exe, args) => Process.run(exe, args))
+        }, runProcess: runProcess)
       : const <String>{};
 
   return MachineCheckResult(
@@ -74,26 +69,4 @@ Future<MachineCheckResult> runMachineCheck({
         ),
     ],
   );
-}
-
-/// Which of [modules] the interpreter at [pythonPath] cannot import. Only
-/// looks them up, so no module code runs.
-Future<Set<String>> _missingModules(
-  String pythonPath,
-  Set<String> modules,
-  RunProcess run,
-) async {
-  if (modules.isEmpty) return const {};
-  const lookup =
-      'import importlib.util, json, sys\n'
-      'print(json.dumps([m for m in sys.argv[1:] '
-      'if importlib.util.find_spec(m) is None]))';
-  try {
-    final result = await run(pythonPath, ['-c', lookup, ...modules]);
-    if (result.exitCode != 0) return const {};
-    final lines = '${result.stdout}'.trim().split('\n');
-    return {...(jsonDecode(lines.last) as List).cast<String>()};
-  } catch (_) {
-    return const {};
-  }
 }
