@@ -7,6 +7,7 @@ import 'auth/session.dart';
 import 'execution_processor.dart';
 import 'heartbeat.dart';
 import 'machine_check.dart';
+import 'machine_id.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
 import 'settings/worker_settings.dart';
@@ -26,6 +27,10 @@ enum RemoteWorkerState {
   failed,
 }
 
+/// How often an idle worker repeats what it reported about its computer, so
+/// scripts linked or switched off while it runs show up on the dashboard.
+const _machineReportInterval = Duration(minutes: 1);
+
 /// The self-hosted worker as a controllable object: start it, stop it, and
 /// watch what it is doing.
 ///
@@ -39,17 +44,23 @@ class RemoteWorker {
     this._config, {
     ScriptStore? scriptStore,
     WorkerSettingsStore? settingsStore,
+    MachineIdStore? machineIdStore,
   }) : _scriptStore = scriptStore,
-       _settingsStore = settingsStore;
+       _settingsStore = settingsStore,
+       _machineIdStore = machineIdStore;
 
   final WorkerConfig _config;
   final ScriptStore? _scriptStore;
   final WorkerSettingsStore? _settingsStore;
+  final MachineIdStore? _machineIdStore;
 
   /// Where linked scripts live. Resolved on first use rather than in the
   /// constructor, so a machine with no home directory can still construct one.
   late final ScriptStore scriptStore =
       _scriptStore ?? ScriptStore.defaultLocation();
+
+  late final MachineIdStore machineIdStore =
+      _machineIdStore ?? MachineIdStore.defaultLocation();
 
   /// Where the creator's switched-off projects are recorded. Resolved on first
   /// use for the same reason as [scriptStore].
@@ -164,8 +175,13 @@ class RemoteWorker {
       ),
     );
 
+    var reportedAt = DateTime.fromMillisecondsSinceEpoch(0);
     try {
       while (!_stopRequested) {
+        if (DateTime.now().difference(reportedAt) > _machineReportInterval) {
+          reportedAt = DateTime.now();
+          await _reportMachine(session, workerId);
+        }
         final claimed = await session.client.computeWorker.claimNext(
           workerId,
           servedProjectIds(),
@@ -195,6 +211,28 @@ class RemoteWorker {
     } catch (error) {
       _log.add('The worker stopped with an error: $error');
       await _shutDown(RemoteWorkerState.failed);
+    }
+  }
+
+  /// Tells the server which computer this is and every script linked on it.
+  /// Best effort: a server too old to take it still runs everything else.
+  Future<void> _reportMachine(WorkerSession session, UuidValue workerId) async {
+    try {
+      final linked = scriptStore.linkedProjectIds();
+      final paused = settingsStore.load().pausedProjectIds;
+      await session.client.computeWorker.reportMachine(
+        workerId,
+        MachineReport(
+          machineId: machineIdStore.read(),
+          linkedProjectIds: linked,
+          pausedProjectIds: [
+            for (final id in linked)
+              if (paused.contains(id)) id,
+          ],
+        ),
+      );
+    } catch (_) {
+      // Retried on the next report.
     }
   }
 
