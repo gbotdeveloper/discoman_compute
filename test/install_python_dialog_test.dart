@@ -13,13 +13,19 @@ class _FakeInstaller extends PythonInstaller {
   final bool fail;
   List<String>? modules;
 
+  List<String>? confirmed;
+
   @override
   Future<PythonInstallResult> install({
     List<String> packages = const [],
     List<String> modules = const [],
+    Future<List<String>> Function(List<String> packages)? confirmGuessed,
     required void Function(PythonInstallProgress progress) onProgress,
   }) async {
     this.modules = modules;
+    if (!fail) {
+      confirmed = await confirmGuessed?.call(['opencv-python', 'helpers']);
+    }
     onProgress(
       const PythonInstallProgress(PythonInstallStep.download, fraction: 0.5),
     );
@@ -81,8 +87,16 @@ void main() {
     final controller = await pump(tester, installer);
 
     await tester.tap(find.text('Install'));
+    // The step spinner keeps animating behind the question.
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Install these packages too?'), findsOneWidget);
+    await tester.tap(find.text('helpers'));
+    await tester.pump();
+    await tester.tap(find.text('Install selected'));
     await tester.pumpAndSettle();
 
+    expect(installer.confirmed, ['opencv-python']);
     expect(installer.modules, isEmpty);
     expect(
       find.textContaining('pip could not install helpers'),

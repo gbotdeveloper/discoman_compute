@@ -299,6 +299,7 @@ class AppController extends ChangeNotifier {
   /// [PythonInstallException] when it fails.
   Future<PythonInstallResult> installPython(
     void Function(PythonInstallProgress progress) onProgress, {
+    Future<List<String>> Function(List<String> packages)? confirmGuessed,
     PythonInstaller? installer,
   }) async {
     final store = ScriptStore.defaultLocation();
@@ -309,6 +310,7 @@ class AppController extends ChangeNotifier {
     }.toList();
     final result = await (installer ?? PythonInstaller()).install(
       modules: modules,
+      confirmGuessed: confirmGuessed,
       onProgress: onProgress,
     );
     await setPythonPath(result.path);

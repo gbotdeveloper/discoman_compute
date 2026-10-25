@@ -41,14 +41,18 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
       _pipLines.clear();
     });
     try {
-      final result = await widget.controller.installPython((progress) {
-        if (!mounted) return;
-        setState(() {
-          _step = progress.step;
-          if (progress.fraction != null) _downloaded = progress.fraction;
-          if (progress.line != null) _pipLines.add(progress.line!);
-        });
-      }, installer: widget.installer);
+      final result = await widget.controller.installPython(
+        (progress) {
+          if (!mounted) return;
+          setState(() {
+            _step = progress.step;
+            if (progress.fraction != null) _downloaded = progress.fraction;
+            if (progress.line != null) _pipLines.add(progress.line!);
+          });
+        },
+        confirmGuessed: _confirmGuessed,
+        installer: widget.installer,
+      );
       if (!mounted) return;
       setState(() {
         _phase = _Phase.done;
@@ -61,6 +65,19 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
         _error = '$error';
       });
     }
+  }
+
+  /// Asks which of the packages guessed from the scripts' imports to
+  /// install: an import can name the creator's own module rather than a
+  /// package.
+  Future<List<String>> _confirmGuessed(List<String> packages) async {
+    if (!mounted) return const [];
+    final chosen = await showDialog<List<String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _GuessedPackagesDialog(packages: packages),
+    );
+    return chosen ?? const [];
   }
 
   @override
@@ -275,6 +292,96 @@ class _StepLine extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GuessedPackagesDialog extends StatefulWidget {
+  const _GuessedPackagesDialog({required this.packages});
+
+  final List<String> packages;
+
+  @override
+  State<_GuessedPackagesDialog> createState() => _GuessedPackagesDialogState();
+}
+
+class _GuessedPackagesDialogState extends State<_GuessedPackagesDialog> {
+  late final Set<String> _chosen = {...widget.packages};
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Install these packages too?',
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Your scripts import them and the new Python does not have '
+                'them. Untick any that is a file of your own rather than a '
+                'package from PyPI.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final name in widget.packages)
+                      CheckboxListTile(
+                        value: _chosen.contains(name),
+                        title: Text(name),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (on) => setState(
+                          () => (on ?? false)
+                              ? _chosen.add(name)
+                              : _chosen.remove(name),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  ActionButton(
+                    label: 'Skip them',
+                    isPrimary: false,
+                    onPressed: () =>
+                        Navigator.of(context).pop(const <String>[]),
+                  ),
+                  ActionButton(
+                    label: 'Install selected',
+                    onPressed: () => Navigator.of(context).pop([
+                      for (final name in widget.packages)
+                        if (_chosen.contains(name)) name,
+                    ]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
