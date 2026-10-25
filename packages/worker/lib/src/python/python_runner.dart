@@ -215,14 +215,15 @@ class PythonRunner {
     );
   }
 
-  /// The module named by the last `ModuleNotFoundError` in [logs].
+  /// The module named when the run ended on a `ModuleNotFoundError`. Only
+  /// the last line counts: a script may log one it caught and fail later
+  /// for another reason.
   String? _missingModuleIn(List<String> logs) {
-    final pattern = RegExp(r"^ModuleNotFoundError: No module named '([^'.]+)");
-    for (final line in logs.reversed) {
-      final match = pattern.firstMatch(line);
-      if (match != null) return match.group(1);
-    }
-    return null;
+    if (logs.isEmpty) return null;
+    final match = RegExp(
+      r"^(?:ModuleNotFoundError: )?No module named '([^'.]+)",
+    ).firstMatch(logs.last);
+    return match?.group(1);
   }
 
   /// Splits stderr the way the executor did: line by line, trimmed, dropping
