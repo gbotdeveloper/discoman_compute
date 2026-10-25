@@ -2,12 +2,16 @@ import 'dart:io';
 
 import '../home_path.dart';
 
+/// Why an interpreter could not be used.
+enum InterpreterProblem { notSet, notFound, failed, notPython }
+
 /// What running `<interpreter> --version` told us.
 class InterpreterCheck {
   const InterpreterCheck._({
     required this.isUsable,
     required this.message,
     this.version,
+    this.problem,
   });
 
   /// Whether the path names a Python that actually runs.
@@ -18,6 +22,9 @@ class InterpreterCheck {
 
   /// The reported version, when there was one.
   final String? version;
+
+  /// Null when [isUsable].
+  final InterpreterProblem? problem;
 }
 
 /// Runs `<path> --version` and reports whether it is a usable interpreter.
@@ -38,6 +45,7 @@ Future<InterpreterCheck> checkInterpreter(
     return const InterpreterCheck._(
       isUsable: false,
       message: 'Enter the path to a Python interpreter.',
+      problem: InterpreterProblem.notSet,
     );
   }
 
@@ -50,11 +58,13 @@ Future<InterpreterCheck> checkInterpreter(
     return InterpreterCheck._(
       isUsable: false,
       message: 'Nothing runnable at $trimmed.',
+      problem: InterpreterProblem.notFound,
     );
   } catch (error) {
     return InterpreterCheck._(
       isUsable: false,
       message: 'Could not run $trimmed: $error',
+      problem: InterpreterProblem.failed,
     );
   }
 
@@ -62,6 +72,7 @@ Future<InterpreterCheck> checkInterpreter(
     return InterpreterCheck._(
       isUsable: false,
       message: '$trimmed exited with code ${result.exitCode}.',
+      problem: InterpreterProblem.failed,
     );
   }
 
@@ -78,6 +89,7 @@ Future<InterpreterCheck> checkInterpreter(
       message: reported.isEmpty
           ? '$trimmed ran but did not report a Python version.'
           : '$trimmed does not look like Python — it reported "$reported".',
+      problem: InterpreterProblem.notPython,
     );
   }
 

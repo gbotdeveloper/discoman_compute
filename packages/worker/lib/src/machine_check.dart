@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 
 import 'python/imports.dart';
 import 'python/interpreter_check.dart';
+import 'python/pip_names.dart';
 import 'scripts/script_store.dart';
 import 'settings/worker_settings.dart';
 
@@ -53,6 +54,8 @@ Future<MachineCheckResult> runMachineCheck({
     pythonVersion: interpreter.version,
     pythonUsable: interpreter.isUsable,
     pythonProblem: interpreter.isUsable ? null : interpreter.message,
+    pythonProblemCode: interpreter.problem?.name,
+    missingPackages: pipPackagesFor(missing.toList()..sort()),
     scripts: [
       for (final projectId in projectIds)
         MachineCheckScript(
