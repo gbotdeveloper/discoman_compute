@@ -78,15 +78,18 @@ void main() {
       missingModules: ['cv2'],
     );
 
+    List<String>? asked;
     final result = await python.install(
       packages: ['numpy'],
       modules: ['cv2', 'json', 'numpy'],
+      confirmGuessed: (packages) async => asked = packages,
       onProgress: (progress) {
         steps.add(progress.step);
         if (progress.line != null) lines.add(progress.line!);
       },
     );
 
+    expect(asked, ['opencv-python']);
     expect(result.path, '${temp.path}/home/python/bin/python3');
     expect(result.unavailablePackages, isEmpty);
     expect(File(result.path).existsSync(), isTrue);
@@ -115,6 +118,7 @@ void main() {
 
     final result = await python.install(
       modules: ['cv2', 'helpers'],
+      confirmGuessed: (packages) async => packages,
       onProgress: (_) {},
     );
 
@@ -190,5 +194,25 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('installs no guessed package the creator did not approve', () async {
+    final pipCalls = <List<String>>[];
+    final python = installer(
+      client: MockClient((_) async => http.Response.bytes(archive, 200)),
+      pipCalls: pipCalls,
+      missingModules: ['cv2', 'helpers'],
+    );
+
+    await python.install(
+      modules: ['cv2', 'helpers'],
+      confirmGuessed: (packages) async => ['opencv-python'],
+      onProgress: (_) {},
+    );
+
+    expect(pipCalls, [
+      pipArgs(basePythonPackages),
+      pipArgs(['opencv-python']),
+    ]);
   });
 }

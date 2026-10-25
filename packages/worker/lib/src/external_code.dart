@@ -67,7 +67,7 @@ Future<ExternalCodeVersion> readExternalCodeVersion(
     );
   }
 
-  final run = runGit ?? (exe, args) => Process.run(exe, args);
+  final run = runGit ?? _runKillingOnTimeout;
   ExternalCodeVersion failed(String problem) => ExternalCodeVersion(
     projectId: projectId,
     name: source.name,
@@ -124,4 +124,23 @@ Future<ExternalCodeVersion> readExternalCodeVersion(
     branch: branch?.exitCode == 0 && branchName != 'HEAD' ? branchName : null,
     dirty: status?.exitCode == 0 ? '${status!.stdout}'.trim().isNotEmpty : null,
   );
+}
+
+/// Runs git, killing it if it has not finished within 10 seconds.
+Future<ProcessResult> _runKillingOnTimeout(
+  String executable,
+  List<String> arguments,
+) async {
+  final process = await Process.start(executable, arguments);
+  final stdout = process.stdout.transform(systemEncoding.decoder).join();
+  final stderr = process.stderr.transform(systemEncoding.decoder).join();
+  try {
+    final exitCode = await process.exitCode.timeout(
+      const Duration(seconds: 10),
+    );
+    return ProcessResult(process.pid, exitCode, await stdout, await stderr);
+  } on TimeoutException {
+    process.kill();
+    rethrow;
+  }
 }

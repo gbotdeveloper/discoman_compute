@@ -191,6 +191,7 @@ class InstallPythonCommand extends Command<int> {
           for (final id in scripts.linkedProjectIds())
             ...importedModules(scripts.fileFor(id).readAsStringSync()),
         }.toList(),
+        confirmGuessed: _confirmGuessedPackages,
         onProgress: (progress) {
           if (progress.step != step) {
             step = progress.step;
@@ -217,4 +218,21 @@ class InstallPythonCommand extends Command<int> {
       return 1;
     }
   }
+}
+
+/// Asks in the terminal before installing packages guessed from import
+/// names. Installs none when nobody is there to ask.
+Future<List<String>> _confirmGuessedPackages(List<String> packages) async {
+  if (!stdin.hasTerminal) {
+    stdout.writeln(
+      'Not installing ${packages.join(', ')}: pass them with --package.',
+    );
+    return const [];
+  }
+  stdout.write(
+    'Your scripts import modules this Python lacks. Install '
+    '${packages.join(', ')} from PyPI? [y/N] ',
+  );
+  final answer = stdin.readLineSync()?.trim().toLowerCase();
+  return answer == 'y' || answer == 'yes' ? packages : const [];
 }

@@ -137,15 +137,17 @@ class PythonInstaller {
 
   bool get isInstalled => File(executablePath).existsSync();
 
-  /// Installs Python with [basePythonPackages], [packages], and whatever
-  /// of [modules] the new Python cannot import yet. A Python installed
-  /// earlier is replaced, and put back if the new one fails to set up.
+  /// Installs Python with [basePythonPackages], [packages], and the pip
+  /// packages [confirmGuessed] approves for whatever of [modules] the new
+  /// Python cannot import. A Python installed earlier is replaced, and put
+  /// back if the new one fails to set up.
   ///
   /// Packages beyond the base that pip cannot install are listed in the
   /// result rather than failing the install.
   Future<PythonInstallResult> install({
     List<String> packages = const [],
     List<String> modules = const [],
+    Future<List<String>> Function(List<String> packages)? confirmGuessed,
     required void Function(PythonInstallProgress progress) onProgress,
   }) async {
     final build = _build;
@@ -189,6 +191,7 @@ class PythonInstaller {
       try {
         if (previous.existsSync()) previous.deleteSync(recursive: true);
         if (directory.existsSync()) directory.renameSync(previous.path);
+        swapped = true;
         Directory(_join(staging.path, 'python')).renameSync(directory.path);
       } on FileSystemException catch (error) {
         throw PythonInstallException(
@@ -197,7 +200,6 @@ class PythonInstaller {
           'again. (${error.message})',
         );
       }
-      swapped = true;
 
       onProgress(const PythonInstallProgress(PythonInstallStep.packages));
       void pipLine(String line) => onProgress(
@@ -221,9 +223,20 @@ class PythonInstaller {
         modules,
         runProcess: _runProcess,
       );
+      // Guessed from import names, so a creator's own module could name an
+      // unrelated package: those are installed only once confirmed.
+      final guessed = pipPackagesFor(modules.where(missing.contains))
+          .where(
+            (name) =>
+                !basePythonPackages.contains(name) && !packages.contains(name),
+          )
+          .toList();
+      final confirmed = guessed.isEmpty || confirmGuessed == null
+          ? const <String>[]
+          : await confirmGuessed(guessed);
       final extras = {
         ...packages,
-        ...pipPackagesFor(modules.where(missing.contains)),
+        ...confirmed.where(guessed.contains),
       }.where((name) => !basePythonPackages.contains(name)).toList();
       final unavailable = <String>[];
       if (extras.isNotEmpty) {
@@ -255,8 +268,12 @@ class PythonInstaller {
       );
       if (!check.isUsable) throw PythonInstallException(check.message);
 
-      if (previous.existsSync()) previous.deleteSync(recursive: true);
       swapped = false;
+      try {
+        if (previous.existsSync()) previous.deleteSync(recursive: true);
+      } on FileSystemException {
+        // Removed by the next install.
+      }
       return PythonInstallResult(
         path: executablePath,
         unavailablePackages: unavailable,
