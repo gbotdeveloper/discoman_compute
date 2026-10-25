@@ -11,6 +11,7 @@ class ProjectsPanel extends StatelessWidget {
     required this.controller,
     required this.onLink,
     this.onInstall,
+    this.onEditExternalCode,
     super.key,
   });
 
@@ -21,6 +22,9 @@ class ProjectsPanel extends StatelessWidget {
 
   /// Called with the pip packages a linked script still needs.
   final ValueChanged<List<String>>? onInstall;
+
+  /// Called with the project whose external code the creator wants to edit.
+  final ValueChanged<CreatorProjectSummary>? onEditExternalCode;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +95,11 @@ class ProjectsPanel extends StatelessWidget {
           : () => onInstall!(
               controller.missingPackagesByProject[project.projectId]!,
             ),
+      externalCodeCount:
+          controller.externalCode[project.projectId]?.length ?? 0,
+      onEditExternalCode: onEditExternalCode == null
+          ? null
+          : () => onEditExternalCode!(project),
       onServedChanged: (served) =>
           controller.setProjectServed(project.projectId, served: served),
     );
@@ -177,6 +186,8 @@ class ProjectRow extends StatelessWidget {
     required this.onServedChanged,
     this.missingPackages = const [],
     this.onInstall,
+    this.externalCodeCount = 0,
+    this.onEditExternalCode,
     super.key,
   });
 
@@ -202,6 +213,10 @@ class ProjectRow extends StatelessWidget {
   /// Pip packages this project's script needs and this computer lacks.
   final List<String> missingPackages;
   final VoidCallback? onInstall;
+
+  /// How many pieces of code outside Discoman are recorded for it here.
+  final int externalCodeCount;
+  final VoidCallback? onEditExternalCode;
 
   _ProjectState get _state {
     if (!runsHere) return _ProjectState.inCloud;
@@ -274,6 +289,17 @@ class ProjectRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 20),
+                  _Reserved(
+                    visible: canClaim,
+                    child: ActionButton(
+                      label: externalCodeCount == 0
+                          ? 'External code'
+                          : 'External code ($externalCodeCount)',
+                      isPrimary: false,
+                      onPressed: isBusy ? null : onEditExternalCode,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   // Held open even where a control does not apply: rows of
                   // different heights read as different kinds of thing, and
                   // these are all just projects.

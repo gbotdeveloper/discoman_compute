@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app_controller.dart';
 import 'contract_review_dialog.dart';
 import 'error_banner.dart';
+import 'external_code_dialog.dart';
 import 'install_packages_dialog.dart';
 import 'projects_panel.dart';
 import 'worker_panel.dart';
@@ -84,6 +85,14 @@ class HomePage extends StatelessWidget {
             controller: controller,
             onLink: (project) => _link(context, project),
             onInstall: (packages) => _install(context, packages),
+            onEditExternalCode: (project) => showDialog<void>(
+              context: context,
+              builder: (context) => ExternalCodeDialog(
+                controller: controller,
+                projectId: project.projectId,
+                projectName: project.name,
+              ),
+            ),
           ),
         ],
       ),

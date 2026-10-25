@@ -223,6 +223,28 @@ class AppController extends ChangeNotifier {
     _notify();
   }
 
+  /// Code outside Discoman each project's script uses on this computer.
+  Map<String, List<ExternalCodeSource>> get externalCode {
+    try {
+      return settingsStore.load().externalCode;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Replaces the code outside Discoman that [projectId] uses here. The
+  /// worker reports it on its next report and stamps every run with it.
+  void setExternalCode(String projectId, List<ExternalCodeSource> code) {
+    final store = settingsStore;
+    final settings = store.load();
+    store.save(
+      settings.copyWith(
+        externalCode: {...settings.externalCode, projectId: code},
+      ),
+    );
+    _notify();
+  }
+
   /// Reads [path] and extracts its contract, without sending anything.
   Future<void> pickScript(String path) async {
     await _run(() async {
