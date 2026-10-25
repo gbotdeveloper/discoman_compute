@@ -10,6 +10,7 @@ import 'machine_check.dart';
 import 'machine_id.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
+import 'scripts/script_sync.dart';
 import 'settings/worker_settings.dart';
 import 'worker_config.dart';
 
@@ -180,6 +181,7 @@ class RemoteWorker {
       while (!_stopRequested) {
         if (DateTime.now().difference(reportedAt) > _machineReportInterval) {
           reportedAt = DateTime.now();
+          await _syncScripts(session);
           await _reportMachine(session, workerId);
         }
         final claimed = await session.client.computeWorker.claimNext(
@@ -211,6 +213,25 @@ class RemoteWorker {
     } catch (error) {
       _log.add('The worker stopped with an error: $error');
       await _shutDown(RemoteWorkerState.failed);
+    }
+  }
+
+  /// Brings the scripts the creator keeps in Discoman onto this computer.
+  /// Best effort, like [_reportMachine].
+  Future<void> _syncScripts(WorkerSession session) async {
+    try {
+      final result = await syncScripts(
+        SyncedScriptsApi.of(session.client),
+        scriptStore,
+      );
+      if (result.downloaded.isNotEmpty) {
+        _log.add(
+          'Copied ${result.downloaded.length} script(s) kept in Discoman to '
+          'this computer.',
+        );
+      }
+    } catch (_) {
+      // Retried on the next report.
     }
   }
 

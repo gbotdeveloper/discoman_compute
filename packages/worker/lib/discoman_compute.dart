@@ -25,6 +25,12 @@ export 'src/python/packages.dart'
     show PackageInstallResult, installPackages, missingPackagesFor;
 export 'src/remote_worker.dart' show RemoteWorker, RemoteWorkerState;
 export 'src/scripts/script_store.dart' show ScriptStore, fingerprintScript;
+export 'src/scripts/script_sync.dart'
+    show
+        ScriptSyncResult,
+        SyncedScriptsApi,
+        keepInDiscomanIfChosen,
+        syncScripts;
 export 'src/settings/worker_settings.dart'
     show WorkerSettings, WorkerSettingsStore, loadWorkerSettingsOrEmpty;
 export 'src/worker_config.dart' show WorkerConfig, WorkerMode, workerVersion;
