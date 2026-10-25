@@ -36,6 +36,8 @@ class SyncedScriptsApi {
   offer;
 }
 
+final _safeProjectId = RegExp(r'^[A-Za-z0-9_-]+$');
+
 /// Copies every script the creator keeps in Discoman onto this computer,
 /// and sends this computer's copy of any that Discoman does not hold yet.
 Future<ScriptSyncResult> syncScripts(
@@ -45,6 +47,8 @@ Future<ScriptSyncResult> syncScripts(
   final downloaded = <String>[];
   final offered = <String>[];
   for (final script in await api.list()) {
+    // The id becomes a file name here.
+    if (!_safeProjectId.hasMatch(script.projectId)) continue;
     final file = store.fileFor(script.projectId);
     final local = file.existsSync() ? file.readAsStringSync() : null;
     final localFingerprint = local == null ? null : fingerprintScript(local);

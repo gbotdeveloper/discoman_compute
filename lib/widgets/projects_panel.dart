@@ -93,7 +93,8 @@ class ProjectsPanel extends StatelessWidget {
       onInstall: onInstall == null
           ? null
           : () => onInstall!(
-              controller.missingPackagesByProject[project.projectId]!,
+              controller.missingPackagesByProject[project.projectId] ??
+                  const [],
             ),
       externalCodeCount:
           controller.externalCode[project.projectId]?.length ?? 0,

@@ -43,7 +43,8 @@ class HomePage extends StatelessWidget {
       return;
     }
     await controller.linkTo(project.projectId);
-    if (choice == LinkChoice.linkAndInstall && context.mounted) {
+    final linked = controller.errorMessage == null;
+    if (linked && choice == LinkChoice.linkAndInstall && context.mounted) {
       await _install(context, candidate.missingPackages);
     }
   }

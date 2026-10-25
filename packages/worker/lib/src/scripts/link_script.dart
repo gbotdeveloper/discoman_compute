@@ -65,6 +65,15 @@ Future<int> runLink(
 
     final fingerprint = fingerprintScript(source);
 
+    // Sent to Discoman before it is stored here, so a running worker's sync
+    // cannot bring the older copy Discoman held back over it.
+    final keptInDiscoman = await keepInDiscomanIfChosen(
+      session.client,
+      projectId: projectId,
+      source: source,
+      fingerprint: fingerprint,
+    );
+
     // Stored before publishing: if the call fails the creator can retry, but a
     // published contract with no script behind it would leave the project
     // pointing at a file this machine does not have.
@@ -77,12 +86,7 @@ Future<int> runLink(
     );
 
     stdout.writeln('Linked. The script is kept at ${stored.path}.');
-    if (await keepInDiscomanIfChosen(
-      session.client,
-      projectId: projectId,
-      source: source,
-      fingerprint: fingerprint,
-    )) {
+    if (keptInDiscoman) {
       stdout.writeln(
         'It is also kept in Discoman, so your other computers get it.',
       );

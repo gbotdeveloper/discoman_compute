@@ -271,21 +271,23 @@ class AppController extends ChangeNotifier {
     if (session == null || picked == null) return;
 
     await _run(() async {
-      // Stored first: a contract published against a script this machine does
-      // not have would leave the project pointing at nothing.
-      ScriptStore.defaultLocation().store(projectId, picked.source);
-      _refreshLinkedProjects();
       final fingerprint = fingerprintScript(picked.source);
-      await session.client.creatorScript.publishContract(
-        projectId,
-        picked.draft,
-        fingerprint,
-      );
+      // Sent to Discoman before it is stored here, so a sync cannot bring
+      // the older copy Discoman held back over it.
       await keepInDiscomanIfChosen(
         session.client,
         projectId: projectId,
         source: picked.source,
         fingerprint: fingerprint,
+      );
+      // Stored before publishing: a contract published against a script this
+      // machine does not have would leave the project pointing at nothing.
+      ScriptStore.defaultLocation().store(projectId, picked.source);
+      _refreshLinkedProjects();
+      await session.client.creatorScript.publishContract(
+        projectId,
+        picked.draft,
+        fingerprint,
       );
       candidate = null;
       await _loadProjects();
