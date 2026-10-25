@@ -251,6 +251,23 @@ class AppController extends ChangeNotifier {
     });
   }
 
+  /// Downloads Discoman's own Python with the packages the linked scripts
+  /// need, and switches this computer to it. Throws a
+  /// [PythonInstallException] when it fails.
+  Future<void> installPython(
+    void Function(PythonInstallProgress progress) onProgress, {
+    PythonInstaller? installer,
+  }) async {
+    final packages = {
+      for (final missing in missingPackagesByProject.values) ...missing,
+    }.toList();
+    final path = await (installer ?? PythonInstaller()).install(
+      packages: packages,
+      onProgress: onProgress,
+    );
+    await setPythonPath(path);
+  }
+
   /// Saves the Python interpreter the creator picked.
   ///
   /// Takes effect on the next start: [RemoteWorker] builds its runner from the

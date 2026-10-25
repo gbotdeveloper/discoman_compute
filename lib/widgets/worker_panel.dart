@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import 'action_button.dart';
+import 'install_python_dialog.dart';
 import 'python_interpreter_dialog.dart';
 import 'section_card.dart';
 
@@ -48,6 +49,9 @@ class WorkerPanel extends StatelessWidget {
                 ? null
                 : () => _changeInterpreter(context, controller),
             changeHint: isRunning ? 'Stop the worker to change this' : null,
+            onInstall: isRunning || controller.isBusy
+                ? null
+                : () => _installPython(context, controller),
           ),
           _DetailRow(label: 'Server', value: controller.config.serverUrl),
           const SizedBox(height: 16),
@@ -64,12 +68,19 @@ Future<void> _changeInterpreter(
 ) async {
   final picked = await showDialog<String>(
     context: context,
-    builder: (context) => PythonInterpreterDialog(
-      initialPath: controller.config.pythonPath,
-    ),
+    builder: (context) =>
+        PythonInterpreterDialog(initialPath: controller.config.pythonPath),
   );
   if (picked == null) return;
   await controller.setPythonPath(picked);
+}
+
+Future<void> _installPython(BuildContext context, AppController controller) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => InstallPythonDialog(controller: controller),
+  );
 }
 
 /// Explains why Start is unavailable.
@@ -156,6 +167,7 @@ class _DetailRow extends StatelessWidget {
     required this.value,
     this.onChange,
     this.changeHint,
+    this.onInstall,
   });
 
   final String label;
@@ -166,6 +178,9 @@ class _DetailRow extends StatelessWidget {
 
   /// Why the change action is unavailable, when it is.
   final String? changeHint;
+
+  /// When given, the row offers to install Discoman's own Python.
+  final VoidCallback? onInstall;
 
   @override
   Widget build(BuildContext context) {
@@ -182,33 +197,44 @@ class _DetailRow extends StatelessWidget {
         children: [
           SizedBox(width: 70, child: Text(label, style: labelStyle)),
           Expanded(child: SelectableText(value, style: labelStyle)),
+          if (onInstall != null)
+            _RowAction(label: 'Install Python', onTap: onInstall!),
           if (onChange != null)
-            Material(
-              type: MaterialType.transparency,
-              child: InkWell(
-                onTap: onChange,
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  child: Text(
-                    'Change',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            )
+            _RowAction(label: 'Change', onTap: onChange!)
           else if (changeHint != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(changeHint!, style: labelStyle),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _RowAction extends StatelessWidget {
+  const _RowAction({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -254,10 +280,7 @@ class _WorkerLog extends StatelessWidget {
                         // Menlo is macOS, Consolas is Windows; the generic
                         // name catches anything else.
                         fontFamily: 'Menlo',
-                        fontFamilyFallback: const [
-                          'Consolas',
-                          'monospace',
-                        ],
+                        fontFamilyFallback: const ['Consolas', 'monospace'],
                       ),
                     ),
                   );
