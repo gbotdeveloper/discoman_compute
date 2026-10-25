@@ -26,6 +26,7 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
     required this.scriptLocation,
     required this.hasContract,
     this.scriptFingerprint,
+    this.keepsScriptInDiscoman,
   });
 
   factory CreatorProjectSummary({
@@ -34,6 +35,7 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
     required _i2.ScriptLocation scriptLocation,
     required bool hasContract,
     String? scriptFingerprint,
+    bool? keepsScriptInDiscoman,
   }) = _CreatorProjectSummaryImpl;
 
   factory CreatorProjectSummary.fromJson(
@@ -49,6 +51,11 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
         jsonSerialization['hasContract'],
       ),
       scriptFingerprint: jsonSerialization['scriptFingerprint'] as String?,
+      keepsScriptInDiscoman: jsonSerialization['keepsScriptInDiscoman'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(
+              jsonSerialization['keepsScriptInDiscoman'],
+            ),
     );
   }
 
@@ -66,6 +73,10 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
   /// published from a compute client.
   String? scriptFingerprint;
 
+  /// Whether the creator keeps this project's script in Discoman so all
+  /// their computers get it. Null until they have chosen.
+  bool? keepsScriptInDiscoman;
+
   /// Returns a shallow copy of this [CreatorProjectSummary]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -75,6 +86,7 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
     _i2.ScriptLocation? scriptLocation,
     bool? hasContract,
     String? scriptFingerprint,
+    bool? keepsScriptInDiscoman,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -85,6 +97,8 @@ abstract class CreatorProjectSummary implements _i1.SerializableModel {
       'scriptLocation': scriptLocation.toJson(),
       'hasContract': hasContract,
       if (scriptFingerprint != null) 'scriptFingerprint': scriptFingerprint,
+      if (keepsScriptInDiscoman != null)
+        'keepsScriptInDiscoman': keepsScriptInDiscoman,
     };
   }
 
@@ -103,12 +117,14 @@ class _CreatorProjectSummaryImpl extends CreatorProjectSummary {
     required _i2.ScriptLocation scriptLocation,
     required bool hasContract,
     String? scriptFingerprint,
+    bool? keepsScriptInDiscoman,
   }) : super._(
          projectId: projectId,
          name: name,
          scriptLocation: scriptLocation,
          hasContract: hasContract,
          scriptFingerprint: scriptFingerprint,
+         keepsScriptInDiscoman: keepsScriptInDiscoman,
        );
 
   /// Returns a shallow copy of this [CreatorProjectSummary]
@@ -121,6 +137,7 @@ class _CreatorProjectSummaryImpl extends CreatorProjectSummary {
     _i2.ScriptLocation? scriptLocation,
     bool? hasContract,
     Object? scriptFingerprint = _Undefined,
+    Object? keepsScriptInDiscoman = _Undefined,
   }) {
     return CreatorProjectSummary(
       projectId: projectId ?? this.projectId,
@@ -130,6 +147,9 @@ class _CreatorProjectSummaryImpl extends CreatorProjectSummary {
       scriptFingerprint: scriptFingerprint is String?
           ? scriptFingerprint
           : this.scriptFingerprint,
+      keepsScriptInDiscoman: keepsScriptInDiscoman is bool?
+          ? keepsScriptInDiscoman
+          : this.keepsScriptInDiscoman,
     );
   }
 }
