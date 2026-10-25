@@ -12,7 +12,8 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'package:discoman_client/src/protocol/protocol.dart' as _i2;
+import '../../execution/models/external_code_version.dart' as _i2;
+import 'package:discoman_client/src/protocol/protocol.dart' as _i3;
 
 /// What a self-hosted worker says about the computer it runs on.
 abstract class MachineReport implements _i1.SerializableModel {
@@ -20,23 +21,30 @@ abstract class MachineReport implements _i1.SerializableModel {
     required this.machineId,
     required this.linkedProjectIds,
     required this.pausedProjectIds,
+    this.externalCode,
   });
 
   factory MachineReport({
     required String machineId,
     required List<String> linkedProjectIds,
     required List<String> pausedProjectIds,
+    List<_i2.ExternalCodeVersion>? externalCode,
   }) = _MachineReportImpl;
 
   factory MachineReport.fromJson(Map<String, dynamic> jsonSerialization) {
     return MachineReport(
       machineId: jsonSerialization['machineId'] as String,
-      linkedProjectIds: _i2.Protocol().deserialize<List<String>>(
+      linkedProjectIds: _i3.Protocol().deserialize<List<String>>(
         jsonSerialization['linkedProjectIds'],
       ),
-      pausedProjectIds: _i2.Protocol().deserialize<List<String>>(
+      pausedProjectIds: _i3.Protocol().deserialize<List<String>>(
         jsonSerialization['pausedProjectIds'],
       ),
+      externalCode: jsonSerialization['externalCode'] == null
+          ? null
+          : _i3.Protocol().deserialize<List<_i2.ExternalCodeVersion>>(
+              jsonSerialization['externalCode'],
+            ),
     );
   }
 
@@ -46,6 +54,10 @@ abstract class MachineReport implements _i1.SerializableModel {
 
   List<String> pausedProjectIds;
 
+  /// Code outside Discoman that each linked script uses on this computer.
+  /// Null from clients that predate it.
+  List<_i2.ExternalCodeVersion>? externalCode;
+
   /// Returns a shallow copy of this [MachineReport]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -53,6 +65,7 @@ abstract class MachineReport implements _i1.SerializableModel {
     String? machineId,
     List<String>? linkedProjectIds,
     List<String>? pausedProjectIds,
+    List<_i2.ExternalCodeVersion>? externalCode,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -61,6 +74,8 @@ abstract class MachineReport implements _i1.SerializableModel {
       'machineId': machineId,
       'linkedProjectIds': linkedProjectIds.toJson(),
       'pausedProjectIds': pausedProjectIds.toJson(),
+      if (externalCode != null)
+        'externalCode': externalCode?.toJson(valueToJson: (v) => v.toJson()),
     };
   }
 
@@ -70,15 +85,19 @@ abstract class MachineReport implements _i1.SerializableModel {
   }
 }
 
+class _Undefined {}
+
 class _MachineReportImpl extends MachineReport {
   _MachineReportImpl({
     required String machineId,
     required List<String> linkedProjectIds,
     required List<String> pausedProjectIds,
+    List<_i2.ExternalCodeVersion>? externalCode,
   }) : super._(
          machineId: machineId,
          linkedProjectIds: linkedProjectIds,
          pausedProjectIds: pausedProjectIds,
+         externalCode: externalCode,
        );
 
   /// Returns a shallow copy of this [MachineReport]
@@ -89,6 +108,7 @@ class _MachineReportImpl extends MachineReport {
     String? machineId,
     List<String>? linkedProjectIds,
     List<String>? pausedProjectIds,
+    Object? externalCode = _Undefined,
   }) {
     return MachineReport(
       machineId: machineId ?? this.machineId,
@@ -96,6 +116,9 @@ class _MachineReportImpl extends MachineReport {
           linkedProjectIds ?? this.linkedProjectIds.map((e0) => e0).toList(),
       pausedProjectIds:
           pausedProjectIds ?? this.pausedProjectIds.map((e0) => e0).toList(),
+      externalCode: externalCode is List<_i2.ExternalCodeVersion>?
+          ? externalCode
+          : this.externalCode?.map((e0) => e0.copyWith()).toList(),
     );
   }
 }
