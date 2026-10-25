@@ -33,22 +33,26 @@ import 'package:discoman_client/src/protocol/execution/models/claimed_execution.
     as _i12;
 import 'package:discoman_client/src/protocol/execution/models/heartbeat_response.dart'
     as _i13;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_ref.dart'
+import 'package:discoman_client/src/protocol/execution/models/claimed_machine_check.dart'
     as _i14;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload.dart'
+import 'package:discoman_client/src/protocol/execution/models/machine_check_result.dart'
     as _i15;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_ticket.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_ref.dart'
     as _i16;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_request.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload.dart'
     as _i17;
-import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_ticket.dart'
     as _i18;
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_request.dart'
+    as _i19;
+import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
+    as _i20;
 import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i30;
+    as _i33;
 import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
-    as _i31;
-import 'package:http/http.dart' as _i33;
-import 'protocol.dart' as _i34;
+    as _i34;
+import 'package:http/http.dart' as _i36;
+import 'protocol.dart' as _i37;
 
 /// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider
 /// endpoint is made available on the server.
@@ -248,17 +252,43 @@ class EndpointComputeWorker extends _i2.EndpointRef {
     },
   );
 
+  /// Hands a self-hosted worker the check the dashboard asked it for, with
+  /// the script every one of the creator's machine-kept projects should hold.
+  /// Null when there is nothing to check.
+  _i3.Future<_i14.ClaimedMachineCheck?> claimMachineCheck(
+    _i2.UuidValue workerId,
+  ) => caller.callServerEndpoint<_i14.ClaimedMachineCheck?>(
+    'computeWorker',
+    'claimMachineCheck',
+    {'workerId': workerId},
+  );
+
+  /// Stores what the worker found when it checked itself.
+  _i3.Future<void> reportMachineCheck(
+    _i2.UuidValue workerId,
+    _i2.UuidValue checkId,
+    _i15.MachineCheckResult result,
+  ) => caller.callServerEndpoint<void>(
+    'computeWorker',
+    'reportMachineCheck',
+    {
+      'workerId': workerId,
+      'checkId': checkId,
+      'result': result,
+    },
+  );
+
   /// Stores one output asset sent through the server and returns the
   /// reference the worker must substitute into its outputs. Workers that
   /// upload directly use [createOutputUpload]; this remains for older ones.
   ///
   /// Everything is enforced server-side: ownership, per-kind size caps,
   /// base64-length reconciliation, and per-execution asset count/byte caps.
-  _i3.Future<_i14.ExecutionAssetRef> uploadExecutionAsset(
+  _i3.Future<_i16.ExecutionAssetRef> uploadExecutionAsset(
     _i2.UuidValue workerId,
     _i2.UuidValue executionId,
-    _i15.ExecutionAssetUpload asset,
-  ) => caller.callServerEndpoint<_i14.ExecutionAssetRef>(
+    _i17.ExecutionAssetUpload asset,
+  ) => caller.callServerEndpoint<_i16.ExecutionAssetRef>(
     'computeWorker',
     'uploadExecutionAsset',
     {
@@ -270,11 +300,11 @@ class EndpointComputeWorker extends _i2.EndpointRef {
 
   /// Reserves one output file and returns a short-lived link the worker
   /// uploads it to directly, so its bytes never pass through the server.
-  _i3.Future<_i16.ExecutionAssetUploadTicket> createOutputUpload(
+  _i3.Future<_i18.ExecutionAssetUploadTicket> createOutputUpload(
     _i2.UuidValue workerId,
     _i2.UuidValue executionId,
-    _i17.ExecutionAssetUploadRequest asset,
-  ) => caller.callServerEndpoint<_i16.ExecutionAssetUploadTicket>(
+    _i19.ExecutionAssetUploadRequest asset,
+  ) => caller.callServerEndpoint<_i18.ExecutionAssetUploadTicket>(
     'computeWorker',
     'createOutputUpload',
     {
@@ -291,7 +321,7 @@ class EndpointComputeWorker extends _i2.EndpointRef {
   _i3.Future<void> reportResult(
     _i2.UuidValue workerId,
     _i2.UuidValue executionId,
-    _i18.ExecutionOutcome outcome,
+    _i20.ExecutionOutcome outcome,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'reportResult',
@@ -366,8 +396,8 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   String get name => 'creatorScript';
 
   /// The creator's projects, newest first, for the client's project chooser.
-  _i3.Future<List<_i30.CreatorProjectSummary>> listProjects() =>
-      caller.callServerEndpoint<List<_i30.CreatorProjectSummary>>(
+  _i3.Future<List<_i33.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i33.CreatorProjectSummary>>(
         'creatorScript',
         'listProjects',
         {},
@@ -398,7 +428,7 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   /// old contract until they publish again.
   _i3.Future<void> publishContract(
     String projectId,
-    _i31.ContractDraft draft,
+    _i34.ContractDraft draft,
     String fingerprint,
   ) => caller.callServerEndpoint<void>(
     'creatorScript',
@@ -440,10 +470,10 @@ class Client extends _i2.ServerpodClientShared {
     onFailedCall,
     Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i33.Client? httpClientOverride,
+    _i36.Client? httpClientOverride,
   }) : super(
          host,
-         _i34.Protocol(),
+         _i37.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
