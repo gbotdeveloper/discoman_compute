@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 import 'package:http/http.dart' as http;
 
 import 'heartbeat.dart';
+import 'python/pip_names.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
 
@@ -108,6 +109,25 @@ class ExecutionProcessor {
           success: false,
           errorReason: 'canceled',
           errorMessage: 'Execution canceled.',
+          durationMs: result.durationMs,
+          warnings: const [],
+          logs: result.logs,
+        ),
+      );
+      return;
+    }
+
+    final missingModule = result.missingModule;
+    if (!result.success && missingModule != null) {
+      await _report(
+        claimed.executionId,
+        ExecutionOutcome(
+          success: false,
+          errorReason: 'missingPackage',
+          errorMessage:
+              'The script imports "$missingModule", but the Python running '
+              'it does not have it. Install it with: '
+              'python -m pip install ${pipPackageFor(missingModule)}',
           durationMs: result.durationMs,
           warnings: const [],
           logs: result.logs,

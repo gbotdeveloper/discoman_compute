@@ -19,6 +19,7 @@ class PythonRunResult {
     required this.durationMs,
     required this.logs,
     required this.errorMessage,
+    this.missingModule,
   });
 
   /// True only when the runner wrote a well-formed result payload.
@@ -41,6 +42,10 @@ class PythonRunResult {
 
   /// Present on failure: the last stderr line or a specific failure message.
   final String? errorMessage;
+
+  /// The top-level module the script could not import, when that is why it
+  /// failed.
+  final String? missingModule;
 }
 
 /// Runs a single claimed execution's Python source with a local interpreter,
@@ -135,7 +140,12 @@ class PythonRunner {
       }
       if (exitCode != 0) {
         final last = logs.isNotEmpty ? logs.last : 'Python execution failed.';
-        return _failure(logs, stopwatch, last);
+        return _failure(
+          logs,
+          stopwatch,
+          last,
+          missingModule: _missingModuleIn(logs),
+        );
       }
 
       final resultFile = File(
@@ -191,6 +201,7 @@ class PythonRunner {
     Stopwatch stopwatch,
     String message, {
     bool timedOut = false,
+    String? missingModule,
   }) {
     return PythonRunResult(
       success: false,
@@ -200,7 +211,18 @@ class PythonRunner {
       durationMs: stopwatch.elapsedMilliseconds,
       logs: logs,
       errorMessage: message,
+      missingModule: missingModule,
     );
+  }
+
+  /// The module named by the last `ModuleNotFoundError` in [logs].
+  String? _missingModuleIn(List<String> logs) {
+    final pattern = RegExp(r"^ModuleNotFoundError: No module named '([^'.]+)");
+    for (final line in logs.reversed) {
+      final match = pattern.firstMatch(line);
+      if (match != null) return match.group(1);
+    }
+    return null;
   }
 
   /// Splits stderr the way the executor did: line by line, trimmed, dropping

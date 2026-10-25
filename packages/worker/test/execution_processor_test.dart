@@ -228,6 +228,25 @@ void main() {
     expect(outcome.errorReason, 'outputUploadFailed');
   });
 
+  test('reports a missing module as a missing package', () async {
+    pythonRunner.result = PythonRunResult(
+      success: false,
+      canceled: false,
+      timedOut: false,
+      outputs: null,
+      durationMs: 5,
+      logs: const ["ModuleNotFoundError: No module named 'cv2'"],
+      errorMessage: "No module named 'cv2'",
+      missingModule: 'cv2',
+    );
+
+    await processor.process(claimed());
+
+    final report = computeWorker.reports.single;
+    expect(report.errorReason, 'missingPackage');
+    expect(report.errorMessage, contains('pip install opencv-python'));
+  });
+
   test('keeps the lease alive until the result is reported', () async {
     final activeDuring = <String, bool>{};
     computeWorker
@@ -377,6 +396,7 @@ class _FakePythonRunner extends PythonRunner {
 
   final Map<String, dynamic> outputs;
   Map<String, dynamic>? lastInputs;
+  PythonRunResult? result;
 
   @override
   Future<PythonRunResult> run({
@@ -387,14 +407,15 @@ class _FakePythonRunner extends PythonRunner {
     required bool Function() cancelRequested,
   }) async {
     lastInputs = inputs;
-    return PythonRunResult(
-      success: true,
-      canceled: false,
-      timedOut: false,
-      outputs: outputs,
-      durationMs: 5,
-      logs: const [],
-      errorMessage: null,
-    );
+    return result ??
+        PythonRunResult(
+          success: true,
+          canceled: false,
+          timedOut: false,
+          outputs: outputs,
+          durationMs: 5,
+          logs: const [],
+          errorMessage: null,
+        );
   }
 }
