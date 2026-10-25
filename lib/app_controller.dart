@@ -144,8 +144,20 @@ class AppController extends ChangeNotifier {
     final session = _session;
     if (session == null) return;
     projects = await session.client.creatorScript.listProjects();
+    await _syncScripts(session);
     _refreshLinkedProjects();
     await refreshMissingPackages();
+  }
+
+  /// Copies the scripts the creator keeps in Discoman onto this computer.
+  /// Best effort: linking by hand still works when it fails.
+  Future<void> _syncScripts(WorkerSession session) async {
+    try {
+      await syncScripts(
+        SyncedScriptsApi.of(session.client),
+        ScriptStore.defaultLocation(),
+      );
+    } catch (_) {}
   }
 
   /// Re-reads which packages the linked scripts need and Python lacks.
@@ -241,10 +253,17 @@ class AppController extends ChangeNotifier {
       // not have would leave the project pointing at nothing.
       ScriptStore.defaultLocation().store(projectId, picked.source);
       _refreshLinkedProjects();
+      final fingerprint = fingerprintScript(picked.source);
       await session.client.creatorScript.publishContract(
         projectId,
         picked.draft,
-        fingerprintScript(picked.source),
+        fingerprint,
+      );
+      await keepInDiscomanIfChosen(
+        session.client,
+        projectId: projectId,
+        source: picked.source,
+        fingerprint: fingerprint,
       );
       candidate = null;
       await _loadProjects();

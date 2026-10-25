@@ -189,8 +189,8 @@ class ProjectRow extends StatelessWidget {
   final bool isBusy;
 
   /// Whether this computer holds the project's script. Scripts are linked per
-  /// machine on purpose — we never copy one between a creator's computers —
-  /// so a project can run here and not there.
+  /// machine unless the project keeps its script in Discoman, so a project
+  /// can run here and not there.
   final bool isLinkedHere;
 
   /// Whether the creator wants this machine to take work for it.
@@ -313,6 +313,27 @@ class ProjectRow extends StatelessWidget {
                   ),
                 ],
               ),
+              if (runsHere && (project.keepsScriptInDiscoman ?? false)) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_sync_outlined,
+                      size: iconSize,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kept in Discoman: all your computers get this script',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (canClaim && missingPackages.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Row(

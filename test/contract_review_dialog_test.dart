@@ -10,6 +10,8 @@ void main() {
     WidgetTester tester, {
     required List<String> missing,
     required String tap,
+    bool keepsInDiscoman = false,
+    String? expectText,
   }) async {
     LinkChoice? choice;
     await tester.pumpWidget(
@@ -34,6 +36,7 @@ void main() {
                     missingPackages: missing,
                   ),
                   projectName: 'Mine',
+                  keepsInDiscoman: keepsInDiscoman,
                 ),
               );
             },
@@ -44,6 +47,9 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
+    if (expectText != null) {
+      expect(find.textContaining(expectText), findsOneWidget);
+    }
     await tester.tap(find.text(tap));
     await tester.pumpAndSettle();
     return choice;
@@ -62,5 +68,17 @@ void main() {
     final choice = await review(tester, missing: const [], tap: 'Link it');
     expect(choice, LinkChoice.link);
     expect(find.text('Link and install'), findsNothing);
+  });
+
+  testWidgets('says the script is sent when the project keeps it', (
+    tester,
+  ) async {
+    await review(
+      tester,
+      missing: const [],
+      tap: 'Link it',
+      keepsInDiscoman: true,
+      expectText: 'It is never run in the cloud.',
+    );
   });
 }

@@ -30,8 +30,11 @@ class HomePage extends StatelessWidget {
 
     final choice = await showDialog<LinkChoice>(
       context: context,
-      builder: (context) =>
-          ContractReviewDialog(candidate: candidate, projectName: project.name),
+      builder: (context) => ContractReviewDialog(
+        candidate: candidate,
+        projectName: project.name,
+        keepsInDiscoman: project.keepsScriptInDiscoman ?? false,
+      ),
     );
 
     if (choice == null) {

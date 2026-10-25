@@ -15,11 +15,15 @@ class ContractReviewDialog extends StatelessWidget {
   const ContractReviewDialog({
     required this.candidate,
     required this.projectName,
+    this.keepsInDiscoman = false,
     super.key,
   });
 
   final ScriptCandidate candidate;
   final String projectName;
+
+  /// The project keeps its script in Discoman for the creator's computers.
+  final bool keepsInDiscoman;
 
   @override
   Widget build(BuildContext context) {
@@ -89,8 +93,12 @@ class ContractReviewDialog extends StatelessWidget {
               ],
               const SizedBox(height: 18),
               Text(
-                'Only what you see above is sent. The script itself is copied '
-                'to this computer and stays here.',
+                keepsInDiscoman
+                    ? 'This project keeps its script in Discoman, so the '
+                          'script is sent too and copied to your other '
+                          'computers. It is never run in the cloud.'
+                    : 'Only what you see above is sent. The script itself is '
+                          'copied to this computer and stays here.',
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   height: 1.45,

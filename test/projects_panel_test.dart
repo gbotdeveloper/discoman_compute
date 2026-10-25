@@ -9,12 +9,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  CreatorProjectSummary project(String name, {required ScriptLocation where}) {
+  CreatorProjectSummary project(
+    String name, {
+    required ScriptLocation where,
+    bool? keepsInDiscoman,
+  }) {
     return CreatorProjectSummary(
       projectId: name.toLowerCase(),
       name: name,
       scriptLocation: where,
       hasContract: false,
+      keepsScriptInDiscoman: keepsInDiscoman,
     );
   }
 
@@ -176,5 +181,27 @@ void main() {
     );
     await tester.tap(find.text('Install'));
     expect(installed, ['Pillow', 'opencv-python']);
+  });
+
+  testWidgets('says when a project keeps its script in Discoman', (
+    tester,
+  ) async {
+    await pump(tester, [
+      project(
+        'Synced',
+        where: ScriptLocation.creatorMachine,
+        keepsInDiscoman: true,
+      ),
+      project(
+        'Local',
+        where: ScriptLocation.creatorMachine,
+        keepsInDiscoman: false,
+      ),
+    ]);
+
+    expect(
+      find.text('Kept in Discoman: all your computers get this script'),
+      findsOneWidget,
+    );
   });
 }
