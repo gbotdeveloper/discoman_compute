@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 import 'auth/remote_auth.dart';
 import 'auth/session.dart';
 import 'execution_processor.dart';
+import 'external_code.dart';
 import 'heartbeat.dart';
 import 'machine_check.dart';
 import 'machine_id.dart';
@@ -174,6 +175,9 @@ class RemoteWorker {
         workerId,
         registration.heartbeatIntervalSeconds,
       ),
+      externalCodeFor: (projectId) => readExternalCode({
+        projectId: settingsStore.load().externalCode[projectId] ?? const [],
+      }),
     );
 
     var reportedAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -240,7 +244,8 @@ class RemoteWorker {
   Future<void> _reportMachine(WorkerSession session, UuidValue workerId) async {
     try {
       final linked = scriptStore.linkedProjectIds();
-      final paused = settingsStore.load().pausedProjectIds;
+      final settings = settingsStore.load();
+      final paused = settings.pausedProjectIds;
       await session.client.computeWorker.reportMachine(
         workerId,
         MachineReport(
@@ -250,6 +255,9 @@ class RemoteWorker {
             for (final id in linked)
               if (paused.contains(id)) id,
           ],
+          externalCode: await readExternalCode({
+            for (final id in linked) id: ?settings.externalCode[id],
+          }),
         ),
       );
     } catch (_) {

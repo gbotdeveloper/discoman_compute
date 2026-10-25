@@ -228,6 +228,29 @@ void main() {
     expect(outcome.errorReason, 'outputUploadFailed');
   });
 
+  test('stamps the run with the code outside Discoman it uses', () async {
+    final stamped = ExecutionProcessor(
+      client: processor.client,
+      workerId: workerId,
+      pythonRunner: pythonRunner,
+      heartbeat: heartbeat,
+      reportRetryDelay: Duration.zero,
+      externalCodeFor: (projectId) async => [
+        ExternalCodeVersion(
+          projectId: projectId,
+          name: 'MATLAB',
+          manualVersion: 'R2024b',
+        ),
+      ],
+      httpClient: MockClient((request) async => http.Response('', 201)),
+    );
+
+    await stamped.process(claimed());
+
+    expect(computeWorker.stamps.single.single.projectId, 'project-1');
+    expect(computeWorker.reports.single.success, isTrue);
+  });
+
   test('reports a missing module as a missing package', () async {
     pythonRunner.result = PythonRunResult(
       success: false,
@@ -315,6 +338,16 @@ class _FakeComputeWorker extends EndpointComputeWorker {
   final reportErrors = <Object>[];
   var reportCalls = 0;
   final reports = <ExecutionOutcome>[];
+  final stamps = <List<ExternalCodeVersion>>[];
+
+  @override
+  Future<void> stampExternalCode(
+    UuidValue workerId,
+    UuidValue executionId,
+    List<ExternalCodeVersion> externalCode,
+  ) async {
+    stamps.add(externalCode);
+  }
 
   @override
   Future<ExecutionAssetUploadTicket> createOutputUpload(

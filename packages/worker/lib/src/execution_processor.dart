@@ -19,6 +19,7 @@ class ExecutionProcessor {
     required this.heartbeat,
     ScriptStore? scriptStore,
     this.reportRetryDelay = const Duration(seconds: 1),
+    this.externalCodeFor,
     http.Client? httpClient,
   }) : _injectedScriptStore = scriptStore,
        _http = httpClient ?? http.Client();
@@ -28,6 +29,12 @@ class ExecutionProcessor {
   final PythonRunner pythonRunner;
   final ExecutionHeartbeat heartbeat;
   final Duration reportRetryDelay;
+
+  /// The code outside Discoman a project uses on this machine. Given only on
+  /// a creator's own computer, where each run is stamped with it.
+  final Future<List<ExternalCodeVersion>> Function(String projectId)?
+  externalCodeFor;
+
   final http.Client _http;
   bool _directUploads = true;
 
@@ -93,6 +100,8 @@ class ExecutionProcessor {
       );
       return;
     }
+
+    await _stampExternalCode(claimed);
 
     final result = await pythonRunner.run(
       source: source,
@@ -183,6 +192,22 @@ class ExecutionProcessor {
         logs: result.logs,
       ),
     );
+  }
+
+  /// Best effort: a run is not held back because its stamp could not be
+  /// written.
+  Future<void> _stampExternalCode(ClaimedExecution claimed) async {
+    final read = externalCodeFor;
+    if (read == null) return;
+    try {
+      final code = await read(claimed.projectId);
+      if (code.isEmpty) return;
+      await client.computeWorker.stampExternalCode(
+        workerId,
+        claimed.executionId,
+        code,
+      );
+    } catch (_) {}
   }
 
   /// Uploads every asset-shaped output value and replaces it with the storage
