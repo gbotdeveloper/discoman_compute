@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:discoman_client/discoman_client.dart';
@@ -74,12 +75,27 @@ Future<ExternalCodeVersion> readExternalCodeVersion(
     problem: problem,
   );
 
-  final ProcessResult log;
+  // Bounded: a checkout on a network drive or behind a lock must not hold
+  // up the run it is read for.
+  Future<ProcessResult?> git(List<String> args) async {
+    try {
+      return await run('git', [
+        '-C',
+        path,
+        ...args,
+      ]).timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      return null;
+    }
+  }
+
+  final ProcessResult? log;
   try {
-    log = await run('git', ['-C', path, 'log', '-1', '--format=%H%n%cI%n%s']);
+    log = await git(['log', '-1', '--format=%H%n%cI%n%s']);
   } on ProcessException {
     return failed('Git is not installed on this computer.');
   }
+  if (log == null) return failed('Git did not answer in time.');
   if (log.exitCode != 0) {
     return failed(
       Directory(path).existsSync()
@@ -88,21 +104,15 @@ Future<ExternalCodeVersion> readExternalCodeVersion(
     );
   }
   final lines = '${log.stdout}'.trim().split('\n');
-  final branch = await run('git', [
-    '-C',
-    path,
-    'rev-parse',
-    '--abbrev-ref',
-    'HEAD',
-  ]);
-  final status = await run('git', [
-    '-C',
-    path,
-    'status',
-    '--porcelain',
-    '--untracked-files=no',
-  ]);
-  final branchName = '${branch.stdout}'.trim();
+  ProcessResult? branch;
+  ProcessResult? status;
+  try {
+    branch = await git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    status = await git(['status', '--porcelain', '--untracked-files=no']);
+  } on ProcessException {
+    // Reported with what the log already said.
+  }
+  final branchName = '${branch?.stdout ?? ''}'.trim();
 
   return ExternalCodeVersion(
     projectId: projectId,
@@ -111,7 +121,7 @@ Future<ExternalCodeVersion> readExternalCodeVersion(
     commit: lines.first,
     commitDate: lines.length > 1 ? DateTime.tryParse(lines[1])?.toUtc() : null,
     commitMessage: lines.length > 2 ? lines.sublist(2).join('\n') : null,
-    branch: branch.exitCode == 0 && branchName != 'HEAD' ? branchName : null,
-    dirty: status.exitCode == 0 ? '${status.stdout}'.trim().isNotEmpty : null,
+    branch: branch?.exitCode == 0 && branchName != 'HEAD' ? branchName : null,
+    dirty: status?.exitCode == 0 ? '${status!.stdout}'.trim().isNotEmpty : null,
   );
 }

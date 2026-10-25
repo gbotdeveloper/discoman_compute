@@ -256,9 +256,13 @@ class _ExternalCodeRowState extends State<_ExternalCodeRow> {
                   future: _version,
                   builder: (context, snapshot) {
                     final version = snapshot.data;
-                    final problem = version?.problem;
+                    final problem = snapshot.hasError
+                        ? '${snapshot.error}'
+                        : version?.problem;
                     return Text(
-                      version == null
+                      snapshot.hasError
+                          ? 'Could not read it: $problem'
+                          : version == null
                           ? 'Reading…'
                           : describeExternalCode(version),
                       style: textTheme.bodySmall?.copyWith(
