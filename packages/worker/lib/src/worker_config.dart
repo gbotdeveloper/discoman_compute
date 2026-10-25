@@ -3,7 +3,7 @@ import 'dart:io';
 import 'settings/worker_settings.dart';
 
 /// The worker build/version string reported to the server on `register`.
-const String workerVersion = '0.2.0';
+const String workerVersion = '0.3.0';
 
 /// Which lane this worker drains.
 enum WorkerMode {
