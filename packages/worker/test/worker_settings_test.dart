@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:discoman_worker/src/external_code.dart';
 import 'package:discoman_worker/src/settings/worker_settings.dart';
 import 'package:test/test.dart';
 
@@ -90,4 +91,37 @@ void main() {
     });
   });
 
+  group('external code', () {
+    test('survives a round trip with the other settings', () {
+      store.save(
+        const WorkerSettings(
+          pythonPath: '/usr/bin/python3',
+          externalCode: {
+            'p1': [
+              ExternalCodeSource(name: 'MATLAB', version: 'R2024b'),
+              ExternalCodeSource(name: 'Library', gitPath: '/src/lib'),
+            ],
+          },
+        ),
+      );
+
+      store.save(store.load().copyWith(pausedProjectIds: {'p1'}));
+
+      final loaded = store.load();
+      expect(loaded.pythonPath, '/usr/bin/python3');
+      final code = loaded.externalCode['p1']!;
+      expect(code.map((c) => c.name), ['MATLAB', 'Library']);
+      expect(code.first.version, 'R2024b');
+      expect(code.last.gitPath, '/src/lib');
+    });
+
+    test('junk entries are dropped', () {
+      store.file.parent.createSync(recursive: true);
+      store.file.writeAsStringSync(
+        '{"externalCode": {"p1": [{"name": ""}, 3, {"name": "Ok"}]}}',
+      );
+
+      expect(store.load().externalCode['p1']!.single.name, 'Ok');
+    });
+  });
 }

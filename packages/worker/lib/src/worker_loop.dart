@@ -121,8 +121,12 @@ Future<int> _runRemoteWorker(WorkerConfig config) async {
     if (!stopped.isCompleted) stopped.complete();
   });
 
+  // The stream closes on a clean stop without ever failing.
   final failed = worker.state
-      .firstWhere((state) => state == RemoteWorkerState.failed)
+      .firstWhere(
+        (state) => state == RemoteWorkerState.failed,
+        orElse: () => RemoteWorkerState.stopped,
+      )
       .then((_) {
         if (!stopped.isCompleted) stopped.complete();
       });

@@ -228,6 +228,48 @@ void main() {
     expect(outcome.errorReason, 'outputUploadFailed');
   });
 
+  test('stamps the run with the code outside Discoman it uses', () async {
+    final stamped = ExecutionProcessor(
+      client: processor.client,
+      workerId: workerId,
+      pythonRunner: pythonRunner,
+      heartbeat: heartbeat,
+      reportRetryDelay: Duration.zero,
+      externalCodeFor: (projectId) async => [
+        ExternalCodeVersion(
+          projectId: projectId,
+          name: 'MATLAB',
+          manualVersion: 'R2024b',
+        ),
+      ],
+      httpClient: MockClient((request) async => http.Response('', 201)),
+    );
+
+    await stamped.process(claimed());
+
+    expect(computeWorker.stamps.single.single.projectId, 'project-1');
+    expect(computeWorker.reports.single.success, isTrue);
+  });
+
+  test('reports a missing module as a missing package', () async {
+    pythonRunner.result = PythonRunResult(
+      success: false,
+      canceled: false,
+      timedOut: false,
+      outputs: null,
+      durationMs: 5,
+      logs: const ["ModuleNotFoundError: No module named 'cv2'"],
+      errorMessage: "No module named 'cv2'",
+      missingModule: 'cv2',
+    );
+
+    await processor.process(claimed());
+
+    final report = computeWorker.reports.single;
+    expect(report.errorReason, 'missingPackage');
+    expect(report.errorMessage, contains('pip install opencv-python'));
+  });
+
   test('keeps the lease alive until the result is reported', () async {
     final activeDuring = <String, bool>{};
     computeWorker
@@ -296,6 +338,16 @@ class _FakeComputeWorker extends EndpointComputeWorker {
   final reportErrors = <Object>[];
   var reportCalls = 0;
   final reports = <ExecutionOutcome>[];
+  final stamps = <List<ExternalCodeVersion>>[];
+
+  @override
+  Future<void> stampExternalCode(
+    UuidValue workerId,
+    UuidValue executionId,
+    List<ExternalCodeVersion> externalCode,
+  ) async {
+    stamps.add(externalCode);
+  }
 
   @override
   Future<ExecutionAssetUploadTicket> createOutputUpload(
@@ -377,6 +429,7 @@ class _FakePythonRunner extends PythonRunner {
 
   final Map<String, dynamic> outputs;
   Map<String, dynamic>? lastInputs;
+  PythonRunResult? result;
 
   @override
   Future<PythonRunResult> run({
@@ -387,14 +440,15 @@ class _FakePythonRunner extends PythonRunner {
     required bool Function() cancelRequested,
   }) async {
     lastInputs = inputs;
-    return PythonRunResult(
-      success: true,
-      canceled: false,
-      timedOut: false,
-      outputs: outputs,
-      durationMs: 5,
-      logs: const [],
-      errorMessage: null,
-    );
+    return result ??
+        PythonRunResult(
+          success: true,
+          canceled: false,
+          timedOut: false,
+          outputs: outputs,
+          durationMs: 5,
+          logs: const [],
+          errorMessage: null,
+        );
   }
 }

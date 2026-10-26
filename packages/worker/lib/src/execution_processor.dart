@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 import 'package:http/http.dart' as http;
 
 import 'heartbeat.dart';
+import 'python/pip_names.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
 
@@ -18,6 +19,7 @@ class ExecutionProcessor {
     required this.heartbeat,
     ScriptStore? scriptStore,
     this.reportRetryDelay = const Duration(seconds: 1),
+    this.externalCodeFor,
     http.Client? httpClient,
   }) : _injectedScriptStore = scriptStore,
        _http = httpClient ?? http.Client();
@@ -27,6 +29,12 @@ class ExecutionProcessor {
   final PythonRunner pythonRunner;
   final ExecutionHeartbeat heartbeat;
   final Duration reportRetryDelay;
+
+  /// The code outside Discoman a project uses on this machine. Given only on
+  /// a creator's own computer, where each run is stamped with it.
+  final Future<List<ExternalCodeVersion>> Function(String projectId)?
+  externalCodeFor;
+
   final http.Client _http;
   bool _directUploads = true;
 
@@ -93,6 +101,8 @@ class ExecutionProcessor {
       return;
     }
 
+    await _stampExternalCode(claimed);
+
     final result = await pythonRunner.run(
       source: source,
       entrypointName: claimed.entrypointName,
@@ -108,6 +118,25 @@ class ExecutionProcessor {
           success: false,
           errorReason: 'canceled',
           errorMessage: 'Execution canceled.',
+          durationMs: result.durationMs,
+          warnings: const [],
+          logs: result.logs,
+        ),
+      );
+      return;
+    }
+
+    final missingModule = result.missingModule;
+    if (!result.success && missingModule != null) {
+      await _report(
+        claimed.executionId,
+        ExecutionOutcome(
+          success: false,
+          errorReason: 'missingPackage',
+          errorMessage:
+              'The script imports "$missingModule", but the Python running '
+              'it does not have it. Install it with: '
+              'python -m pip install ${pipPackageFor(missingModule)}',
           durationMs: result.durationMs,
           warnings: const [],
           logs: result.logs,
@@ -163,6 +192,22 @@ class ExecutionProcessor {
         logs: result.logs,
       ),
     );
+  }
+
+  /// Best effort: a run is not held back because its stamp could not be
+  /// written.
+  Future<void> _stampExternalCode(ClaimedExecution claimed) async {
+    final read = externalCodeFor;
+    if (read == null) return;
+    try {
+      final code = await read(claimed.projectId);
+      if (code.isEmpty) return;
+      await client.computeWorker.stampExternalCode(
+        workerId,
+        claimed.executionId,
+        code,
+      );
+    } catch (_) {}
   }
 
   /// Uploads every asset-shaped output value and replaces it with the storage

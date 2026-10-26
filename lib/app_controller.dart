@@ -17,11 +17,15 @@ class ScriptCandidate {
     required this.path,
     required this.source,
     required this.draft,
+    this.missingPackages = const [],
   });
 
   final String path;
   final String source;
   final ContractDraft draft;
+
+  /// Pip packages the script imports that this computer's Python lacks.
+  final List<String> missingPackages;
 
   String get fileName => path.split(Platform.pathSeparator).last;
 }
@@ -84,6 +88,16 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Pip packages each linked script needs that this computer's Python
+  /// lacks. Projects missing nothing are left out.
+  Map<String, List<String>> missingPackagesByProject = const {};
+
+  /// Whether a pip install is running.
+  bool isInstalling = false;
+
+  /// What the running or last pip install printed.
+  final List<String> installLog = [];
+
   /// The most recent worker log lines, oldest first.
   final List<String> log = [];
 
@@ -130,7 +144,59 @@ class AppController extends ChangeNotifier {
     final session = _session;
     if (session == null) return;
     projects = await session.client.creatorScript.listProjects();
+    await _syncScripts(session);
     _refreshLinkedProjects();
+    await refreshMissingPackages();
+  }
+
+  /// Copies the scripts the creator keeps in Discoman onto this computer.
+  /// Best effort: linking by hand still works when it fails.
+  Future<void> _syncScripts(WorkerSession session) async {
+    try {
+      await syncScripts(
+        SyncedScriptsApi.of(session.client),
+        ScriptStore.defaultLocation(),
+      );
+    } catch (_) {}
+  }
+
+  /// Re-reads which packages the linked scripts need and Python lacks.
+  Future<void> refreshMissingPackages() async {
+    final store = ScriptStore.defaultLocation();
+    final missing = <String, List<String>>{};
+    for (final projectId in linkedProjectIds) {
+      final file = store.fileFor(projectId);
+      if (!file.existsSync()) continue;
+      final packages = await missingPackagesFor(
+        config.pythonPath,
+        file.readAsStringSync(),
+      );
+      if (packages.isNotEmpty) missing[projectId] = packages;
+    }
+    missingPackagesByProject = missing;
+    _notify();
+  }
+
+  /// Installs [packages] into this computer's Python with pip.
+  Future<PackageInstallResult> installMissingPackages(
+    List<String> packages,
+  ) async {
+    isInstalling = true;
+    installLog.clear();
+    _notify();
+    try {
+      return await installPackages(
+        config.pythonPath,
+        packages,
+        onOutput: (line) {
+          installLog.add(line);
+          _notify();
+        },
+      );
+    } finally {
+      isInstalling = false;
+      await refreshMissingPackages();
+    }
   }
 
   /// Re-reads which projects have a script on this machine.
@@ -157,6 +223,28 @@ class AppController extends ChangeNotifier {
     _notify();
   }
 
+  /// Code outside Discoman each project's script uses on this computer.
+  Map<String, List<ExternalCodeSource>> get externalCode {
+    try {
+      return settingsStore.load().externalCode;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Replaces the code outside Discoman that [projectId] uses here. The
+  /// worker reports it on its next report and stamps every run with it.
+  void setExternalCode(String projectId, List<ExternalCodeSource> code) {
+    final store = settingsStore;
+    final settings = store.load();
+    store.save(
+      settings.copyWith(
+        externalCode: {...settings.externalCode, projectId: code},
+      ),
+    );
+    _notify();
+  }
+
   /// Reads [path] and extracts its contract, without sending anything.
   Future<void> pickScript(String path) async {
     await _run(() async {
@@ -165,6 +253,7 @@ class AppController extends ChangeNotifier {
         path: path,
         source: source,
         draft: extractContractDraft(source),
+        missingPackages: await missingPackagesFor(config.pythonPath, source),
       );
     });
   }
@@ -182,18 +271,50 @@ class AppController extends ChangeNotifier {
     if (session == null || picked == null) return;
 
     await _run(() async {
-      // Stored first: a contract published against a script this machine does
-      // not have would leave the project pointing at nothing.
+      final fingerprint = fingerprintScript(picked.source);
+      // Sent to Discoman before it is stored here, so a sync cannot bring
+      // the older copy Discoman held back over it.
+      await keepInDiscomanIfChosen(
+        session.client,
+        projectId: projectId,
+        source: picked.source,
+        fingerprint: fingerprint,
+      );
+      // Stored before publishing: a contract published against a script this
+      // machine does not have would leave the project pointing at nothing.
       ScriptStore.defaultLocation().store(projectId, picked.source);
       _refreshLinkedProjects();
       await session.client.creatorScript.publishContract(
         projectId,
         picked.draft,
-        fingerprintScript(picked.source),
+        fingerprint,
       );
       candidate = null;
       await _loadProjects();
     });
+  }
+
+  /// Downloads Discoman's own Python with the packages the linked scripts
+  /// need, and switches this computer to it. Throws a
+  /// [PythonInstallException] when it fails.
+  Future<PythonInstallResult> installPython(
+    void Function(PythonInstallProgress progress) onProgress, {
+    Future<List<String>> Function(List<String> packages)? confirmGuessed,
+    PythonInstaller? installer,
+  }) async {
+    final store = ScriptStore.defaultLocation();
+    final modules = {
+      for (final projectId in linkedProjectIds)
+        if (store.fileFor(projectId).existsSync())
+          ...importedModules(store.fileFor(projectId).readAsStringSync()),
+    }.toList();
+    final result = await (installer ?? PythonInstaller()).install(
+      modules: modules,
+      confirmGuessed: confirmGuessed,
+      onProgress: onProgress,
+    );
+    await setPythonPath(result.path);
+    return result;
   }
 
   /// Saves the Python interpreter the creator picked.
@@ -209,6 +330,7 @@ class AppController extends ChangeNotifier {
       final store = settingsStore;
       store.save(store.load().copyWith(pythonPath: path));
       config = WorkerConfig.resolve(modeArg: 'remote');
+      await refreshMissingPackages();
     });
   }
 

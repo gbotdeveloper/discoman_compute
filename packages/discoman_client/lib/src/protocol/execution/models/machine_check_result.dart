@@ -22,6 +22,8 @@ abstract class MachineCheckResult implements _i1.SerializableModel {
     this.pythonVersion,
     required this.pythonUsable,
     this.pythonProblem,
+    this.pythonProblemCode,
+    this.missingPackages,
     required this.scripts,
   });
 
@@ -30,6 +32,8 @@ abstract class MachineCheckResult implements _i1.SerializableModel {
     String? pythonVersion,
     required bool pythonUsable,
     String? pythonProblem,
+    String? pythonProblemCode,
+    List<String>? missingPackages,
     required List<_i2.MachineCheckScript> scripts,
   }) = _MachineCheckResultImpl;
 
@@ -41,6 +45,12 @@ abstract class MachineCheckResult implements _i1.SerializableModel {
         jsonSerialization['pythonUsable'],
       ),
       pythonProblem: jsonSerialization['pythonProblem'] as String?,
+      pythonProblemCode: jsonSerialization['pythonProblemCode'] as String?,
+      missingPackages: jsonSerialization['missingPackages'] == null
+          ? null
+          : _i3.Protocol().deserialize<List<String>>(
+              jsonSerialization['missingPackages'],
+            ),
       scripts: _i3.Protocol().deserialize<List<_i2.MachineCheckScript>>(
         jsonSerialization['scripts'],
       ),
@@ -56,6 +66,12 @@ abstract class MachineCheckResult implements _i1.SerializableModel {
   /// Why the interpreter could not be used, when it could not.
   String? pythonProblem;
 
+  /// notSet, notFound, failed or notPython, alongside [pythonProblem].
+  String? pythonProblemCode;
+
+  /// The pip packages providing every missing module, each once.
+  List<String>? missingPackages;
+
   List<_i2.MachineCheckScript> scripts;
 
   /// Returns a shallow copy of this [MachineCheckResult]
@@ -66,6 +82,8 @@ abstract class MachineCheckResult implements _i1.SerializableModel {
     String? pythonVersion,
     bool? pythonUsable,
     String? pythonProblem,
+    String? pythonProblemCode,
+    List<String>? missingPackages,
     List<_i2.MachineCheckScript>? scripts,
   });
   @override
@@ -76,6 +94,8 @@ abstract class MachineCheckResult implements _i1.SerializableModel {
       if (pythonVersion != null) 'pythonVersion': pythonVersion,
       'pythonUsable': pythonUsable,
       if (pythonProblem != null) 'pythonProblem': pythonProblem,
+      if (pythonProblemCode != null) 'pythonProblemCode': pythonProblemCode,
+      if (missingPackages != null) 'missingPackages': missingPackages?.toJson(),
       'scripts': scripts.toJson(valueToJson: (v) => v.toJson()),
     };
   }
@@ -94,12 +114,16 @@ class _MachineCheckResultImpl extends MachineCheckResult {
     String? pythonVersion,
     required bool pythonUsable,
     String? pythonProblem,
+    String? pythonProblemCode,
+    List<String>? missingPackages,
     required List<_i2.MachineCheckScript> scripts,
   }) : super._(
          pythonPath: pythonPath,
          pythonVersion: pythonVersion,
          pythonUsable: pythonUsable,
          pythonProblem: pythonProblem,
+         pythonProblemCode: pythonProblemCode,
+         missingPackages: missingPackages,
          scripts: scripts,
        );
 
@@ -112,6 +136,8 @@ class _MachineCheckResultImpl extends MachineCheckResult {
     Object? pythonVersion = _Undefined,
     bool? pythonUsable,
     Object? pythonProblem = _Undefined,
+    Object? pythonProblemCode = _Undefined,
+    Object? missingPackages = _Undefined,
     List<_i2.MachineCheckScript>? scripts,
   }) {
     return MachineCheckResult(
@@ -123,6 +149,12 @@ class _MachineCheckResultImpl extends MachineCheckResult {
       pythonProblem: pythonProblem is String?
           ? pythonProblem
           : this.pythonProblem,
+      pythonProblemCode: pythonProblemCode is String?
+          ? pythonProblemCode
+          : this.pythonProblemCode,
+      missingPackages: missingPackages is List<String>?
+          ? missingPackages
+          : this.missingPackages?.map((e0) => e0).toList(),
       scripts: scripts ?? this.scripts.map((e0) => e0.copyWith()).toList(),
     );
   }

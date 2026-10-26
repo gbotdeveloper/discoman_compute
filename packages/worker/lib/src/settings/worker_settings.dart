@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../external_code.dart';
 import '../home_path.dart';
 
 /// Preferences a creator sets once and both front ends honour.
@@ -8,6 +9,7 @@ class WorkerSettings {
   const WorkerSettings({
     this.pythonPath,
     this.pausedProjectIds = const {},
+    this.externalCode = const {},
   });
 
   /// The Python interpreter to run scripts with, or null when the creator has
@@ -23,13 +25,19 @@ class WorkerSettings {
   /// held-back runs starting at once — is not what they asked for.
   final Set<String> pausedProjectIds;
 
+  /// Code outside Discoman that each project's script uses on this machine,
+  /// so the dashboard can show which version every computer has.
+  final Map<String, List<ExternalCodeSource>> externalCode;
+
   WorkerSettings copyWith({
     String? pythonPath,
     Set<String>? pausedProjectIds,
+    Map<String, List<ExternalCodeSource>>? externalCode,
   }) {
     return WorkerSettings(
       pythonPath: pythonPath ?? this.pythonPath,
       pausedProjectIds: pausedProjectIds ?? this.pausedProjectIds,
+      externalCode: externalCode ?? this.externalCode,
     );
   }
 }
@@ -64,6 +72,7 @@ class WorkerSettingsStore {
       if (decoded is! Map) return const WorkerSettings();
       final python = decoded['pythonPath'];
       final paused = decoded['pausedProjectIds'];
+      final external = decoded['externalCode'];
       return WorkerSettings(
         pythonPath: (python is String && python.trim().isNotEmpty)
             ? python.trim()
@@ -72,6 +81,16 @@ class WorkerSettingsStore {
             ? {
                 for (final id in paused)
                   if (id is String && id.trim().isNotEmpty) id.trim(),
+              }
+            : const {},
+        externalCode: external is Map
+            ? {
+                for (final entry in external.entries)
+                  if (entry.key is String && entry.value is List)
+                    entry.key as String: [
+                      for (final item in entry.value as List)
+                        ?ExternalCodeSource.tryFromJson(item),
+                    ],
               }
             : const {},
       );
@@ -95,6 +114,12 @@ class WorkerSettingsStore {
         if (settings.pythonPath != null) 'pythonPath': settings.pythonPath,
         if (settings.pausedProjectIds.isNotEmpty)
           'pausedProjectIds': settings.pausedProjectIds.toList()..sort(),
+        if (settings.externalCode.values.any((list) => list.isNotEmpty))
+          'externalCode': {
+            for (final entry in settings.externalCode.entries)
+              if (entry.value.isNotEmpty)
+                entry.key: [for (final code in entry.value) code.toJson()],
+          },
       }),
       flush: true,
     );

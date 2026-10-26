@@ -44,6 +44,7 @@ void main() {
 
     expect(result.isUsable, isFalse);
     expect(result.message, contains('/nope/python3'));
+    expect(result.problem, InterpreterProblem.notFound);
   });
 
   test('rejects something runnable that is not Python', () async {
@@ -54,6 +55,7 @@ void main() {
 
     expect(result.isUsable, isFalse);
     expect(result.message, contains('does not look like Python'));
+    expect(result.problem, InterpreterProblem.notPython);
   });
 
   test('rejects a non-zero exit', () async {
@@ -64,6 +66,7 @@ void main() {
 
     expect(result.isUsable, isFalse);
     expect(result.message, contains('127'));
+    expect(result.problem, InterpreterProblem.failed);
   });
 
   test('expands a leading tilde before launching', () async {

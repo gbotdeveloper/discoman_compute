@@ -59,6 +59,8 @@ void main() {
       expect(byId['alpha']!.present, isTrue);
       expect(byId['alpha']!.fingerprint, byId['alpha']!.expectedFingerprint);
       expect(byId['alpha']!.missingModules, ['pandas']);
+      expect(result.missingPackages, ['pandas']);
+      expect(result.pythonProblemCode, isNull);
 
       expect(byId['beta']!.paused, isTrue);
       expect(byId['beta']!.fingerprint, isNot('sha256:older'));
@@ -85,6 +87,7 @@ void main() {
 
       expect(result.pythonUsable, isFalse);
       expect(result.pythonProblem, contains('/nowhere/python3'));
+      expect(result.pythonProblemCode, 'notFound');
       expect(lookups, 0);
       expect(
         result.scripts.map((s) => s.missingModules),

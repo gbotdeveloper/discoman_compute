@@ -8,6 +8,7 @@ import '../auth/session.dart';
 import '../python/contract_extractor.dart';
 import '../worker_config.dart';
 import 'script_store.dart';
+import 'script_sync.dart';
 
 /// The `link` flow: attaches a Python script on this machine to one of the
 /// creator's projects.
@@ -64,6 +65,15 @@ Future<int> runLink(
 
     final fingerprint = fingerprintScript(source);
 
+    // Sent to Discoman before it is stored here, so a running worker's sync
+    // cannot bring the older copy Discoman held back over it.
+    final keptInDiscoman = await keepInDiscomanIfChosen(
+      session.client,
+      projectId: projectId,
+      source: source,
+      fingerprint: fingerprint,
+    );
+
     // Stored before publishing: if the call fails the creator can retry, but a
     // published contract with no script behind it would leave the project
     // pointing at a file this machine does not have.
@@ -76,6 +86,11 @@ Future<int> runLink(
     );
 
     stdout.writeln('Linked. The script is kept at ${stored.path}.');
+    if (keptInDiscoman) {
+      stdout.writeln(
+        'It is also kept in Discoman, so your other computers get it.',
+      );
+    }
     stdout.writeln(
       'Open the project in GBot to design its screens, then run '
       "'discoman-compute start' to serve it from this machine.",
@@ -163,9 +178,7 @@ void _printDraft(ContractDraft draft) {
   }
   for (final field in draft.inputFields) {
     final required = field.isRequired ? 'required' : 'optional';
-    stdout.writeln(
-      '  ${field.parameterName} — ${field.type.name}, $required',
-    );
+    stdout.writeln('  ${field.parameterName} — ${field.type.name}, $required');
   }
 
   stdout.writeln('Outputs:');

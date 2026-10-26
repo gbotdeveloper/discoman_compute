@@ -5,11 +5,13 @@ import 'package:discoman_client/discoman_client.dart';
 import 'auth/remote_auth.dart';
 import 'auth/session.dart';
 import 'execution_processor.dart';
+import 'external_code.dart';
 import 'heartbeat.dart';
 import 'machine_check.dart';
 import 'machine_id.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
+import 'scripts/script_sync.dart';
 import 'settings/worker_settings.dart';
 import 'worker_config.dart';
 
@@ -173,6 +175,9 @@ class RemoteWorker {
         workerId,
         registration.heartbeatIntervalSeconds,
       ),
+      externalCodeFor: (projectId) => readExternalCode({
+        projectId: settingsStore.load().externalCode[projectId] ?? const [],
+      }),
     );
 
     var reportedAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -180,6 +185,7 @@ class RemoteWorker {
       while (!_stopRequested) {
         if (DateTime.now().difference(reportedAt) > _machineReportInterval) {
           reportedAt = DateTime.now();
+          await _syncScripts(session);
           await _reportMachine(session, workerId);
         }
         final claimed = await session.client.computeWorker.claimNext(
@@ -214,12 +220,32 @@ class RemoteWorker {
     }
   }
 
+  /// Brings the scripts the creator keeps in Discoman onto this computer.
+  /// Best effort, like [_reportMachine].
+  Future<void> _syncScripts(WorkerSession session) async {
+    try {
+      final result = await syncScripts(
+        SyncedScriptsApi.of(session.client),
+        scriptStore,
+      );
+      if (result.downloaded.isNotEmpty) {
+        _log.add(
+          'Copied ${result.downloaded.length} script(s) kept in Discoman to '
+          'this computer.',
+        );
+      }
+    } catch (_) {
+      // Retried on the next report.
+    }
+  }
+
   /// Tells the server which computer this is and every script linked on it.
   /// Best effort: a server too old to take it still runs everything else.
   Future<void> _reportMachine(WorkerSession session, UuidValue workerId) async {
     try {
       final linked = scriptStore.linkedProjectIds();
-      final paused = settingsStore.load().pausedProjectIds;
+      final settings = settingsStore.load();
+      final paused = settings.pausedProjectIds;
       await session.client.computeWorker.reportMachine(
         workerId,
         MachineReport(
@@ -229,6 +255,9 @@ class RemoteWorker {
             for (final id in linked)
               if (paused.contains(id)) id,
           ],
+          externalCode: await readExternalCode({
+            for (final id in linked) id: ?settings.externalCode[id],
+          }),
         ),
       );
     } catch (_) {
