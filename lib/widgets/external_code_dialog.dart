@@ -94,7 +94,7 @@ class _ExternalCodeDialogState extends State<ExternalCodeDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'External code',
+                'External code versions',
                 style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),

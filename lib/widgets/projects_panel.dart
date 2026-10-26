@@ -294,8 +294,8 @@ class ProjectRow extends StatelessWidget {
                     visible: canClaim,
                     child: ActionButton(
                       label: externalCodeCount == 0
-                          ? 'External code'
-                          : 'External code ($externalCodeCount)',
+                          ? 'External code versions'
+                          : 'External code versions ($externalCodeCount)',
                       isPrimary: false,
                       onPressed: isBusy ? null : onEditExternalCode,
                     ),
