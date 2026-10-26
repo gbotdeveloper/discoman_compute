@@ -43,7 +43,8 @@ class _InstallPackagesDialogState extends State<InstallPackagesDialog> {
         colorScheme.primary,
       ),
       PackageInstallResult(success: true) => (
-        'Installed. Your runs can use them now.',
+        'Installed. Your runs can use '
+            '${widget.packages.length == 1 ? 'it' : 'them'} now.',
         colorScheme.primary,
       ),
       PackageInstallResult(externallyManaged: true) => (
