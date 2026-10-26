@@ -64,6 +64,23 @@ void main() {
     expect(choice, LinkChoice.linkAndInstall);
   });
 
+  testWidgets('says "it" for one missing package and "they" for more', (
+    tester,
+  ) async {
+    await review(
+      tester,
+      missing: ['pandas'],
+      tap: 'Cancel',
+      expectText: 'Runs fail until it is installed.',
+    );
+    await review(
+      tester,
+      missing: ['pandas', 'cowsay'],
+      tap: 'Cancel',
+      expectText: 'Runs fail until they are installed.',
+    );
+  });
+
   testWidgets('links straight away when nothing is missing', (tester) async {
     final choice = await review(tester, missing: const [], tap: 'Link it');
     expect(choice, LinkChoice.link);
