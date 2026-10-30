@@ -19,7 +19,7 @@ void main() {
       ..store('beta', 'def run():\n    return 2\n');
     settings = WorkerSettingsStore(File('${temp.path}/settings.json'));
     worker = RemoteWorker(
-      WorkerConfig.resolve(modeArg: 'remote'),
+      WorkerConfig.resolve(),
       scriptStore: scripts,
       settingsStore: settings,
     );

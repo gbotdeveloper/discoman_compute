@@ -41,4 +41,4 @@ export 'src/scripts/script_sync.dart'
         syncScripts;
 export 'src/settings/worker_settings.dart'
     show WorkerSettings, WorkerSettingsStore, loadWorkerSettingsOrEmpty;
-export 'src/worker_config.dart' show WorkerConfig, WorkerMode, workerVersion;
+export 'src/worker_config.dart' show WorkerConfig, workerVersion;
