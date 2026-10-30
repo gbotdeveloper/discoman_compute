@@ -1,8 +1,7 @@
 name: discoman_worker
 description: >-
-  The discoman compute worker: runs queued Python executions, in the cloud
-  Container App Job pool (cloud mode) or on a creator's own machine (remote
-  mode).
+  The discoman compute worker: runs queued Python executions on a creator's
+  own machine.
 publish_to: none
 
 environment:

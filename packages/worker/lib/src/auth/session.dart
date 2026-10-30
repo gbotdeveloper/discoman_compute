@@ -6,10 +6,9 @@ import 'in_memory_auth_storage.dart';
 /// A Serverpod [Client] paired with the [ClientAuthSessionManager] that carries
 /// its auth token on every call.
 ///
-/// Both worker modes use the same plumbing the apps use: a session manager
-/// installed as the client's `authKeyProvider`, with the [AuthSuccess] held in
-/// memory only. What differs is how the session is obtained (see cloud_auth.dart
-/// and remote_auth.dart).
+/// The same plumbing the apps use: a session manager installed as the
+/// client's `authKeyProvider`, with the [AuthSuccess] held in memory only. How
+/// the session is obtained lives elsewhere (see remote_auth.dart).
 class WorkerSession {
   WorkerSession(this.client, this.sessionManager);
 
