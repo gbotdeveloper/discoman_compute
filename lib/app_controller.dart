@@ -37,15 +37,32 @@ class ScriptCandidate {
 /// audit, so every dependency it does not have is a dependency they do not
 /// have to trust.
 class AppController extends ChangeNotifier {
-  AppController({WorkerConfig? config, WorkerSettingsStore? settingsStore})
-    : config = config ?? WorkerConfig.resolve(modeArg: 'remote'),
-      _settingsStore = settingsStore;
+  AppController({
+    WorkerConfig? config,
+    WorkerSettingsStore? settingsStore,
+    UsageStore? usageStore,
+    Future<MachineResources> Function()? readMachine,
+  }) : config = config ?? WorkerConfig.resolve(modeArg: 'remote'),
+       _settingsStore = settingsStore,
+       _usageStore = usageStore,
+       _readMachine = readMachine ?? MachineResources.read;
 
   /// Injectable so a test never writes to the creator's real home directory.
   final WorkerSettingsStore? _settingsStore;
+  final UsageStore? _usageStore;
+  final Future<MachineResources> Function() _readMachine;
 
   late final WorkerSettingsStore settingsStore =
       _settingsStore ?? WorkerSettingsStore.defaultLocation();
+
+  late final UsageStore usageStore =
+      _usageStore ?? UsageStore.defaultLocation();
+
+  /// What this computer has, read once.
+  MachineResources? machine;
+
+  /// The latest measured runs of each project on this computer.
+  Map<String, List<RunUsage>> usageByProject = const {};
 
   /// Rebuilt when a setting that feeds it changes, so the panel shows what the
   /// next run will actually use.
@@ -55,6 +72,7 @@ class AppController extends ChangeNotifier {
   RemoteWorker? _worker;
   StreamSubscription<String>? _logSubscription;
   StreamSubscription<RemoteWorkerState>? _stateSubscription;
+  StreamSubscription<String>? _measuredSubscription;
 
   /// The signed-in creator's email, or null while signed out.
   String? signedInAs;
@@ -116,6 +134,46 @@ class AppController extends ChangeNotifier {
   bool get canServeAnything =>
       linkedProjectIds.any((id) => !pausedProjectIds.contains(id));
 
+  /// How many runs this computer takes at once.
+  int get parallelRuns {
+    try {
+      return settingsStore.load().parallelRuns;
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  /// How many runs at once suit this computer, judged by what the scripts it
+  /// serves used. Null until one of them has run here.
+  int? get suggestedRuns {
+    final machine = this.machine;
+    if (machine == null) return null;
+    return suggestedParallelRuns(machine, [
+      for (final entry in usageByProject.entries)
+        if (linkedProjectIds.contains(entry.key) &&
+            !pausedProjectIds.contains(entry.key))
+          ...entry.value,
+    ]);
+  }
+
+  /// Takes effect on the next start, like the interpreter.
+  void setParallelRuns(int runs) {
+    final store = settingsStore;
+    store.save(store.load().copyWith(parallelRuns: runs));
+    _notify();
+  }
+
+  /// Re-reads what the runs here used, and what this computer has.
+  Future<void> refreshUsage() async {
+    try {
+      machine ??= await _readMachine();
+    } catch (_) {
+      // Leaves the suggestion out.
+    }
+    usageByProject = usageStore.load();
+    _notify();
+  }
+
   bool get isWorkerBusy =>
       workerState == RemoteWorkerState.connecting ||
       workerState == RemoteWorkerState.online;
@@ -147,6 +205,7 @@ class AppController extends ChangeNotifier {
     await _syncScripts(session);
     _refreshLinkedProjects();
     await refreshMissingPackages();
+    await refreshUsage();
   }
 
   /// Copies the scripts the creator keeps in Discoman onto this computer.
@@ -336,13 +395,20 @@ class AppController extends ChangeNotifier {
 
   Future<void> startWorker() async {
     if (_worker != null) return;
-    final worker = RemoteWorker(config, settingsStore: _settingsStore);
+    final worker = RemoteWorker(
+      config,
+      settingsStore: _settingsStore,
+      usageStore: _usageStore,
+    );
     _worker = worker;
     _logSubscription = worker.log.listen(_appendLog);
     _stateSubscription = worker.state.listen((state) {
       workerState = state;
       _notify();
     });
+    _measuredSubscription = worker.measured.listen(
+      (_) => unawaited(refreshUsage()),
+    );
 
     await _run(worker.start);
   }
@@ -394,8 +460,10 @@ class AppController extends ChangeNotifier {
   Future<void> _disposeWorker() async {
     await _logSubscription?.cancel();
     await _stateSubscription?.cancel();
+    await _measuredSubscription?.cancel();
     _logSubscription = null;
     _stateSubscription = null;
+    _measuredSubscription = null;
     await _worker?.dispose();
     _worker = null;
     workerState = RemoteWorkerState.stopped;
