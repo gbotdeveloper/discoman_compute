@@ -124,4 +124,24 @@ void main() {
       expect(store.load().externalCode['p1']!.single.name, 'Ok');
     });
   });
+
+  group('parallel runs', () {
+    test('one at a time unless chosen otherwise', () {
+      expect(store.load().parallelRuns, 1);
+    });
+
+    test('survive a change to another setting', () {
+      store.save(const WorkerSettings(parallelRuns: 4));
+      store.save(store.load().copyWith(pythonPath: '/usr/bin/python3'));
+
+      expect(store.load().parallelRuns, 4);
+    });
+
+    test('junk reads as one', () {
+      store.file.parent.createSync(recursive: true);
+      store.file.writeAsStringSync('{"parallelRuns": -2}');
+
+      expect(store.load().parallelRuns, 1);
+    });
+  });
 }
