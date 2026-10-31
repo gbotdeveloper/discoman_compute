@@ -15,12 +15,13 @@ import 'worker_config.dart';
 
 /// Runs the worker in the mode selected by [config], returning the process exit
 /// code (0 normal, 1 on a fatal auth/bus error).
-Future<int> runWorker(WorkerConfig config) async {
+/// [parallelRuns] overrides how many runs a self-hosted machine takes at once.
+Future<int> runWorker(WorkerConfig config, {int? parallelRuns}) async {
   switch (config.mode) {
     case WorkerMode.cloud:
       return _runCloudWorker(config);
     case WorkerMode.remote:
-      return _runRemoteWorker(config);
+      return _runRemoteWorker(config, parallelRuns: parallelRuns);
   }
 }
 
@@ -96,8 +97,8 @@ Future<int> _runCloudWorker(WorkerConfig config) async {
 /// Remote (self-hosted) mode: run [RemoteWorker] until Ctrl+C, printing its
 /// log to stdout. The loop itself lives in that class so the desktop app can
 /// run the same worker in a window.
-Future<int> _runRemoteWorker(WorkerConfig config) async {
-  final worker = RemoteWorker(config);
+Future<int> _runRemoteWorker(WorkerConfig config, {int? parallelRuns}) async {
+  final worker = RemoteWorker(config, parallelRuns: parallelRuns);
   final logSubscription = worker.log.listen(stdout.writeln);
 
   try {

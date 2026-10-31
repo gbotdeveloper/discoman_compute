@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../app_controller.dart';
 import 'action_button.dart';
 import 'install_python_dialog.dart';
+import 'parallel_runs_dialog.dart';
 import 'python_interpreter_dialog.dart';
 import 'section_card.dart';
 
@@ -53,6 +54,14 @@ class WorkerPanel extends StatelessWidget {
                 ? null
                 : () => _installPython(context, controller),
           ),
+          _DetailRow(
+            label: 'At once',
+            value: _parallelRunsLabel(controller),
+            onChange: isRunning || controller.isBusy
+                ? null
+                : () => _changeParallelRuns(context, controller),
+            changeHint: isRunning ? 'Stop the worker to change this' : null,
+          ),
           _DetailRow(label: 'Server', value: controller.config.serverUrl),
           const SizedBox(height: 16),
           _WorkerLog(lines: controller.log),
@@ -73,6 +82,42 @@ Future<void> _changeInterpreter(
   );
   if (picked == null) return;
   await controller.setPythonPath(picked);
+}
+
+String _parallelRunsLabel(AppController controller) {
+  final runs = controller.parallelRuns;
+  final suggested = controller.suggestedRuns;
+  final label = runs == 1 ? '1 run' : '$runs runs';
+  return suggested == null || suggested == runs
+      ? label
+      : '$label (suggested: $suggested)';
+}
+
+Future<void> _changeParallelRuns(
+  BuildContext context,
+  AppController controller,
+) async {
+  final served = {
+    for (final entry in controller.usageByProject.entries)
+      if (controller.linkedProjectIds.contains(entry.key) &&
+          !controller.pausedProjectIds.contains(entry.key))
+        entry.key: entry.value,
+  };
+  final picked = await showDialog<int>(
+    context: context,
+    builder: (context) => ParallelRunsDialog(
+      current: controller.parallelRuns,
+      suggested: controller.suggestedRuns,
+      machine: controller.machine,
+      usageByProject: served,
+      projectNames: {
+        for (final project in controller.projects)
+          project.projectId: project.name,
+      },
+    ),
+  );
+  if (picked == null) return;
+  controller.setParallelRuns(picked);
 }
 
 Future<void> _installPython(BuildContext context, AppController controller) {
