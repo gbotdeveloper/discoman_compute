@@ -111,29 +111,16 @@ class _ExternalCodeDialogState extends State<ExternalCodeDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_code.isEmpty)
-                        Text('Nothing added yet.', style: textTheme.bodyMedium),
-                      for (final source in _code)
-                        _ExternalCodeRow(
-                          key: ObjectKey(source),
-                          source: source,
-                          read: widget.read,
-                          onRemove: () => _save([
-                            for (final other in _code)
-                              if (!identical(other, source)) other,
-                          ]),
-                        ),
-                    ],
-                  ),
-                ),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Manual')),
+                  ButtonSegment(value: true, label: Text('Git folder')),
+                ],
+                selected: {_usesGit},
+                onSelectionChanged: (choice) =>
+                    setState(() => _usesGit = choice.single),
               ),
-              const Divider(height: 28),
+              const SizedBox(height: 12),
               TextField(
                 controller: _name,
                 decoration: const InputDecoration(
@@ -142,16 +129,6 @@ class _ExternalCodeDialogState extends State<ExternalCodeDialog> {
                   border: OutlineInputBorder(),
                 ),
                 onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 10),
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Version I type')),
-                  ButtonSegment(value: true, label: Text('Git folder')),
-                ],
-                selected: {_usesGit},
-                onSelectionChanged: (choice) =>
-                    setState(() => _usesGit = choice.single),
               ),
               const SizedBox(height: 10),
               if (_usesGit)
@@ -185,22 +162,51 @@ class _ExternalCodeDialogState extends State<ExternalCodeDialog> {
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ActionButton(
+                  label: 'Add',
+                  isPrimary: false,
+                  onPressed: _canAdd ? _add : null,
+                ),
+              ),
+              const Divider(height: 28),
+              Text(
+                _code.isEmpty
+                    ? 'Nothing added yet.'
+                    : 'Added (${_code.length})',
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final (index, source)
+                        in _code.indexed.toList().reversed)
+                      _ExternalCodeRow(
+                        key: ObjectKey(source),
+                        number: index + 1,
+                        source: source,
+                        read: widget.read,
+                        onRemove: () => _save([
+                          for (final other in _code)
+                            if (!identical(other, source)) other,
+                        ]),
+                      ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 18),
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  ActionButton(
-                    label: 'Add',
-                    isPrimary: false,
-                    onPressed: _canAdd ? _add : null,
-                  ),
-                  ActionButton(
-                    label: 'Done',
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: ActionButton(
+                  label: 'Done',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
             ],
           ),
@@ -212,12 +218,15 @@ class _ExternalCodeDialogState extends State<ExternalCodeDialog> {
 
 class _ExternalCodeRow extends StatefulWidget {
   const _ExternalCodeRow({
+    required this.number,
     required this.source,
     required this.onRemove,
     this.read,
     super.key,
   });
 
+  /// Its place in the order the creator added them, from 1.
+  final int number;
   final ExternalCodeSource source;
   final VoidCallback onRemove;
   final Future<ExternalCodeVersion> Function(ExternalCodeSource source)? read;
@@ -241,6 +250,15 @@ class _ExternalCodeRowState extends State<_ExternalCodeRow> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              '${widget.number}.',
+              style: textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

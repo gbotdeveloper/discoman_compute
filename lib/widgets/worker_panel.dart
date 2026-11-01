@@ -50,12 +50,16 @@ class WorkerPanel extends StatelessWidget {
                 ? null
                 : () => _changeInterpreter(context, controller),
             changeHint: isRunning ? 'Stop the worker to change this' : null,
-            onInstall: isRunning || controller.isBusy
+            onInstall:
+                isRunning ||
+                    controller.isBusy ||
+                    controller.config.pythonPath ==
+                        PythonInstaller().executablePath
                 ? null
                 : () => _installPython(context, controller),
           ),
           _DetailRow(
-            label: 'At once',
+            label: 'Workers',
             value: _parallelRunsLabel(controller),
             onChange: isRunning || controller.isBusy
                 ? null
@@ -87,7 +91,7 @@ Future<void> _changeInterpreter(
 String _parallelRunsLabel(AppController controller) {
   final runs = controller.parallelRuns;
   final suggested = controller.suggestedRuns;
-  final label = runs == 1 ? '1 run' : '$runs runs';
+  final label = runs == 1 ? '1 worker' : '$runs workers';
   return suggested == null || suggested == runs
       ? label
       : '$label (suggested: $suggested)';
@@ -236,22 +240,49 @@ class _DetailRow extends StatelessWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 70, child: Text(label, style: labelStyle)),
-          Expanded(child: SelectableText(value, style: labelStyle)),
-          if (onInstall != null)
-            _RowAction(label: 'Install Python', onTap: onInstall!),
-          if (onChange != null)
-            _RowAction(label: 'Change', onTap: onChange!)
-          else if (changeHint != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(changeHint!, style: labelStyle),
+      padding: const EdgeInsets.only(top: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: ConstrainedBox(
+            // Rows without a button stay as tall as rows with one.
+            constraints: const BoxConstraints(minHeight: 30),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 70,
+                  child: Text(
+                    label,
+                    style: textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: SelectableText(
+                    value,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (onInstall != null) ...[
+                  _RowAction(label: 'Install Python', onTap: onInstall!),
+                  const SizedBox(width: 8),
+                ],
+                if (onChange != null)
+                  _RowAction(label: 'Change', onTap: onChange!)
+                else if (changeHint != null)
+                  Text(changeHint!, style: labelStyle),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }
@@ -265,18 +296,27 @@ class _RowAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w600,
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
