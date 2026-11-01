@@ -144,4 +144,26 @@ void main() {
       expect(store.load().parallelRuns, 1);
     });
   });
+
+  group('project run limits', () {
+    test('no project is limited unless chosen', () {
+      expect(store.load().projectRunLimits, isEmpty);
+    });
+
+    test('survive a change to another setting', () {
+      store.save(const WorkerSettings(projectRunLimits: {'p1': 1, 'p2': 2}));
+      store.save(store.load().copyWith(parallelRuns: 3));
+
+      expect(store.load().projectRunLimits, {'p1': 1, 'p2': 2});
+    });
+
+    test('junk entries are dropped', () {
+      store.file.parent.createSync(recursive: true);
+      store.file.writeAsStringSync(
+        '{"projectRunLimits": {"p1": 0, "p2": "two", "p3": 2}}',
+      );
+
+      expect(store.load().projectRunLimits, {'p3': 2});
+    });
+  });
 }

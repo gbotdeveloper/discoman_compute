@@ -11,6 +11,7 @@ class WorkerSettings {
     this.pausedProjectIds = const {},
     this.externalCode = const {},
     this.parallelRuns = 1,
+    this.projectRunLimits = const {},
   });
 
   /// The Python interpreter to run scripts with, or null when the creator has
@@ -33,17 +34,23 @@ class WorkerSettings {
   /// How many runs this computer takes at once.
   final int parallelRuns;
 
+  /// The most runs of each project this computer takes at once; a project
+  /// left out may use every worker.
+  final Map<String, int> projectRunLimits;
+
   WorkerSettings copyWith({
     String? pythonPath,
     Set<String>? pausedProjectIds,
     Map<String, List<ExternalCodeSource>>? externalCode,
     int? parallelRuns,
+    Map<String, int>? projectRunLimits,
   }) {
     return WorkerSettings(
       pythonPath: pythonPath ?? this.pythonPath,
       pausedProjectIds: pausedProjectIds ?? this.pausedProjectIds,
       externalCode: externalCode ?? this.externalCode,
       parallelRuns: parallelRuns ?? this.parallelRuns,
+      projectRunLimits: projectRunLimits ?? this.projectRunLimits,
     );
   }
 }
@@ -80,6 +87,7 @@ class WorkerSettingsStore {
       final paused = decoded['pausedProjectIds'];
       final external = decoded['externalCode'];
       final parallel = decoded['parallelRuns'];
+      final limits = decoded['projectRunLimits'];
       return WorkerSettings(
         pythonPath: (python is String && python.trim().isNotEmpty)
             ? python.trim()
@@ -101,6 +109,15 @@ class WorkerSettingsStore {
               }
             : const {},
         parallelRuns: parallel is int && parallel > 1 ? parallel : 1,
+        projectRunLimits: limits is Map
+            ? {
+                for (final entry in limits.entries)
+                  if (entry.key is String &&
+                      entry.value is int &&
+                      (entry.value as int) >= 1)
+                    entry.key as String: entry.value as int,
+              }
+            : const {},
       );
     } catch (_) {
       return const WorkerSettings();
@@ -129,6 +146,8 @@ class WorkerSettingsStore {
                 entry.key: [for (final code in entry.value) code.toJson()],
           },
         if (settings.parallelRuns > 1) 'parallelRuns': settings.parallelRuns,
+        if (settings.projectRunLimits.isNotEmpty)
+          'projectRunLimits': settings.projectRunLimits,
       }),
       flush: true,
     );
