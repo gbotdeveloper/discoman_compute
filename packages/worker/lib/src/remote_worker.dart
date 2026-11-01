@@ -34,6 +34,20 @@ enum RemoteWorkerState {
 /// scripts linked or switched off while it runs show up on the dashboard.
 const _machineReportInterval = Duration(minutes: 1);
 
+/// The longest a worker waits between tries while it cannot reach Discoman.
+const _maxRetryDelay = Duration(seconds: 30);
+
+/// The projects in [served] that may take one more run, given how many of
+/// each are [running] and the creator's [limits].
+List<String> claimableProjectIds(
+  List<String> served,
+  Map<String, int> limits,
+  Map<String, int> running,
+) => [
+  for (final id in served)
+    if ((running[id] ?? 0) < (limits[id] ?? double.maxFinite)) id,
+];
+
 /// The self-hosted worker as a controllable object: start it, stop it, and
 /// watch what it is doing.
 ///
@@ -97,6 +111,16 @@ class RemoteWorker {
   bool _stopRequested = false;
   bool _failed = false;
   Future<void>? _loop;
+
+  /// Runs in progress here, by project, so a project's limit holds across
+  /// every worker on this computer.
+  final _running = <String, int>{};
+
+  /// Claims go one at a time, so two workers cannot both take the last run
+  /// a project's limit allows.
+  Future<void> _claimTurn = Future.value();
+
+  bool _lostContact = false;
 
   /// Every line the worker would have printed.
   Stream<String> get log => _log.stream;
@@ -231,17 +255,17 @@ class RemoteWorker {
     );
 
     var reportedAt = DateTime.fromMillisecondsSinceEpoch(0);
-    try {
-      while (!_stopRequested) {
+    var retryDelay = const Duration(seconds: 3);
+    while (!_stopRequested) {
+      try {
         if (DateTime.now().difference(reportedAt) > _machineReportInterval) {
           reportedAt = DateTime.now();
           if (syncsScripts) await _syncScripts(session);
           await _reportMachine(session, workerId);
         }
-        final claimed = await session.client.computeWorker.claimNext(
-          workerId,
-          servedProjectIds(),
-        );
+        final claimed = await _claim(session, workerId);
+        _backInContact();
+        retryDelay = const Duration(seconds: 3);
         if (claimed == null) {
           // Idle: heartbeat (no execution) to stay marked online, then back
           // off before asking again.
@@ -261,15 +285,76 @@ class RemoteWorker {
         }
 
         _log.add('Running ${claimed.kind.name} ${claimed.executionId}.');
-        await processor.process(claimed);
+        try {
+          await processor.process(claimed);
+        } finally {
+          _running.update(claimed.projectId, (count) => count - 1);
+        }
         _log.add('Finished ${claimed.executionId}.');
+      } catch (error) {
+        if (_isRefusal(error)) {
+          _log.add('The worker stopped with an error: $error');
+          _failed = true;
+          _stopRequested = true;
+          return;
+        }
+        // A dropped connection or a slow reply: whatever was claimed comes
+        // back to the queue when its lease runs out, so trying again later
+        // loses nothing.
+        if (!_lostContact) {
+          _lostContact = true;
+          _log.add('Lost contact with Discoman ($error). Trying again…');
+        }
+        await _pauseUnlessStopped(retryDelay);
+        retryDelay = retryDelay * 2 > _maxRetryDelay
+            ? _maxRetryDelay
+            : retryDelay * 2;
       }
-    } catch (error) {
-      _log.add('The worker stopped with an error: $error');
-      _failed = true;
-      _stopRequested = true;
     }
   }
+
+  /// The next run for this worker, or null when nothing it may take waits.
+  Future<ClaimedExecution?> _claim(WorkerSession session, UuidValue workerId) {
+    final claim = _claimTurn.then((_) async {
+      final claimable = claimableProjectIds(
+        servedProjectIds(),
+        settingsStore.load().projectRunLimits,
+        _running,
+      );
+      if (claimable.isEmpty) return null;
+      final claimed = await session.client.computeWorker.claimNext(
+        workerId,
+        claimable,
+      );
+      if (claimed != null) {
+        _running.update(claimed.projectId, (n) => n + 1, ifAbsent: () => 1);
+      }
+      return claimed;
+    });
+    _claimTurn = claim.then((_) {}, onError: (_) {});
+    return claim;
+  }
+
+  /// Waits [delay], cut short by [stop] so stopping never waits out a retry.
+  Future<void> _pauseUnlessStopped(Duration delay) async {
+    final until = DateTime.now().add(delay);
+    while (!_stopRequested && DateTime.now().isBefore(until)) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+  }
+
+  void _backInContact() {
+    if (!_lostContact) return;
+    _lostContact = false;
+    _log.add('Back in contact with Discoman.');
+  }
+
+  /// Whether Discoman turned this worker away, rather than not answering.
+  /// Asking again would only be turned away again.
+  static bool _isRefusal(Object error) =>
+      error is ServerpodClientUnauthorized ||
+      error is ServerpodClientForbidden ||
+      error is ScriptRunException;
 
   /// Brings the scripts the creator keeps in Discoman onto this computer.
   /// Best effort, like [_reportMachine].

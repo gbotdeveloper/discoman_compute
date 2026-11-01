@@ -52,4 +52,29 @@ void main() {
 
     expect(worker.servedProjectIds(), ['alpha', 'beta']);
   });
+
+  group('project run limits', () {
+    test('a project at its limit is left out until a run ends', () {
+      expect(
+        claimableProjectIds(['alpha', 'beta'], {'alpha': 1}, {'alpha': 1}),
+        ['beta'],
+      );
+      expect(
+        claimableProjectIds(['alpha', 'beta'], {'alpha': 1}, {'alpha': 0}),
+        ['alpha', 'beta'],
+      );
+    });
+
+    test('a project without a limit takes every worker', () {
+      expect(claimableProjectIds(['alpha'], const {}, {'alpha': 30}), [
+        'alpha',
+      ]);
+    });
+
+    test('a limit for a project not served changes nothing', () {
+      expect(claimableProjectIds(['beta'], {'alpha': 1}, {'alpha': 1}), [
+        'beta',
+      ]);
+    });
+  });
 }

@@ -7,6 +7,7 @@ import 'contract_review_dialog.dart';
 import 'error_banner.dart';
 import 'external_code_dialog.dart';
 import 'install_packages_dialog.dart';
+import 'project_page.dart';
 import 'projects_panel.dart';
 import 'worker_panel.dart';
 
@@ -58,6 +59,20 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  Future<void> _editExternalCode(
+    BuildContext context,
+    CreatorProjectSummary project,
+  ) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => ExternalCodeDialog(
+        controller: controller,
+        projectId: project.projectId,
+        projectName: project.name,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // As in SignInPage: the page subscribes itself, so it cannot be dropped
@@ -86,12 +101,18 @@ class HomePage extends StatelessWidget {
             controller: controller,
             onLink: (project) => _link(context, project),
             onInstall: (packages) => _install(context, packages),
-            onEditExternalCode: (project) => showDialog<void>(
-              context: context,
-              builder: (context) => ExternalCodeDialog(
-                controller: controller,
-                projectId: project.projectId,
-                projectName: project.name,
+            onEditExternalCode: (project) =>
+                _editExternalCode(context, project),
+            onOpen: (project) => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ProjectPage(
+                  controller: controller,
+                  projectId: project.projectId,
+                  onLink: (project) => _link(context, project),
+                  onInstall: (packages) => _install(context, packages),
+                  onEditExternalCode: (project) =>
+                      _editExternalCode(context, project),
+                ),
               ),
             ),
           ),
