@@ -42,7 +42,7 @@ class AppController extends ChangeNotifier {
     WorkerSettingsStore? settingsStore,
     UsageStore? usageStore,
     Future<MachineResources> Function()? readMachine,
-  }) : config = config ?? WorkerConfig.resolve(modeArg: 'remote'),
+  }) : config = config ?? WorkerConfig.resolve(),
        _settingsStore = settingsStore,
        _usageStore = usageStore,
        _readMachine = readMachine ?? MachineResources.read;
@@ -388,7 +388,7 @@ class AppController extends ChangeNotifier {
       // would silently clear the projects switched off on this machine.
       final store = settingsStore;
       store.save(store.load().copyWith(pythonPath: path));
-      config = WorkerConfig.resolve(modeArg: 'remote');
+      config = WorkerConfig.resolve();
       await refreshMissingPackages();
     });
   }

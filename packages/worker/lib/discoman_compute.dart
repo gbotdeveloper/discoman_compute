@@ -3,15 +3,18 @@
 ///
 /// The two front ends live on top of this — `bin/discoman_compute.dart` for the
 /// terminal, `app/` for the desktop window. Keeping the engine here is what
-/// lets the cloud worker stay a plain Dart package with no Flutter dependency.
+/// lets other workers build on it as a plain Dart package with no Flutter
+/// dependency.
 library;
 
 export 'src/auth/file_auth_storage.dart' show MachineTokenStore;
 export 'src/auth/remote_auth.dart'
     show RemoteAuthException, enrolMachine, signIn;
 export 'src/auth/session.dart' show WorkerSession, buildWorkerSession;
+export 'src/execution_processor.dart' show ExecutionProcessor;
 export 'src/external_code.dart'
     show ExternalCodeSource, readExternalCode, readExternalCodeVersion;
+export 'src/heartbeat.dart' show ExecutionHeartbeat;
 export 'src/home_path.dart' show expandHomePath;
 export 'src/machine_resources.dart'
     show MachineResources, suggestedParallelRuns;
@@ -29,6 +32,7 @@ export 'src/python/python_installer.dart'
         managedPythonVersion;
 export 'src/python/packages.dart'
     show PackageInstallResult, installPackages, missingPackagesFor;
+export 'src/python/python_runner.dart' show PythonRunner;
 export 'src/python/run_usage.dart' show RunUsage;
 export 'src/remote_worker.dart' show RemoteWorker, RemoteWorkerState;
 export 'src/scripts/script_store.dart' show ScriptStore, fingerprintScript;
@@ -41,4 +45,4 @@ export 'src/scripts/script_sync.dart'
 export 'src/settings/usage_store.dart' show UsageStore;
 export 'src/settings/worker_settings.dart'
     show WorkerSettings, WorkerSettingsStore, loadWorkerSettingsOrEmpty;
-export 'src/worker_config.dart' show WorkerConfig, WorkerMode, workerVersion;
+export 'src/worker_config.dart' show WorkerConfig, workerVersion;
