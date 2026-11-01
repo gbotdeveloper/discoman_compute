@@ -38,7 +38,7 @@ class ScriptCandidate {
 /// have to trust.
 class AppController extends ChangeNotifier {
   AppController({WorkerConfig? config, WorkerSettingsStore? settingsStore})
-    : config = config ?? WorkerConfig.resolve(modeArg: 'remote'),
+    : config = config ?? WorkerConfig.resolve(),
       _settingsStore = settingsStore;
 
   /// Injectable so a test never writes to the creator's real home directory.
@@ -329,7 +329,7 @@ class AppController extends ChangeNotifier {
       // would silently clear the projects switched off on this machine.
       final store = settingsStore;
       store.save(store.load().copyWith(pythonPath: path));
-      config = WorkerConfig.resolve(modeArg: 'remote');
+      config = WorkerConfig.resolve();
       await refreshMissingPackages();
     });
   }

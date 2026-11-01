@@ -14,8 +14,8 @@ Future<void> main(List<String> arguments) async {
   final runner =
       CommandRunner<int>(
           'discoman-compute',
-          'Discoman compute worker: runs queued Python executions in the cloud '
-              'pool or on a creator\'s own machine.',
+          'Discoman compute worker: runs queued Python executions on a '
+              'creator\'s own machine.',
         )
         ..addCommand(StartCommand())
         ..addCommand(LoginCommand())
@@ -31,17 +31,10 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
-/// `discoman-compute start` — runs the worker loop (cloud or remote).
+/// `discoman-compute start` — runs the worker loop.
 class StartCommand extends Command<int> {
   StartCommand() {
     argParser
-      ..addOption(
-        'mode',
-        allowed: ['cloud', 'remote'],
-        help:
-            'Which lane to drain. Falls back to the WORKER_MODE env var, '
-            'then "remote".',
-      )
       ..addOption(
         'server-url',
         help:
@@ -69,18 +62,11 @@ class StartCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final WorkerConfig config;
-    try {
-      config = WorkerConfig.resolve(
-        modeArg: argResults?['mode'] as String?,
-        serverUrlArg: argResults?['server-url'] as String?,
-        pythonArg: argResults?['python'] as String?,
-        nameArg: argResults?['name'] as String?,
-      );
-    } on FormatException catch (error) {
-      stderr.writeln(error.message);
-      return 64;
-    }
+    final config = WorkerConfig.resolve(
+      serverUrlArg: argResults?['server-url'] as String?,
+      pythonArg: argResults?['python'] as String?,
+      nameArg: argResults?['name'] as String?,
+    );
     return runWorker(config);
   }
 }
@@ -111,7 +97,6 @@ class LoginCommand extends Command<int> {
   @override
   Future<int> run() async {
     final config = WorkerConfig.resolve(
-      modeArg: 'remote',
       serverUrlArg: argResults?['server-url'] as String?,
       nameArg: argResults?['name'] as String?,
     );
@@ -150,7 +135,6 @@ class LinkCommand extends Command<int> {
   @override
   Future<int> run() async {
     final config = WorkerConfig.resolve(
-      modeArg: 'remote',
       serverUrlArg: argResults?['server-url'] as String?,
     );
     return runLink(
