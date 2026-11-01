@@ -415,7 +415,12 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> startWorker() async {
-    if (_worker != null) return;
+    if (_worker != null) {
+      // A worker stopped by an error is finished; only a live one blocks a
+      // new start.
+      if (workerState != RemoteWorkerState.failed) return;
+      await _disposeWorker();
+    }
     final worker = RemoteWorker(
       config,
       settingsStore: _settingsStore,
