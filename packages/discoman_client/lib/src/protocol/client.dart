@@ -54,11 +54,11 @@ import 'package:discoman_client/src/protocol/execution/models/execution_asset_up
 import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
     as _i23;
 import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i37;
-import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
     as _i38;
-import 'package:http/http.dart' as _i40;
-import 'protocol.dart' as _i41;
+import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
+    as _i39;
+import 'package:http/http.dart' as _i41;
+import 'protocol.dart' as _i42;
 
 /// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider
 /// endpoint is made available on the server.
@@ -468,8 +468,8 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   String get name => 'creatorScript';
 
   /// The creator's projects, newest first, for the client's project chooser.
-  _i3.Future<List<_i37.CreatorProjectSummary>> listProjects() =>
-      caller.callServerEndpoint<List<_i37.CreatorProjectSummary>>(
+  _i3.Future<List<_i38.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i38.CreatorProjectSummary>>(
         'creatorScript',
         'listProjects',
         {},
@@ -539,7 +539,7 @@ class EndpointCreatorScript extends _i2.EndpointRef {
   /// old contract until they publish again.
   _i3.Future<void> publishContract(
     String projectId,
-    _i38.ContractDraft draft,
+    _i39.ContractDraft draft,
     String fingerprint,
   ) => caller.callServerEndpoint<void>(
     'creatorScript',
@@ -581,10 +581,10 @@ class Client extends _i2.ServerpodClientShared {
     onFailedCall,
     Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i40.Client? httpClientOverride,
+    _i41.Client? httpClientOverride,
   }) : super(
          host,
-         _i41.Protocol(),
+         _i42.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
