@@ -22,6 +22,10 @@ void main() {
     expect(suggestedParallelRuns(machine, [_usage(ram: 1)]), 8);
   });
 
+  test('a script that mostly waits gets no more runs than free cores', () {
+    expect(suggestedParallelRuns(machine, [_usage(ram: 1, cores: 0)]), 8);
+  });
+
   test('a script using every core runs alone', () {
     expect(suggestedParallelRuns(machine, [_usage(cores: 8)]), 1);
   });

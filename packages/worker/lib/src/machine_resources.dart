@@ -98,7 +98,9 @@ Future<List<String>?> _nvidiaSmi(List<String> arguments) async {
 /// memory or cores, judged by the heaviest script measured so far.
 ///
 /// Leaves a quarter of the memory and one core for everything else on the
-/// computer. Null until at least one run has been measured.
+/// computer, and never suggests more runs than the cores left: a script that
+/// mostly waits measures as using almost none. Null until at least one run
+/// has been measured.
 int? suggestedParallelRuns(
   MachineResources machine,
   Iterable<RunUsage> usages,
@@ -109,7 +111,10 @@ int? suggestedParallelRuns(
   final vrams = [for (final u in usages) ?u.peakVramBytes];
 
   final freeCores = machine.cores > 1 ? machine.cores - 1 : 1;
-  var limit = (freeCores / (cores < 0.25 ? 0.25 : cores)).floor();
+  var limit = _min(
+    freeCores,
+    (freeCores / (cores < 0.25 ? 0.25 : cores)).floor(),
+  );
   final machineRam = machine.ramBytes;
   if (machineRam != null && ram > 0) {
     limit = _min(limit, (machineRam * 0.75 / ram).floor());
