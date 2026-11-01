@@ -231,7 +231,8 @@ class MissingPackagesNotice extends StatelessWidget {
             Expanded(
               child: Text(
                 "This computer's Python is missing ${packages.join(', ')}. "
-                'Runs fail until they are installed.',
+                'Runs fail until ${packages.length == 1 ? 'it is' : 'they are'} '
+                'installed.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onErrorContainer,
                   height: 1.4,
