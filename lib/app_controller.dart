@@ -143,23 +143,44 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  /// How many runs at once suit this computer, judged by what the scripts it
-  /// serves used. Null until one of them has run here.
-  int? get suggestedRuns {
-    final machine = this.machine;
-    if (machine == null) return null;
-    return suggestedParallelRuns(machine, [
-      for (final entry in usageByProject.entries)
-        if (linkedProjectIds.contains(entry.key) &&
-            !pausedProjectIds.contains(entry.key))
-          ...entry.value,
-    ]);
-  }
-
   /// Takes effect on the next start, like the interpreter.
   void setParallelRuns(int runs) {
     final store = settingsStore;
     store.save(store.load().copyWith(parallelRuns: runs));
+    _notify();
+  }
+
+  /// How many of [projectId]'s runs at once suit this computer, judged by
+  /// what its own runs used here. Null until it has run here.
+  int? suggestedRunsFor(String projectId) {
+    final machine = this.machine;
+    if (machine == null) return null;
+    return suggestedParallelRuns(machine, usageByProject[projectId] ?? []);
+  }
+
+  /// The most runs of each project this computer takes at once.
+  Map<String, int> get projectRunLimits {
+    try {
+      return settingsStore.load().projectRunLimits;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Limits [projectId] to [limit] runs at once here, or lifts the limit when
+  /// null. Takes effect on the worker's next claim, like a pause.
+  void setProjectRunLimit(String projectId, int? limit) {
+    final store = settingsStore;
+    final settings = store.load();
+    store.save(
+      settings.copyWith(
+        projectRunLimits: {
+          for (final entry in settings.projectRunLimits.entries)
+            if (entry.key != projectId) entry.key: entry.value,
+          projectId: ?limit,
+        },
+      ),
+    );
     _notify();
   }
 

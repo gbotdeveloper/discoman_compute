@@ -12,10 +12,14 @@ class ProjectsPanel extends StatelessWidget {
     required this.onLink,
     this.onInstall,
     this.onEditExternalCode,
+    this.onOpen,
     super.key,
   });
 
   final AppController controller;
+
+  /// Called with the project whose own page the creator wants to open.
+  final ValueChanged<CreatorProjectSummary>? onOpen;
 
   /// Called with the project the creator wants to attach a script to.
   final ValueChanged<CreatorProjectSummary> onLink;
@@ -103,6 +107,9 @@ class ProjectsPanel extends StatelessWidget {
           : () => onEditExternalCode!(project),
       onServedChanged: (served) =>
           controller.setProjectServed(project.projectId, served: served),
+      runLimit: controller.projectRunLimits[project.projectId],
+      // A cloud project has nothing to set on this computer.
+      onOpen: runsHere && onOpen != null ? () => onOpen!(project) : null,
     );
   }
 }
@@ -189,6 +196,8 @@ class ProjectRow extends StatelessWidget {
     this.onInstall,
     this.externalCodeCount = 0,
     this.onEditExternalCode,
+    this.runLimit,
+    this.onOpen,
     super.key,
   });
 
@@ -219,6 +228,12 @@ class ProjectRow extends StatelessWidget {
   final int externalCodeCount;
   final VoidCallback? onEditExternalCode;
 
+  /// The most of its runs this computer takes at once, when limited.
+  final int? runLimit;
+
+  /// Opens the project's own page.
+  final VoidCallback? onOpen;
+
   _ProjectState get _state {
     if (!runsHere) return _ProjectState.inCloud;
     if (!isLinkedHere) return _ProjectState.scriptMissing;
@@ -244,7 +259,9 @@ class ProjectRow extends StatelessWidget {
       ),
       _ProjectState.running => (
         Icons.play_circle_fill_rounded,
-        'Running from this computer',
+        runLimit == null
+            ? 'Running from this computer'
+            : 'Running from this computer · at most $runLimit at once',
         colorScheme.primary,
       ),
       _ProjectState.paused => (
@@ -271,124 +288,142 @@ class ProjectRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: colorScheme.outlineVariant),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          // Two rows rather than two columns: the switch belongs beside the
-          // status it changes, and a Row centres the pair on each other for
-          // free.
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onOpen,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              // Two rows rather than two columns: the switch belongs beside the
+              // status it changes, and a Row centres the pair on each other for
+              // free.
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Text(
-                      project.name.isEmpty ? 'Untitled project' : project.name,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          project.name.isEmpty
+                              ? 'Untitled project'
+                              : project.name,
+                          style: textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  _Reserved(
-                    visible: canClaim,
-                    child: ActionButton(
-                      label: externalCodeCount == 0
-                          ? 'External code versions'
-                          : 'External code versions ($externalCodeCount)',
-                      isPrimary: false,
-                      onPressed: isBusy ? null : onEditExternalCode,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Held open even where a control does not apply: rows of
-                  // different heights read as different kinds of thing, and
-                  // these are all just projects.
-                  _Reserved(
-                    // Linking a script here would silently move the project
-                    // onto this machine. Where a project runs is decided in
-                    // GBot, so the group heading says so rather than offering
-                    // a shortcut.
-                    visible: runsHere,
-                    child: ActionButton(
-                      label: isLinkedHere ? 'Replace script' : 'Link a script',
-                      isPrimary: !isLinkedHere,
-                      onPressed: isBusy ? null : onLink,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(icon, size: iconSize, color: colour),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(label, style: statusStyle)),
-                  const SizedBox(width: 20),
-                  _Reserved(
-                    // Only a project whose script is here has runs to claim.
-                    visible: canClaim,
-                    child: Tooltip(
-                      // The switch carries no label, so this is the only place
-                      // that says what it does.
-                      message: 'Run this project on this computer',
-                      child: Switch(
-                        value: isServed,
-                        onChanged: isBusy ? null : onServedChanged,
+                      const SizedBox(width: 20),
+                      _Reserved(
+                        visible: canClaim,
+                        child: ActionButton(
+                          label: externalCodeCount == 0
+                              ? 'External code versions'
+                              : 'External code versions ($externalCodeCount)',
+                          isPrimary: false,
+                          onPressed: isBusy ? null : onEditExternalCode,
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              if (runsHere && (project.keepsScriptInDiscoman ?? false)) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.cloud_sync_outlined,
-                      size: iconSize,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Kept in Discoman: all your computers get this script',
-                        style: textTheme.bodySmall?.copyWith(
+                      const SizedBox(width: 10),
+                      // Held open even where a control does not apply: rows of
+                      // different heights read as different kinds of thing, and
+                      // these are all just projects.
+                      _Reserved(
+                        // Linking a script here would silently move the project
+                        // onto this machine. Where a project runs is decided in
+                        // GBot, so the group heading says so rather than offering
+                        // a shortcut.
+                        visible: runsHere,
+                        child: ActionButton(
+                          label: isLinkedHere
+                              ? 'Replace script'
+                              : 'Link a script',
+                          isPrimary: !isLinkedHere,
+                          onPressed: isBusy ? null : onLink,
+                        ),
+                      ),
+                      if (onOpen != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.chevron_right_rounded,
                           color: colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if (canClaim && missingPackages.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: iconSize,
-                      color: colorScheme.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Missing packages: ${missingPackages.join(', ')}',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.error,
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(icon, size: iconSize, color: colour),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(label, style: statusStyle)),
+                      const SizedBox(width: 20),
+                      _Reserved(
+                        // Only a project whose script is here has runs to claim.
+                        visible: canClaim,
+                        child: Tooltip(
+                          // The switch carries no label, so this is the only place
+                          // that says what it does.
+                          message: 'Run this project on this computer',
+                          child: Switch(
+                            value: isServed,
+                            onChanged: isBusy ? null : onServedChanged,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 20),
-                    ActionButton(
-                      label: 'Install',
-                      isPrimary: false,
-                      onPressed: isBusy ? null : onInstall,
+                    ],
+                  ),
+                  if (runsHere && (project.keepsScriptInDiscoman ?? false)) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.cloud_sync_outlined,
+                          size: iconSize,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Kept in Discoman: all your computers get this script',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
-            ],
+                  if (canClaim && missingPackages.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: iconSize,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Missing packages: ${missingPackages.join(', ')}',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.error,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        ActionButton(
+                          label: 'Install',
+                          isPrimary: false,
+                          onPressed: isBusy ? null : onInstall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

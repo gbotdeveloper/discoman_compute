@@ -90,11 +90,7 @@ Future<void> _changeInterpreter(
 
 String _parallelRunsLabel(AppController controller) {
   final runs = controller.parallelRuns;
-  final suggested = controller.suggestedRuns;
-  final label = runs == 1 ? '1 worker' : '$runs workers';
-  return suggested == null || suggested == runs
-      ? label
-      : '$label (suggested: $suggested)';
+  return runs == 1 ? '1 worker' : '$runs workers';
 }
 
 Future<void> _changeParallelRuns(
@@ -111,7 +107,6 @@ Future<void> _changeParallelRuns(
     context: context,
     builder: (context) => ParallelRunsDialog(
       current: controller.parallelRuns,
-      suggested: controller.suggestedRuns,
       machine: controller.machine,
       usageByProject: served,
       projectNames: {

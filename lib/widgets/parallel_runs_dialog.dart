@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 
 import 'action_button.dart';
 
-/// Lets the creator choose how many runs this computer takes at once, with a
-/// suggestion from what the scripts used when they last ran here.
+/// Lets the creator choose how many runs this computer takes at once across
+/// every project, beside what each script used when it last ran here.
 ///
 /// Pops the chosen number, or null if the creator backed out.
 class ParallelRunsDialog extends StatefulWidget {
   const ParallelRunsDialog({
     required this.current,
-    required this.suggested,
     required this.machine,
     required this.usageByProject,
     required this.projectNames,
@@ -18,7 +17,6 @@ class ParallelRunsDialog extends StatefulWidget {
   });
 
   final int current;
-  final int? suggested;
   final MachineResources? machine;
 
   /// Only the projects this computer serves.
@@ -45,7 +43,6 @@ class _ParallelRunsDialogState extends State<ParallelRunsDialog> {
       color: colorScheme.onSurfaceVariant,
       height: 1.45,
     );
-    final suggested = widget.suggested;
     final machine = widget.machine;
 
     return Dialog(
@@ -58,16 +55,17 @@ class _ParallelRunsDialogState extends State<ParallelRunsDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Runs at the same time',
+                'Workers',
                 style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'How many runs this computer takes at once. More finishes a '
-                'queue sooner, as long as the computer has the memory and '
-                'cores for them.',
+                'How many runs this computer takes at once, across all '
+                'projects. More finishes a queue sooner, as long as the '
+                'computer has the memory and cores for them. To hold back one '
+                'heavy project, limit it on its own page.',
                 style: mutedStyle,
               ),
               const SizedBox(height: 18),
@@ -93,36 +91,8 @@ class _ParallelRunsDialogState extends State<ParallelRunsDialog> {
                         ? () => _set(_runs + 1)
                         : null,
                   ),
-                  const Spacer(),
-                  if (suggested != null && suggested != _runs)
-                    ActionButton(
-                      label: 'Use suggestion ($suggested)',
-                      isPrimary: false,
-                      onPressed: () => _set(suggested),
-                    ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                suggested == null
-                    ? 'Once a linked script has run here, Discoman suggests a '
-                          'number from the memory and cores it used.'
-                    : 'Suggested: $suggested, from the heaviest script here. '
-                          'It leaves a quarter of the memory and one core for '
-                          'everything else.',
-                style: mutedStyle,
-              ),
-              if (suggested != null && _runs > suggested) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'More than suggested: runs may slow each other down, or '
-                  'fail when memory runs out.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.error,
-                    height: 1.45,
-                  ),
-                ),
-              ],
               if (machine != null) ...[
                 const SizedBox(height: 14),
                 Text(
