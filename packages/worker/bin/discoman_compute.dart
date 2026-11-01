@@ -51,6 +51,12 @@ class StartCommand extends Command<int> {
         'name',
         help:
             'Hostname reported on register. Defaults to this machine\'s name.',
+      )
+      ..addOption(
+        'parallel',
+        help:
+            'How many runs to take at once. Defaults to what the desktop app '
+            'saved, then 1.',
       );
   }
 
@@ -67,7 +73,13 @@ class StartCommand extends Command<int> {
       pythonArg: argResults?['python'] as String?,
       nameArg: argResults?['name'] as String?,
     );
-    return runWorker(config);
+    final parallelArg = argResults?['parallel'] as String?;
+    final parallelRuns = parallelArg == null ? null : int.tryParse(parallelArg);
+    if (parallelArg != null && (parallelRuns == null || parallelRuns < 1)) {
+      stderr.writeln('--parallel takes a whole number of at least 1.');
+      return 64;
+    }
+    return runWorker(config, parallelRuns: parallelRuns);
   }
 }
 

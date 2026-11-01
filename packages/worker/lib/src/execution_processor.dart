@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'heartbeat.dart';
 import 'python/pip_names.dart';
 import 'python/python_runner.dart';
+import 'python/run_usage.dart';
 import 'scripts/script_store.dart';
 
 /// Runs one claimed execution end to end: Python execution (honoring cancel and
@@ -20,6 +21,7 @@ class ExecutionProcessor {
     ScriptStore? scriptStore,
     this.reportRetryDelay = const Duration(seconds: 1),
     this.externalCodeFor,
+    this.onUsage,
     http.Client? httpClient,
   }) : _injectedScriptStore = scriptStore,
        _http = httpClient ?? http.Client();
@@ -34,6 +36,9 @@ class ExecutionProcessor {
   /// a creator's own computer, where each run is stamped with it.
   final Future<List<ExternalCodeVersion>> Function(String projectId)?
   externalCodeFor;
+
+  /// Told what each measured run used, by project.
+  final void Function(String projectId, RunUsage usage)? onUsage;
 
   final http.Client _http;
   bool _directUploads = true;
@@ -110,6 +115,14 @@ class ExecutionProcessor {
       timeoutSeconds: claimed.timeoutSeconds,
       cancelRequested: () => heartbeat.cancelRequested,
     );
+    final usage = result.usage;
+    if (usage != null) {
+      try {
+        onUsage?.call(claimed.projectId, usage);
+      } catch (_) {
+        // A measurement that cannot be kept must not fail the run.
+      }
+    }
 
     if (result.canceled) {
       await _report(

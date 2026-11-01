@@ -12,6 +12,7 @@ import 'machine_id.dart';
 import 'python/python_runner.dart';
 import 'scripts/script_store.dart';
 import 'scripts/script_sync.dart';
+import 'settings/usage_store.dart';
 import 'settings/worker_settings.dart';
 import 'worker_config.dart';
 
@@ -36,6 +37,11 @@ const _machineReportInterval = Duration(minutes: 1);
 /// The self-hosted worker as a controllable object: start it, stop it, and
 /// watch what it is doing.
 ///
+/// Takes as many runs at once as the creator chose for this computer. Each
+/// one registers as its own worker sharing this computer's machine id, so the
+/// server needs nothing new to hand them out and the dashboard still shows one
+/// computer.
+///
 /// The engine used to live inside a CLI function that wrote to stdout and
 /// exited the process on Ctrl+C. Both front ends need the same loop but
 /// neither of those behaviours: the desktop app has to show the log in a window
@@ -47,14 +53,22 @@ class RemoteWorker {
     ScriptStore? scriptStore,
     WorkerSettingsStore? settingsStore,
     MachineIdStore? machineIdStore,
+    UsageStore? usageStore,
+    int? parallelRuns,
   }) : _scriptStore = scriptStore,
        _settingsStore = settingsStore,
-       _machineIdStore = machineIdStore;
+       _machineIdStore = machineIdStore,
+       _usageStore = usageStore,
+       _parallelRuns = parallelRuns;
 
   final WorkerConfig _config;
   final ScriptStore? _scriptStore;
   final WorkerSettingsStore? _settingsStore;
   final MachineIdStore? _machineIdStore;
+  final UsageStore? _usageStore;
+
+  /// Overrides the saved setting, for the CLI's `--parallel`.
+  final int? _parallelRuns;
 
   /// Where linked scripts live. Resolved on first use rather than in the
   /// constructor, so a machine with no home directory can still construct one.
@@ -69,13 +83,19 @@ class RemoteWorker {
   late final WorkerSettingsStore settingsStore =
       _settingsStore ?? WorkerSettingsStore.defaultLocation();
 
+  /// What each project's runs used on this computer.
+  late final UsageStore usageStore =
+      _usageStore ?? UsageStore.defaultLocation();
+
   final _log = StreamController<String>.broadcast();
   final _state = StreamController<RemoteWorkerState>.broadcast();
+  final _measured = StreamController<String>.broadcast();
 
   var _currentState = RemoteWorkerState.stopped;
   WorkerSession? _session;
-  UuidValue? _workerId;
+  final _workerIds = <UuidValue>[];
   bool _stopRequested = false;
+  bool _failed = false;
   Future<void>? _loop;
 
   /// Every line the worker would have printed.
@@ -85,6 +105,9 @@ class RemoteWorker {
   Stream<RemoteWorkerState> get state => _state.stream;
 
   RemoteWorkerState get currentState => _currentState;
+
+  /// The project of each run whose usage was just recorded in [usageStore].
+  Stream<String> get measured => _measured.stream;
 
   /// The projects this machine is currently willing to run.
   ///
@@ -111,6 +134,7 @@ class RemoteWorker {
       return;
     }
     _stopRequested = false;
+    _failed = false;
     _emitState(RemoteWorkerState.connecting);
 
     final session = buildWorkerSession(_config.serverUrl);
@@ -124,25 +148,32 @@ class RemoteWorker {
       throw RemoteAuthException('Could not sign in this machine: $error');
     }
 
-    final WorkerRegistration registration;
+    final parallelRuns = _parallelRuns ?? settingsStore.load().parallelRuns;
+    final registrations = <WorkerRegistration>[];
     try {
-      registration = await session.client.computeWorker.register(
-        _config.hostname,
-        workerVersion,
-      );
+      for (var i = 0; i < parallelRuns; i++) {
+        final registration = await session.client.computeWorker.register(
+          _config.hostname,
+          workerVersion,
+        );
+        registrations.add(registration);
+        _workerIds.add(registration.workerId);
+      }
     } catch (error) {
       _log.add('Could not register this machine: $error');
       await _shutDown(RemoteWorkerState.failed);
       rethrow;
     }
 
-    _workerId = registration.workerId;
     _emitState(RemoteWorkerState.online);
     _log.add(
-      'Compute client "${_config.hostname}" is online. Waiting for runs.',
+      parallelRuns == 1
+          ? 'Compute client "${_config.hostname}" is online. Waiting for runs.'
+          : 'Compute client "${_config.hostname}" is online, taking up to '
+                '$parallelRuns runs at once. Waiting for runs.',
     );
 
-    _loop = _claimLoop(session, registration);
+    _loop = _runAll(session, registrations);
   }
 
   /// Stops claiming, deregisters this machine, and closes the connection.
@@ -159,17 +190,32 @@ class RemoteWorker {
     await stop();
     await _log.close();
     await _state.close();
+    await _measured.close();
   }
 
+  Future<void> _runAll(
+    WorkerSession session,
+    List<WorkerRegistration> registrations,
+  ) async {
+    await Future.wait([
+      for (final (i, registration) in registrations.indexed)
+        _claimLoop(session, registration, syncsScripts: i == 0),
+    ]);
+    if (_failed) await _shutDown(RemoteWorkerState.failed);
+  }
+
+  /// One run at a time for one registration. Only the first copies down the
+  /// scripts kept in Discoman, so they are not fetched once per run slot.
   Future<void> _claimLoop(
     WorkerSession session,
-    WorkerRegistration registration,
-  ) async {
+    WorkerRegistration registration, {
+    required bool syncsScripts,
+  }) async {
     final workerId = registration.workerId;
     final processor = ExecutionProcessor(
       client: session.client,
       workerId: workerId,
-      pythonRunner: PythonRunner(_config.pythonPath),
+      pythonRunner: PythonRunner(_config.pythonPath, measureUsage: true),
       heartbeat: ExecutionHeartbeat(
         session.client,
         workerId,
@@ -178,6 +224,10 @@ class RemoteWorker {
       externalCodeFor: (projectId) => readExternalCode({
         projectId: settingsStore.load().externalCode[projectId] ?? const [],
       }),
+      onUsage: (projectId, usage) {
+        usageStore.record(projectId, usage);
+        if (!_measured.isClosed) _measured.add(projectId);
+      },
     );
 
     var reportedAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -185,7 +235,7 @@ class RemoteWorker {
       while (!_stopRequested) {
         if (DateTime.now().difference(reportedAt) > _machineReportInterval) {
           reportedAt = DateTime.now();
-          await _syncScripts(session);
+          if (syncsScripts) await _syncScripts(session);
           await _reportMachine(session, workerId);
         }
         final claimed = await session.client.computeWorker.claimNext(
@@ -216,7 +266,8 @@ class RemoteWorker {
       }
     } catch (error) {
       _log.add('The worker stopped with an error: $error');
-      await _shutDown(RemoteWorkerState.failed);
+      _failed = true;
+      _stopRequested = true;
     }
   }
 
@@ -293,13 +344,13 @@ class RemoteWorker {
   /// is marked offline by the server's lease expiry anyway.
   Future<void> _shutDown(RemoteWorkerState nextState) async {
     final session = _session;
-    final workerId = _workerId;
+    final workerIds = [..._workerIds];
     _session = null;
-    _workerId = null;
+    _workerIds.clear();
     _loop = null;
 
     if (session != null) {
-      if (workerId != null) {
+      for (final workerId in workerIds) {
         try {
           await session.client.computeWorker.deregister(workerId);
         } catch (_) {

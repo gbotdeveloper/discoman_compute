@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../machine_resources.dart';
+import 'run_usage.dart';
 import 'runner_script.dart';
 
 /// The tail of user log output kept for a run: last 200 lines, each clipped to
@@ -20,6 +22,7 @@ class PythonRunResult {
     required this.logs,
     required this.errorMessage,
     this.missingModule,
+    this.usage,
   });
 
   /// True only when the runner wrote a well-formed result payload.
@@ -46,6 +49,9 @@ class PythonRunResult {
   /// The top-level module the script could not import, when that is why it
   /// failed.
   final String? missingModule;
+
+  /// What the run used, when it was measured.
+  final RunUsage? usage;
 }
 
 /// Runs a single claimed execution's Python source with a local interpreter,
@@ -53,10 +59,14 @@ class PythonRunResult {
 /// + runner.py in a throwaway temp dir, the job JSON on stdin, the result read
 /// back from result.json, stderr collected as logs.
 class PythonRunner {
-  PythonRunner(this.pythonPath);
+  PythonRunner(this.pythonPath, {this.measureUsage = false});
 
   /// Interpreter to invoke (e.g. `python3` or an absolute path).
   final String pythonPath;
+
+  /// Whether to record the memory, processor time and graphics memory each
+  /// run uses.
+  final bool measureUsage;
 
   Future<PythonRunResult> run({
     required String source,
@@ -74,10 +84,16 @@ class PythonRunner {
       File(
         '${tempDir.path}${Platform.pathSeparator}runner.py',
       ).writeAsStringSync(runnerPy);
+      if (measureUsage) {
+        File(
+          '${tempDir.path}${Platform.pathSeparator}measure.py',
+        ).writeAsStringSync(measurePy);
+      }
 
       final process = await Process.start(pythonPath, [
-        'runner.py',
+        measureUsage ? 'measure.py' : 'runner.py',
       ], workingDirectory: tempDir.path);
+      final vram = measureUsage ? _VramWatch(process.pid) : null;
 
       final stderrBuffer = StringBuffer();
       final stderrDone = process.stderr
@@ -113,11 +129,15 @@ class PythonRunner {
       final exitCode = await process.exitCode;
       timeoutTimer.cancel();
       cancelTimer.cancel();
+      vram?.stop();
       await stderrDone;
       await stdoutDone;
       stopwatch.stop();
 
       final logs = _truncateLogs(_splitStderr(stderrBuffer.toString()));
+      final usage = measureUsage
+          ? _readUsage(tempDir, stopwatch.elapsedMilliseconds, vram?.peak)
+          : null;
 
       if (canceled) {
         return PythonRunResult(
@@ -128,6 +148,7 @@ class PythonRunner {
           durationMs: stopwatch.elapsedMilliseconds,
           logs: logs,
           errorMessage: 'Execution canceled.',
+          usage: usage,
         );
       }
       if (timedOut) {
@@ -136,6 +157,7 @@ class PythonRunner {
           stopwatch,
           'Python execution timed out after ${effectiveTimeout}s.',
           timedOut: true,
+          usage: usage,
         );
       }
       if (exitCode != 0) {
@@ -145,6 +167,7 @@ class PythonRunner {
           stopwatch,
           last,
           missingModule: _missingModuleIn(logs),
+          usage: usage,
         );
       }
 
@@ -156,6 +179,7 @@ class PythonRunner {
           logs,
           stopwatch,
           'Python execution returned no JSON payload.',
+          usage: usage,
         );
       }
 
@@ -167,6 +191,7 @@ class PythonRunner {
             logs,
             stopwatch,
             'Python execution did not return a JSON object.',
+            usage: usage,
           );
         }
         outputs = Map<String, dynamic>.from(payload['outputs'] as Map);
@@ -175,6 +200,7 @@ class PythonRunner {
           logs,
           stopwatch,
           'Python execution returned a malformed JSON payload.',
+          usage: usage,
         );
       }
 
@@ -186,6 +212,7 @@ class PythonRunner {
         durationMs: stopwatch.elapsedMilliseconds,
         logs: logs,
         errorMessage: null,
+        usage: usage,
       );
     } finally {
       try {
@@ -202,6 +229,7 @@ class PythonRunner {
     String message, {
     bool timedOut = false,
     String? missingModule,
+    RunUsage? usage,
   }) {
     return PythonRunResult(
       success: false,
@@ -212,7 +240,27 @@ class PythonRunner {
       logs: logs,
       errorMessage: message,
       missingModule: missingModule,
+      usage: usage,
     );
+  }
+
+  RunUsage? _readUsage(Directory tempDir, int wallMs, int? peakVramBytes) {
+    try {
+      final json = jsonDecode(
+        File(
+          '${tempDir.path}${Platform.pathSeparator}usage.json',
+        ).readAsStringSync(),
+      );
+      if (json is! Map) return null;
+      return RunUsage.tryFromJson({
+        ...json,
+        'wallMs': wallMs,
+        'peakVramBytes': ?peakVramBytes,
+      });
+    } catch (_) {
+      // Killed runs and scripts that end the interpreter abruptly leave none.
+      return null;
+    }
   }
 
   /// The module named when the run ended on a `ModuleNotFoundError`. Only
@@ -257,4 +305,28 @@ class PythonRunner {
     }
     return kept;
   }
+}
+
+/// Polls `nvidia-smi` for the graphics memory a run holds, keeping the peak.
+/// Stops asking on a computer without an NVIDIA card.
+class _VramWatch {
+  _VramWatch(int pid) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      if (_asking) return;
+      _asking = true;
+      final used = await vramUsedBy(pid);
+      _asking = false;
+      if (used == null) {
+        stop();
+        return;
+      }
+      if (peak == null || used > peak!) peak = used;
+    });
+  }
+
+  late final Timer _timer;
+  var _asking = false;
+  int? peak;
+
+  void stop() => _timer.cancel();
 }

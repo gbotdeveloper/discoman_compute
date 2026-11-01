@@ -10,6 +10,7 @@ class WorkerSettings {
     this.pythonPath,
     this.pausedProjectIds = const {},
     this.externalCode = const {},
+    this.parallelRuns = 1,
   });
 
   /// The Python interpreter to run scripts with, or null when the creator has
@@ -29,15 +30,20 @@ class WorkerSettings {
   /// so the dashboard can show which version every computer has.
   final Map<String, List<ExternalCodeSource>> externalCode;
 
+  /// How many runs this computer takes at once.
+  final int parallelRuns;
+
   WorkerSettings copyWith({
     String? pythonPath,
     Set<String>? pausedProjectIds,
     Map<String, List<ExternalCodeSource>>? externalCode,
+    int? parallelRuns,
   }) {
     return WorkerSettings(
       pythonPath: pythonPath ?? this.pythonPath,
       pausedProjectIds: pausedProjectIds ?? this.pausedProjectIds,
       externalCode: externalCode ?? this.externalCode,
+      parallelRuns: parallelRuns ?? this.parallelRuns,
     );
   }
 }
@@ -73,6 +79,7 @@ class WorkerSettingsStore {
       final python = decoded['pythonPath'];
       final paused = decoded['pausedProjectIds'];
       final external = decoded['externalCode'];
+      final parallel = decoded['parallelRuns'];
       return WorkerSettings(
         pythonPath: (python is String && python.trim().isNotEmpty)
             ? python.trim()
@@ -93,6 +100,7 @@ class WorkerSettingsStore {
                     ],
               }
             : const {},
+        parallelRuns: parallel is int && parallel > 1 ? parallel : 1,
       );
     } catch (_) {
       return const WorkerSettings();
@@ -120,6 +128,7 @@ class WorkerSettingsStore {
               if (entry.value.isNotEmpty)
                 entry.key: [for (final code in entry.value) code.toJson()],
           },
+        if (settings.parallelRuns > 1) 'parallelRuns': settings.parallelRuns,
       }),
       flush: true,
     );

@@ -8,8 +8,9 @@ import 'worker_config.dart';
 /// Runs [RemoteWorker] until Ctrl+C, printing its log to stdout, and returns
 /// the process exit code (0 normal, 1 when it fails). The loop itself lives in
 /// that class so the desktop app can run the same worker in a window.
-Future<int> runWorker(WorkerConfig config) async {
-  final worker = RemoteWorker(config);
+/// [parallelRuns] overrides how many runs the machine takes at once.
+Future<int> runWorker(WorkerConfig config, {int? parallelRuns}) async {
+  final worker = RemoteWorker(config, parallelRuns: parallelRuns);
   final logSubscription = worker.log.listen(stdout.writeln);
 
   try {

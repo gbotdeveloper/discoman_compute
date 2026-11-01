@@ -16,6 +16,8 @@ export 'src/external_code.dart'
     show ExternalCodeSource, readExternalCode, readExternalCodeVersion;
 export 'src/heartbeat.dart' show ExecutionHeartbeat;
 export 'src/home_path.dart' show expandHomePath;
+export 'src/machine_resources.dart'
+    show MachineResources, suggestedParallelRuns;
 export 'src/python/contract_extractor.dart' show extractContractDraft;
 export 'src/python/imports.dart' show importedModules;
 export 'src/python/interpreter_check.dart'
@@ -31,6 +33,7 @@ export 'src/python/python_installer.dart'
 export 'src/python/packages.dart'
     show PackageInstallResult, installPackages, missingPackagesFor;
 export 'src/python/python_runner.dart' show PythonRunner;
+export 'src/python/run_usage.dart' show RunUsage;
 export 'src/remote_worker.dart' show RemoteWorker, RemoteWorkerState;
 export 'src/scripts/script_store.dart' show ScriptStore, fingerprintScript;
 export 'src/scripts/script_sync.dart'
@@ -39,6 +42,7 @@ export 'src/scripts/script_sync.dart'
         SyncedScriptsApi,
         keepInDiscomanIfChosen,
         syncScripts;
+export 'src/settings/usage_store.dart' show UsageStore;
 export 'src/settings/worker_settings.dart'
     show WorkerSettings, WorkerSettingsStore, loadWorkerSettingsOrEmpty;
 export 'src/worker_config.dart' show WorkerConfig, workerVersion;
