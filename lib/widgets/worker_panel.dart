@@ -53,8 +53,7 @@ class WorkerPanel extends StatelessWidget {
             onInstall:
                 isRunning ||
                     controller.isBusy ||
-                    controller.config.pythonPath ==
-                        PythonInstaller().executablePath
+                    _usesInstalledManagedPython(controller)
                 ? null
                 : () => _installPython(context, controller),
           ),
@@ -73,6 +72,14 @@ class WorkerPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Whether Discoman's own Python is the one in use and is still there to
+/// run, so installing it again would change nothing.
+bool _usesInstalledManagedPython(AppController controller) {
+  final installer = PythonInstaller();
+  return controller.config.pythonPath == installer.executablePath &&
+      installer.isInstalled;
 }
 
 Future<void> _changeInterpreter(
