@@ -39,6 +39,7 @@ export 'src/python/python_installer.dart'
 export 'src/python/packages.dart'
     show PackageInstallResult, installPackages, missingPackagesFor;
 export 'src/python/pip_names.dart' show manualInstallNote;
+export 'src/python/python_discovery.dart' show FoundPython, findPythons;
 export 'src/python/python_runner.dart' show PythonRunner;
 export 'src/python/run_environment.dart' show loadLoginShellPath;
 export 'src/python/run_usage.dart' show RunUsage;
