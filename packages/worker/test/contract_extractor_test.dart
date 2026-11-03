@@ -292,5 +292,192 @@ def run(rows: pd.DataFrame, photos_df: pd.DataFrame) -> pd.DataFrame:
         ['result', PythonFieldType.table],
       );
     });
+
+    test('marks a list built by append as multiple images', () {
+      const source = '''
+from PIL import Image
+import matplotlib.pyplot as plt
+
+def run(count: int, arrays: list, names: list[str]):
+    frames = []
+    for i in range(count):
+        frames.append({
+            "kind": "image",
+            "name": f"frame_{i}.png",
+        })
+    tiles: list = []
+    base = Image.open("x.png").convert("RGB")
+    for angle in (0, 90):
+        tiles.append(base.rotate(angle))
+    charts = []
+    for i in range(count):
+        fig, ax = plt.subplots()
+        charts.append(fig)
+    numbers = []
+    numbers.append(len(frames))
+    return {
+        "frames": frames,
+        "tiles": tiles,
+        "charts": charts,
+        "numbers": numbers,
+        "thumbs": [Image.fromarray(a) for a in arrays],
+        "pairs": [{"kind": "image", "name": n} for n in names],
+    }
+''';
+      final outputs = extractContractDraft(source).outputFields;
+      expect(outputs.map((f) => [f.outputKey, f.type, f.multiple]), [
+        ['frames', PythonFieldType.image, true],
+        ['tiles', PythonFieldType.image, true],
+        ['charts', PythonFieldType.image, true],
+        ['numbers', PythonFieldType.text, false],
+        ['thumbs', PythonFieldType.image, true],
+        ['pairs', PythonFieldType.image, true],
+      ]);
+    });
+
+    test('reads a returned list of images over a list return annotation', () {
+      const cases = {
+        '''
+def run(n: int) -> list[dict]:
+    out = []
+    for i in range(n):
+        out.append({"kind": "image", "name": "a.png"})
+    return out
+''': [
+          PythonFieldType.image,
+          true,
+        ],
+        '''
+def run(paths: list[str]) -> list[dict]:
+    images = []
+    for path in paths:
+        images.append(encode(path))
+    return images
+''': [
+          PythonFieldType.image,
+          true,
+        ],
+        'def run(n: int) -> list[Image.Image]:\n    return make(n)\n': [
+          PythonFieldType.image,
+          true,
+        ],
+        'def run(n: int) -> PIL.Image.Image:\n    return make(n)\n': [
+          PythonFieldType.image,
+          false,
+        ],
+        'def run(n: int) -> list[dict]:\n    return rows(n)\n': [
+          PythonFieldType.list,
+          false,
+        ],
+      };
+      for (final entry in cases.entries) {
+        final output = extractContractDraft(entry.key).outputFields.single;
+        expect(
+          [output.outputKey, output.type, output.multiple],
+          ['result', ...entry.value],
+          reason: entry.key,
+        );
+      }
+    });
+
+    test('reads docstring image hints for outputs', () {
+      const source = '''
+def run(x: int):
+    """Makes pictures.
+
+    - gallery -> image[]
+    - cover -> image
+    """
+    gallery = build(x)
+    return {"gallery": gallery, "cover": first(x), "note": "ok"}
+''';
+      final outputs = extractContractDraft(source).outputFields;
+      expect(outputs.map((f) => [f.outputKey, f.type, f.multiple]), [
+        ['gallery', PythonFieldType.image, true],
+        ['cover', PythonFieldType.image, false],
+        ['note', PythonFieldType.text, false],
+      ]);
+    });
+
+    test('reads a list under an image-word output key as images', () {
+      const source = '''
+def run(n: int):
+    masks = []
+    for i in range(n):
+        masks.append(segment(i))
+    return {
+        "masks": masks,
+        "overlay_images": [draw(m) for m in masks],
+        "frame_counts": [1, 2],
+        "plots": helper(n),
+    }
+''';
+      final outputs = extractContractDraft(source).outputFields;
+      expect(outputs.map((f) => [f.outputKey, f.type, f.multiple]), [
+        ['masks', PythonFieldType.image, true],
+        ['overlay_images', PythonFieldType.image, true],
+        ['frame_counts', PythonFieldType.text, false],
+        ['plots', PythonFieldType.text, false],
+      ]);
+    });
+
+    test('reads PIL images, bytes and image-word names as image inputs', () {
+      const source = '''
+def run(
+    photos: list[Image.Image],
+    scans: list[PIL.Image.Image],
+    raw_frames: list[bytes],
+    photo: Image.Image,
+    mask: Optional[PIL.Image.Image],
+    payload: bytes,
+    overlay,
+    thumbnails,
+    cover_image: str,
+    image_path: str,
+    plot_title: str,
+    figure: str = "default",
+):
+    return {"r": 1}
+''';
+      final fields = extractContractDraft(source).inputFields;
+      expect(fields.map((f) => [f.parameterName, f.type, f.multiple]), [
+        ['photos', PythonFieldType.image, true],
+        ['scans', PythonFieldType.image, true],
+        ['raw_frames', PythonFieldType.image, true],
+        ['photo', PythonFieldType.image, false],
+        ['mask', PythonFieldType.image, false],
+        ['payload', PythonFieldType.image, false],
+        ['overlay', PythonFieldType.image, false],
+        ['thumbnails', PythonFieldType.image, true],
+        ['cover_image', PythonFieldType.image, false],
+        ['image_path', PythonFieldType.text, false],
+        ['plot_title', PythonFieldType.text, false],
+        ['figure', PythonFieldType.text, false],
+      ]);
+    });
+
+    test('reads docstring image hints for text inputs', () {
+      const source = '''
+def run(reference: str, extras):
+    """Compares.
+
+    - reference -> image
+    - extras -> image[]
+    """
+    return {"r": 1}
+''';
+      final fields = extractContractDraft(source).inputFields;
+      expect(fields.map((f) => [f.parameterName, f.type, f.multiple]), [
+        ['reference', PythonFieldType.image, false],
+        ['extras', PythonFieldType.image, true],
+      ]);
+    });
+
+    test('skips variadic image parameters with a note', () {
+      const source = 'def run(*images):\n    return {"r": 1}';
+      final draft = extractContractDraft(source);
+      expect(draft.inputFields, isEmpty);
+      expect(draft.notes.first, contains('*images'));
+    });
   });
 }

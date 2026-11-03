@@ -47,7 +47,12 @@ ContractDraft extractContractDraft(String source) {
     docstringBody,
     notes,
   );
-  final outputFields = _buildOutputFields(source, entrypoint, notes);
+  final outputFields = _buildOutputFields(
+    source,
+    entrypoint,
+    docstringBody,
+    notes,
+  );
   final docstring = _extractDocstringSummary(docstringBody);
   if (docstring != null) {
     notes.add('Docstring: $docstring');
@@ -170,13 +175,28 @@ List<ContractInputField> _buildInputFields(
           (type == 'text' && _isStrAnnotation(itemAnnotation));
       if (!multiple && type != 'table') type = 'list';
     } else if (type == 'list') {
-      final nameHint = _inferAssetPayloadTypeFromParameterName(parameterName);
+      final nameHint =
+          _inferAssetPayloadTypeFromParameterName(parameterName) ??
+          (_inferImageFromLastWord(parameterName) == null ? null : 'image');
       if (nameHint != null) {
         type = nameHint;
         multiple = true;
         notes.add(
           'Inferred "$parameterName" as a list of $nameHint from the '
           'parameter name.',
+        );
+      }
+    } else if (type == 'text' &&
+        (annotation == null || _isStrAnnotation(annotation)) &&
+        (defaultValue == null || defaultValue == 'None')) {
+      final nameHint = _inferImageFromLastWord(parameterName);
+      if (nameHint != null) {
+        type = 'image';
+        multiple = nameHint.endsWith('[]');
+        notes.add(
+          'Inferred "$parameterName" as '
+          '${multiple ? 'a list of images' : 'an image'} from the parameter '
+          'name.',
         );
       }
     }
@@ -207,10 +227,12 @@ String _resolveInputFieldType(
   String? docstringBody,
   List<String> notes,
 ) {
-  final annotatedType = _mapAnnotationToFieldType(annotation);
+  final annotatedType = _isBytesAnnotation(annotation)
+      ? 'image'
+      : _mapAnnotationToFieldType(annotation);
   // A DataFrame is a table of rows, never an uploaded file.
   final isDataFrame = (annotation ?? '').toLowerCase().contains('dataframe');
-  if (annotatedType == 'table' && !isDataFrame) {
+  if ((annotatedType == 'table' && !isDataFrame) || annotatedType == 'text') {
     final docstringHint = _inferAssetPayloadTypeFromDocstringHints(
       docstringBody,
       parameterName,
@@ -221,6 +243,8 @@ String _resolveInputFieldType(
       );
       return docstringHint;
     }
+  }
+  if (annotatedType == 'table' && !isDataFrame) {
     final nameHint = _inferAssetPayloadTypeFromParameterName(parameterName);
     if (nameHint != null) {
       notes.add(
@@ -277,32 +301,86 @@ bool _isStrAnnotation(String annotation) {
   return lower.substring(lower.lastIndexOf('.') + 1) == 'str';
 }
 
+/// `bytes`, `Optional[bytes]` or `bytes | None`: an uploaded image's bytes.
+bool _isBytesAnnotation(String? annotation) {
+  final members = _splitTopLevel(
+    (annotation ?? '').toLowerCase().replaceAll(RegExp(r'\s+'), ''),
+    '|',
+  ).where((member) => member != 'none').toList();
+  return members.length == 1 &&
+      RegExp(
+        r'^(?:(?:typing\.)?optional\[)?bytes\]?$',
+      ).hasMatch(members.single);
+}
+
 // --- Outputs --------------------------------------------------------------
 
 List<ContractOutputField> _buildOutputFields(
   String source,
   _TopLevelFunction entrypoint,
+  String? docstringBody,
   List<String> notes,
 ) {
   final literal = _entrypointSourceReturnLiteral(source, entrypoint.name);
   if (literal.keys.isNotEmpty) {
     return [
       for (var i = 0; i < literal.keys.length; i++)
-        _literalOutputField(i, literal.keys[i], literal.typeHints),
+        _literalOutputField(
+          i,
+          literal.keys[i],
+          _resolveOutputHint(
+            literal.keys[i],
+            literal.typeHints[literal.keys[i]],
+            listName: literal.listKeys.contains(literal.keys[i])
+                ? literal.keys[i]
+                : null,
+            docstringBody: docstringBody,
+          ),
+        ),
     ];
   }
 
-  if (entrypoint.returnAnnotation != null) {
+  final returned = _entrypointReturnedValue(source, entrypoint.name);
+  final returnedHint = _resolveOutputHint(
+    'result',
+    returned?.type,
+    listName: returned?.listName,
+    docstringBody: docstringBody,
+  );
+  if (returnedHint != null && _assetHints.contains(returnedHint)) {
+    final multiple = returnedHint.endsWith('[]');
     return [
       ContractOutputField(
         id: 'draft-output-1',
         outputKey: 'result',
         displayLabel: 'Result',
         type: _fieldType(
-          _mapAnnotationToFieldType(entrypoint.returnAnnotation),
+          multiple
+              ? returnedHint.substring(0, returnedHint.length - 2)
+              : returnedHint,
+        ),
+        presentationHint: 'Result inferred from the returned value.',
+        multiple: multiple,
+      ),
+    ];
+  }
+
+  final returnAnnotation = entrypoint.returnAnnotation;
+  if (returnAnnotation != null) {
+    final itemAnnotation = _listItemAnnotation(returnAnnotation);
+    final multiple =
+        itemAnnotation != null && _isImageAnnotation(itemAnnotation);
+    return [
+      ContractOutputField(
+        id: 'draft-output-1',
+        outputKey: 'result',
+        displayLabel: 'Result',
+        type: _fieldType(
+          multiple ? 'image' : _mapAnnotationToFieldType(returnAnnotation),
         ),
         presentationHint:
             'Result inferred from the function return annotation.',
+        multiple: multiple,
       ),
     ];
   }
@@ -324,14 +402,42 @@ List<ContractOutputField> _buildOutputFields(
   ];
 }
 
+const _assetHints = {'image', 'file', 'image[]', 'file[]'};
+
+/// A docstring `- key -> image[]` line wins; a list under an image-word name
+/// whose items are unknown is a list of images.
+String? _resolveOutputHint(
+  String key,
+  String? inferred, {
+  required String? listName,
+  required String? docstringBody,
+}) {
+  final listed = _inferAssetListFromDocstringHints(docstringBody, key);
+  if (listed != null) return '$listed[]';
+  final documented = _inferAssetPayloadTypeFromDocstringHints(
+    docstringBody,
+    key,
+  );
+  if (documented != null) return documented;
+  if (inferred == null &&
+      listName != null &&
+      _inferImageFromLastWord(listName) != null) {
+    return 'image[]';
+  }
+  return inferred;
+}
+
+/// `Image.Image`, `PIL.Image.Image` or a matplotlib `Figure`.
+bool _isImageAnnotation(String annotation) {
+  final lower = annotation.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  final headName = lower.substring(lower.lastIndexOf('.') + 1);
+  return headName == 'image' || headName == 'figure';
+}
+
 /// An output from a literal return key. A `[]` suffix on its type hint marks a
 /// list of files.
-ContractOutputField _literalOutputField(
-  int index,
-  String key,
-  Map<String, String> typeHints,
-) {
-  final hint = typeHints[key] ?? 'text';
+ContractOutputField _literalOutputField(int index, String key, String? hint) {
+  hint ??= 'text';
   final multiple = hint.endsWith('[]');
   return ContractOutputField(
     id: 'draft-output-${index + 1}',
@@ -345,42 +451,100 @@ ContractOutputField _literalOutputField(
 }
 
 class _ReturnLiteral {
-  _ReturnLiteral(this.keys, this.typeHints);
+  _ReturnLiteral(this.keys, this.typeHints, this.listKeys);
   final List<String> keys;
   final Map<String, String> typeHints;
+
+  /// Keys whose value is a list.
+  final Set<String> listKeys;
 }
 
 _ReturnLiteral _entrypointSourceReturnLiteral(String source, String name) {
   final keys = <String>[];
   final typeHints = <String, String>{};
+  final listKeys = <String>{};
   final escaped = _escapeRegExp(name);
   final headerRegex = RegExp(
     'def\\s+$escaped\\s*\\([^)]*\\)\\s*(?:->\\s*[^:\\n]+)?\\s*:[\\s\\S]*?return\\s*\\{',
     multiLine: true,
   );
   final headerMatch = headerRegex.firstMatch(source);
-  if (headerMatch == null) return _ReturnLiteral(keys, typeHints);
+  if (headerMatch == null) return _ReturnLiteral(keys, typeHints, listKeys);
 
   final headerText = headerMatch.group(0)!;
   final bodyStart = headerMatch.start + headerText.length;
   final bodyEnd = findBalancedBraceEnd(source, bodyStart);
-  if (bodyEnd == -1) return _ReturnLiteral(keys, typeHints);
+  if (bodyEnd == -1) return _ReturnLiteral(keys, typeHints, listKeys);
 
   final sourceBeforeReturn = headerText.substring(
     0,
     headerText.lastIndexOf('return'),
   );
-  final assignmentTypeHints = _collectAssignmentTypeHints(sourceBeforeReturn);
+  final assignments = _collectAssignmentTypeHints(sourceBeforeReturn);
   final body = source.substring(bodyStart, bodyEnd);
   for (final entry in _extractTopLevelLiteralDictEntries(body)) {
     keys.add(entry.key);
     final inferred = _inferLiteralReturnValueType(
       entry.value,
-      assignmentTypeHints,
+      assignments.types,
     );
     if (inferred != null) typeHints[entry.key] = inferred;
+    if (_holdsList(entry.value, assignments.lists)) listKeys.add(entry.key);
   }
-  return _ReturnLiteral(keys, typeHints);
+  return _ReturnLiteral(keys, typeHints, listKeys);
+}
+
+class _ReturnedValue {
+  _ReturnedValue(this.type, this.listName);
+  final String? type;
+
+  /// The returned variable's name when it holds a list.
+  final String? listName;
+}
+
+/// The value of the entrypoint's `return` when it is not a literal dict,
+/// preferring a return at the body's own indentation.
+_ReturnedValue? _entrypointReturnedValue(String source, String name) {
+  final header = RegExp(
+    '^def\\s+${_escapeRegExp(name)}\\s*\\([^)]*\\)\\s*(?:->\\s*[^:\\n]+)?\\s*:',
+    multiLine: true,
+  ).firstMatch(source);
+  if (header == null) return null;
+  final body = _extractIndentedBlock(source, header.end);
+  final returns = RegExp(
+    r'^([ \t]*)return[ \t]+',
+    multiLine: true,
+  ).allMatches(body).toList();
+  if (returns.isEmpty) return null;
+  final baseIndent = RegExp(r'^[ \t]*').firstMatch(body)!.group(0)!;
+  final match = returns.firstWhere(
+    (m) => m.group(1) == baseIndent,
+    orElse: () => returns.first,
+  );
+
+  final String expression;
+  final opener = match.end < body.length ? body[match.end] : '';
+  final closeAt = opener == '[' || opener == '(' || opener == '{'
+      ? findBalancedBraceEnd(body, match.end + 1)
+      : -1;
+  if (closeAt != -1) {
+    expression = body.substring(match.end, closeAt + 1);
+  } else {
+    final lineEnd = body.indexOf('\n', match.end);
+    expression = body
+        .substring(match.end, lineEnd == -1 ? body.length : lineEnd)
+        .replaceFirst(RegExp(r'''\s*#[^"']*$'''), '')
+        .trim();
+  }
+
+  final assignments = _collectAssignmentTypeHints(
+    body.substring(0, match.start),
+  );
+  final isName = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(expression);
+  return _ReturnedValue(
+    _inferLiteralReturnValueType(expression, assignments.types),
+    isName && _holdsList(expression, assignments.lists) ? expression : null,
+  );
 }
 
 class _LiteralDictEntry {
@@ -437,11 +601,52 @@ List<String> _splitTopLevelCommaSegments(String source) {
   return segments;
 }
 
-Map<String, String> _collectAssignmentTypeHints(String sourceBeforeReturn) {
+/// Variable types assigned before a return, and the variables holding lists.
+/// A list assigned `[]` and then `.append()`-ed only images is `image[]`.
+({Map<String, String> types, Set<String> lists}) _collectAssignmentTypeHints(
+  String sourceBeforeReturn,
+) {
   final hints = <String, String>{};
-  for (final line in sourceBeforeReturn.split(RegExp(r'\r?\n'))) {
+  final lists = <String>{};
+  final appended = <String, Set<String?>>{};
+  var offset = 0;
+  for (final rawLine in sourceBeforeReturn.split('\n')) {
+    final lineStart = offset;
+    offset += rawLine.length + 1;
+    final line = rawLine.endsWith('\r')
+        ? rawLine.substring(0, rawLine.length - 1)
+        : rawLine;
+
+    final append = RegExp(
+      r'^\s*([A-Za-z_][A-Za-z0-9_]*)\.append\s*\(',
+    ).firstMatch(line);
+    if (append != null) {
+      final name = append.group(1)!;
+      if (!lists.contains(name)) continue;
+      final argStart = lineStart + append.end;
+      final argEnd = findBalancedBraceEnd(sourceBeforeReturn, argStart);
+      if (argEnd == -1) continue;
+      final itemTypes = appended.putIfAbsent(name, () => {})
+        ..add(
+          _inferListItemType(
+            sourceBeforeReturn.substring(argStart, argEnd),
+            hints,
+          ),
+        );
+      final known = itemTypes.whereType<String>().toSet();
+      if (known.any((type) => type != 'image' && type != 'file')) {
+        lists.remove(name);
+        hints.remove(name);
+      } else if (itemTypes.length == 1 && known.length == 1) {
+        hints[name] = '${known.single}[]';
+      } else {
+        hints.remove(name);
+      }
+      continue;
+    }
+
     final match = RegExp(
-      r'^\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*=\s*(.+)$',
+      r'^\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*(?::\s*[^=]+?)?\s*=\s*(.+)$',
     ).firstMatch(line);
     if (match == null || match.group(1) == null) continue;
     final targets = match.group(1)!.split(',').map((t) => t.trim()).toList();
@@ -450,19 +655,78 @@ Map<String, String> _collectAssignmentTypeHints(String sourceBeforeReturn) {
       hints[targets[0]] = 'image';
       continue;
     }
+    final bare = expression.replaceFirst(RegExp(r'''\s*#[^"']*$'''), '');
+    final isList =
+        targets.length == 1 &&
+        (bare == '[]' || bare == 'list()' || _holdsList(bare, lists));
     final expressionType = _inferAssignmentExpressionType(expression, hints);
-    if (expressionType == null) continue;
     for (final target in targets) {
-      hints[target] = expressionType;
+      appended.remove(target);
+      if (isList) {
+        lists.add(target);
+      } else {
+        lists.remove(target);
+      }
+      if (expressionType != null) hints[target] = expressionType;
     }
   }
-  return hints;
+  return (types: hints, lists: lists);
+}
+
+/// A list literal or comprehension whose items are not plain numbers or
+/// strings, `list(...)`, or a variable known to hold a list.
+bool _holdsList(String expression, Set<String> lists) {
+  final trimmed = expression.trim();
+  if (lists.contains(trimmed)) return true;
+  if (RegExp(r'^list\s*\(').hasMatch(trimmed)) return true;
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return false;
+  final items = _splitTopLevelCommaSegments(
+    trimmed.substring(1, trimmed.length - 1),
+  ).map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+  return items.isNotEmpty &&
+      !items.any(
+        (item) =>
+            _isNumericLiteralExpression(item) || _startsWithStringLiteral(item),
+      );
+}
+
+bool _startsWithStringLiteral(String e) =>
+    RegExp('^[rbfuRBFU]*["\']').hasMatch(e);
+
+/// The element of a comprehension item such as `img for img in images`.
+String _comprehensionElement(String item) {
+  var depth = 0;
+  for (var i = 0; i < item.length; i++) {
+    final ch = item[i];
+    if (ch == '"' || ch == "'") {
+      i = _skipQuotedString(item, i) - 1;
+    } else if (ch == '(' || ch == '[' || ch == '{') {
+      depth++;
+    } else if (ch == ')' || ch == ']' || ch == '}') {
+      depth--;
+    } else if (depth == 0 && item.startsWith(RegExp(r'\sfor\s'), i)) {
+      return item.substring(0, i).trim();
+    }
+  }
+  return item;
+}
+
+String? _inferListItemType(String expression, Map<String, String> hints) {
+  final item = expression.trim();
+  if (_startsWithStringLiteral(item)) return 'text';
+  return _inferCanonicalAssetPayloadType(item) ??
+      hints[item] ??
+      (_isMatplotlibFigureExpression(item) || _isPilImageExpression(item, hints)
+          ? 'image'
+          : null) ??
+      _inferNumericExpressionType(item, hints);
 }
 
 String? _inferAssignmentExpressionType(String expr, Map<String, String> hints) {
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
+  if (_isPilImageExpression(expr, hints)) return 'image';
   if (_isDataFrameExpression(expr)) return 'table';
   final assetList = _inferAssetListExpressionType(expr, hints);
   if (assetList != null) return assetList;
@@ -478,11 +742,12 @@ String? _inferLiteralReturnValueType(String expr, Map<String, String> hints) {
   final assigned = hints[expr.trim()];
   if (assigned != null) return assigned;
   if (_isMatplotlibFigureExpression(expr)) return 'image';
+  if (_isPilImageExpression(expr, hints)) return 'image';
   return _inferNumericExpressionType(expr, hints);
 }
 
-/// `image[]` or `file[]` for a list literal whose items are all images or all
-/// files, such as `[fig, other_fig]`.
+/// `image[]` or `file[]` for a list literal or comprehension whose items are
+/// all images or all files, such as `[fig, other_fig]`.
 String? _inferAssetListExpressionType(String expr, Map<String, String> hints) {
   final trimmed = expr.trim();
   if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return null;
@@ -492,9 +757,7 @@ String? _inferAssetListExpressionType(String expr, Map<String, String> hints) {
   if (items.isEmpty) return null;
   final types = {
     for (final item in items)
-      _inferCanonicalAssetPayloadType(item) ??
-          hints[item] ??
-          (_isMatplotlibFigureExpression(item) ? 'image' : null),
+      _inferListItemType(_comprehensionElement(item), hints),
   };
   if (types.length != 1) return null;
   final type = types.single;
@@ -548,6 +811,32 @@ bool _isMatplotlibFigureExpression(String e) =>
       r'\b(?:plt|pyplot|matplotlib\.pyplot)\.(?:figure|gcf)\s*\(',
     ).hasMatch(e) ||
     RegExp(r'\bFigure\s*\(').hasMatch(e);
+
+const _pilImageMethods =
+    'convert|resize|rotate|crop|copy|transpose|filter|point|quantize';
+
+/// A PIL image made by `Image.open/new/fromarray(...)`, `ImageOps.*(...)` or an
+/// image method on a known image, with any chain of image methods after it.
+bool _isPilImageExpression(String expression, Map<String, String> hints) {
+  var rest = expression.trim();
+  final start = RegExp(
+    r'^(?:(?:PIL\.)?Image\.(?:open|new|fromarray|frombytes|frombuffer|merge|'
+    r'composite|blend|alpha_composite)|(?:PIL\.)?ImageOps\.[A-Za-z_]+|'
+    '([A-Za-z_][A-Za-z0-9_]*)\\.(?:$_pilImageMethods))\\s*\\(',
+  ).firstMatch(rest);
+  if (start == null) return false;
+  final receiver = start.group(1);
+  if (receiver != null && hints[receiver] != 'image') return false;
+  var end = findBalancedBraceEnd(rest, start.end);
+  while (end != -1) {
+    rest = rest.substring(end + 1).trim();
+    if (rest.isEmpty) return true;
+    final next = RegExp('^\\.(?:$_pilImageMethods)\\s*\\(').firstMatch(rest);
+    if (next == null) return false;
+    end = findBalancedBraceEnd(rest, next.end);
+  }
+  return false;
+}
 
 bool _isNumericLiteralExpression(String e) => RegExp(
   r'^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$',
@@ -690,6 +979,7 @@ const _annotationTypeNames = {
   'date': 'date',
   'datetime': 'date',
   'dataframe': 'table',
+  'image': 'image',
 };
 
 /// Maps an annotation by its outermost type, so `list[int]` is a list and not
@@ -802,6 +1092,34 @@ String? _inferAssetPayloadTypeFromParameterName(String parameterName) {
   ];
   if (words.any(imagePayloadWords.contains)) return 'image';
   if (words.any(filePayloadWords.contains)) return 'file';
+  return null;
+}
+
+/// Words that mark an image when they end a name, such as `masks` or
+/// `result_frame`.
+const _imageNameWords = {
+  ...imagePayloadWords,
+  'frame',
+  'mask',
+  'scan',
+  'overlay',
+  'thumbnail',
+  'plot',
+  'figure',
+};
+
+/// `image`, or `image[]` when plural, for a name whose last word is an image
+/// word.
+String? _inferImageFromLastWord(String name) {
+  final words = _tokenizeIdentifier(name);
+  if (words.isEmpty) return null;
+  final last = words.last;
+  if (_imageNameWords.contains(last)) return 'image';
+  if (last.length > 1 &&
+      last.endsWith('s') &&
+      _imageNameWords.contains(last.substring(0, last.length - 1))) {
+    return 'image[]';
+  }
   return null;
 }
 
