@@ -4,28 +4,22 @@ import 'package:discoman_worker/src/python/run_environment.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test(
-    'puts extra folders, then the login shell, before the inherited PATH',
-    () {
-      final env = runEnvironment(
-        extraPath: ['/opt/tool/bin'],
-        inherited: {'PATH': '/usr/bin:/bin'},
-        loginShellPath: '/opt/homebrew/bin:/usr/bin',
-      );
+  test('puts the login shell PATH before the inherited one', () {
+    final env = runEnvironment(
+      inherited: {'PATH': '/usr/bin:/bin'},
+      loginShellPath: '/opt/homebrew/bin:/usr/bin',
+    );
 
-      expect(env, {'PATH': '/opt/tool/bin:/opt/homebrew/bin:/usr/bin:/bin'});
-    },
-    testOn: '!windows',
-  );
+    expect(env, {'PATH': '/opt/homebrew/bin:/usr/bin:/bin'});
+  }, testOn: '!windows');
 
   test('keeps the inherited PATH on Windows', () {
     final env = runEnvironment(
-      extraPath: [r'C:\tools'],
       inherited: {'Path': r'C:\Windows'},
       loginShellPath: '/ignored',
     );
 
-    expect(env, {'Path': r'C:\tools;C:\Windows'});
+    expect(env, {'Path': r'C:\Windows'});
   }, testOn: 'windows');
 
   test('reads the login shell PATH without failing', () async {

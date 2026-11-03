@@ -72,11 +72,7 @@ class PythonRunResult {
 /// name while parallel runs each write into their own folder. runner.py and
 /// what it writes live in a second, private folder the script never sees.
 class PythonRunner {
-  PythonRunner(
-    this.pythonPath, {
-    this.measureUsage = false,
-    this.extraPath = const [],
-  });
+  PythonRunner(this.pythonPath, {this.measureUsage = false});
 
   /// Interpreter to invoke (e.g. `python3` or an absolute path).
   final String pythonPath;
@@ -84,9 +80,6 @@ class PythonRunner {
   /// Whether to record the memory, processor time and graphics memory each
   /// run uses.
   final bool measureUsage;
-
-  /// Folders put in front of PATH for the script.
-  final List<String> extraPath;
 
   /// How long a stopped run's processes get to end before they are killed.
   static const killGrace = Duration(seconds: 3);
@@ -223,7 +216,7 @@ class PythonRunner {
     );
     final existingPythonPath = inherited[pythonPathKey] ?? '';
     final environment = {
-      ...runEnvironment(extraPath: extraPath),
+      ...runEnvironment(),
       'DISCOMAN_RUN_DIR': folder.directory.path,
       'DISCOMAN_SCRIPT_DIR': scriptDir ?? folder.directory.path,
       if (scriptDir != null)

@@ -343,22 +343,6 @@ class AppController extends ChangeNotifier {
     _notify();
   }
 
-  /// Folders put in front of PATH for every run.
-  List<String> get extraPath {
-    try {
-      return settingsStore.load().extraPath;
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  /// Takes effect on the next start, like the interpreter.
-  void setExtraPath(List<String> folders) {
-    final store = settingsStore;
-    store.save(store.load().copyWith(extraPath: folders));
-    _notify();
-  }
-
   /// Shows [path] in the Finder or Explorer.
   Future<void> showInFolder(String path) async {
     try {

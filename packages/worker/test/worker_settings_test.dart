@@ -166,13 +166,4 @@ void main() {
       expect(store.load().projectRunLimits, {'p3': 2});
     });
   });
-
-  test('extra PATH folders survive a round trip', () {
-    store.save(const WorkerSettings(extraPath: ['/opt/matlab/bin', ' ']));
-
-    expect(store.load().extraPath, ['/opt/matlab/bin']);
-    expect(store.load().copyWith(parallelRuns: 2).extraPath, [
-      '/opt/matlab/bin',
-    ]);
-  });
 }

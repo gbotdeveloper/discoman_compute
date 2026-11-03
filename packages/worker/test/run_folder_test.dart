@@ -44,15 +44,10 @@ void main() {
     String script, {
     Map<String, dynamic> inputs = const {},
     int timeoutSeconds = 60,
-    List<String> extraPath = const [],
     bool measureUsage = false,
   }) {
     final file = write('main.py', script);
-    return PythonRunner(
-      python,
-      extraPath: extraPath,
-      measureUsage: measureUsage,
-    ).run(
+    return PythonRunner(python, measureUsage: measureUsage).run(
       source: file.readAsStringSync(),
       entrypointName: 'main',
       inputs: inputs,
@@ -291,21 +286,6 @@ void main() {
     expect(result.success, isFalse);
     expect(result.logs, contains('[stdout] from a program'));
     expect(result.errorMessage, 'bad input');
-  }, skip: skip);
-
-  test('puts the extra PATH folders first', () async {
-    final extra = Directory('${temp.path}${Platform.pathSeparator}bin')
-      ..createSync();
-
-    final result = await run(
-      'import os\n\n'
-      'def main():\n'
-      '    return {"first": os.environ["PATH"].split(os.pathsep)[0]}\n',
-      extraPath: [extra.path],
-    );
-
-    expect(result.success, isTrue, reason: result.logs.join('\n'));
-    expect(result.outputs?['first'], extra.path);
   }, skip: skip);
 
   test('says when a run returns too many files', () async {
