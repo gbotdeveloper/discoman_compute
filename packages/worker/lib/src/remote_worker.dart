@@ -10,6 +10,7 @@ import 'heartbeat.dart';
 import 'machine_check.dart';
 import 'machine_id.dart';
 import 'python/python_runner.dart';
+import 'python/run_environment.dart';
 import 'scripts/script_store.dart';
 import 'scripts/script_sync.dart';
 import 'settings/usage_store.dart';
@@ -172,6 +173,8 @@ class RemoteWorker {
       throw RemoteAuthException('Could not sign in this machine: $error');
     }
 
+    await loadLoginShellPath();
+    deleteStaleRunFolders();
     final parallelRuns = _parallelRuns ?? settingsStore.load().parallelRuns;
     final registrations = <WorkerRegistration>[];
     try {
@@ -251,6 +254,9 @@ class RemoteWorker {
       onUsage: (projectId, usage) {
         usageStore.record(projectId, usage);
         if (!_measured.isClosed) _measured.add(projectId);
+      },
+      onFailed: (executionId, message) {
+        if (!_log.isClosed) _log.add('Failed $executionId: $message');
       },
     );
 

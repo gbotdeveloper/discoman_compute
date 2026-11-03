@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
 import '../machine_resources.dart';
+import 'run_environment.dart';
 import 'run_usage.dart';
 import 'runner_script.dart';
 
-/// The tail of user log output kept for a run: last 200 lines, each clipped to
-/// 2000 characters — matching the legacy executor's bounds.
+/// The tail of each output stream kept for a run: last 200 lines, each
+/// clipped to 2000 characters — matching the legacy executor's bounds.
 const int _maxLogLines = 200;
 const int _maxLogLineLength = 2000;
 
@@ -40,7 +42,8 @@ class PythonRunResult {
   /// Wall time of the Python process, in milliseconds.
   final int durationMs;
 
-  /// Bounded stderr (user prints + failure details).
+  /// Bounded stdout (each line marked `[stdout]`) then stderr (user prints
+  /// and failure details).
   final List<String> logs;
 
   /// Present on failure: the last stderr line or a specific failure message.
@@ -68,6 +71,23 @@ class PythonRunner {
   /// run uses.
   final bool measureUsage;
 
+  /// How long a stopped run's processes get to end before they are killed.
+  static const killGrace = Duration(seconds: 3);
+
+  /// How long output is still read after Python exits, in case something it
+  /// started keeps the pipes open.
+  static const outputGrace = Duration(seconds: 2);
+
+  static final _running = <Process>{};
+
+  /// Kills every run in progress and whatever each started, for when the app
+  /// quits.
+  static void killAll() {
+    for (final process in [..._running]) {
+      _killTree(process, ProcessSignal.sigkill);
+    }
+  }
+
   Future<PythonRunResult> run({
     required String source,
     required String entrypointName,
@@ -90,130 +110,27 @@ class PythonRunner {
         ).writeAsStringSync(measurePy);
       }
 
-      final process = await Process.start(pythonPath, [
-        measureUsage ? 'measure.py' : 'runner.py',
-      ], workingDirectory: tempDir.path);
-      final vram = measureUsage ? _VramWatch(process.pid) : null;
-
-      final stderrBuffer = StringBuffer();
-      final stderrDone = process.stderr
-          .transform(utf8.decoder)
-          .forEach(stderrBuffer.write);
-      // The runner reports through result.json, not stdout, but drain stdout so
-      // a script that writes a lot to it cannot fill the pipe and deadlock.
-      final stdoutDone = process.stdout.drain<void>();
-
-      process.stdin.write(
-        jsonEncode({'entrypointName': entrypointName, 'inputs': inputs}),
+      final process = await Process.start(
+        pythonPath,
+        [measureUsage ? 'measure.py' : 'runner.py'],
+        workingDirectory: tempDir.path,
+        // UTF-8 both ways, whatever the computer's language: Windows would
+        // otherwise use its code page and garble names like "görüntü".
+        environment: {...runEnvironment(), 'PYTHONUTF8': '1'},
       );
-      await process.stdin.close();
-
-      var timedOut = false;
-      var canceled = false;
-
-      final effectiveTimeout = timeoutSeconds > 0 ? timeoutSeconds : 15;
-      final timeoutTimer = Timer(Duration(seconds: effectiveTimeout), () {
-        timedOut = true;
-        process.kill(ProcessSignal.sigkill);
-      });
-      final cancelTimer = Timer.periodic(const Duration(milliseconds: 200), (
-        timer,
-      ) {
-        if (cancelRequested()) {
-          canceled = true;
-          process.kill(ProcessSignal.sigkill);
-          timer.cancel();
-        }
-      });
-
-      final exitCode = await process.exitCode;
-      timeoutTimer.cancel();
-      cancelTimer.cancel();
-      vram?.stop();
-      await stderrDone;
-      await stdoutDone;
-      stopwatch.stop();
-
-      final logs = _truncateLogs(_splitStderr(stderrBuffer.toString()));
-      final usage = measureUsage
-          ? _readUsage(tempDir, stopwatch.elapsedMilliseconds, vram?.peak)
-          : null;
-
-      if (canceled) {
-        return PythonRunResult(
-          success: false,
-          canceled: true,
-          timedOut: false,
-          outputs: null,
-          durationMs: stopwatch.elapsedMilliseconds,
-          logs: logs,
-          errorMessage: 'Execution canceled.',
-          usage: usage,
-        );
-      }
-      if (timedOut) {
-        return _failure(
-          logs,
-          stopwatch,
-          'Python execution timed out after ${effectiveTimeout}s.',
-          timedOut: true,
-          usage: usage,
-        );
-      }
-      if (exitCode != 0) {
-        final last = logs.isNotEmpty ? logs.last : 'Python execution failed.';
-        return _failure(
-          logs,
-          stopwatch,
-          last,
-          missingModule: _missingModuleIn(logs),
-          usage: usage,
-        );
-      }
-
-      final resultFile = File(
-        '${tempDir.path}${Platform.pathSeparator}result.json',
-      );
-      if (!resultFile.existsSync()) {
-        return _failure(
-          logs,
-          stopwatch,
-          'Python execution returned no JSON payload.',
-          usage: usage,
-        );
-      }
-
-      Map<String, dynamic> outputs;
+      _running.add(process);
       try {
-        final payload = jsonDecode(resultFile.readAsStringSync());
-        if (payload is! Map || payload['outputs'] is! Map) {
-          return _failure(
-            logs,
-            stopwatch,
-            'Python execution did not return a JSON object.',
-            usage: usage,
-          );
-        }
-        outputs = Map<String, dynamic>.from(payload['outputs'] as Map);
-      } catch (_) {
-        return _failure(
-          logs,
+        return await _watch(
+          process,
+          tempDir,
           stopwatch,
-          'Python execution returned a malformed JSON payload.',
-          usage: usage,
+          job: {'entrypointName': entrypointName, 'inputs': inputs},
+          timeoutSeconds: timeoutSeconds,
+          cancelRequested: cancelRequested,
         );
+      } finally {
+        _running.remove(process);
       }
-
-      return PythonRunResult(
-        success: true,
-        canceled: false,
-        timedOut: false,
-        outputs: outputs,
-        durationMs: stopwatch.elapsedMilliseconds,
-        logs: logs,
-        errorMessage: null,
-        usage: usage,
-      );
     } finally {
       try {
         tempDir.deleteSync(recursive: true);
@@ -221,6 +138,172 @@ class PythonRunner {
         // Best effort cleanup.
       }
     }
+  }
+
+  Future<PythonRunResult> _watch(
+    Process process,
+    Directory tempDir,
+    Stopwatch stopwatch, {
+    required Map<String, dynamic> job,
+    required int timeoutSeconds,
+    required bool Function() cancelRequested,
+  }) async {
+    final vram = measureUsage ? _VramWatch(process.pid) : null;
+
+    final stderrTail = _LogTail();
+    final stdoutTail = _LogTail();
+    final stderrDone = _collect(process.stderr, stderrTail);
+    // The runner reports through result.json, not stdout, but programs the
+    // script starts write to it, so its tail is kept too.
+    final stdoutDone = _collect(process.stdout, stdoutTail);
+
+    try {
+      process.stdin.add(utf8.encode(jsonEncode(job)));
+      await process.stdin.close();
+    } catch (_) {
+      // Python ended before reading its job; its exit code says why.
+    }
+
+    var timedOut = false;
+    var canceled = false;
+
+    final effectiveTimeout = timeoutSeconds > 0 ? timeoutSeconds : 15;
+    final timeoutTimer = Timer(Duration(seconds: effectiveTimeout), () {
+      timedOut = true;
+      _stop(process);
+    });
+    final cancelTimer = Timer.periodic(const Duration(milliseconds: 200), (
+      timer,
+    ) {
+      if (cancelRequested()) {
+        canceled = true;
+        _stop(process);
+        timer.cancel();
+      }
+    });
+
+    final exitCode = await process.exitCode;
+    timeoutTimer.cancel();
+    cancelTimer.cancel();
+    vram?.stop();
+    // Something the script started may still hold the pipes open; its output
+    // is not worth hanging the worker for.
+    await Future.wait([
+      stderrDone.future,
+      stdoutDone.future,
+    ]).timeout(outputGrace, onTimeout: () => const []);
+    await stderrDone.cancel();
+    await stdoutDone.cancel();
+    stopwatch.stop();
+
+    final stderrLines = stderrTail.lines;
+    final logs = [
+      for (final line in stdoutTail.withOmitted()) '[stdout] $line',
+      ...stderrTail.withOmitted(),
+    ];
+    final usage = measureUsage
+        ? _readUsage(tempDir, stopwatch.elapsedMilliseconds, vram?.peak)
+        : null;
+
+    if (canceled) {
+      return PythonRunResult(
+        success: false,
+        canceled: true,
+        timedOut: false,
+        outputs: null,
+        durationMs: stopwatch.elapsedMilliseconds,
+        logs: logs,
+        errorMessage: 'Execution canceled.',
+        usage: usage,
+      );
+    }
+    if (timedOut) {
+      return _failure(
+        logs,
+        stopwatch,
+        'Python execution timed out after ${effectiveTimeout}s.',
+        timedOut: true,
+        usage: usage,
+      );
+    }
+    if (exitCode != 0) {
+      final last = stderrLines.isNotEmpty
+          ? stderrLines.last
+          : 'Python execution failed.';
+      return _failure(
+        logs,
+        stopwatch,
+        last,
+        missingModule: _missingModuleIn(stderrLines),
+        usage: usage,
+      );
+    }
+
+    final resultFile = File(
+      '${tempDir.path}${Platform.pathSeparator}result.json',
+    );
+    if (!resultFile.existsSync()) {
+      return _failure(
+        logs,
+        stopwatch,
+        'Python execution returned no JSON payload.',
+        usage: usage,
+      );
+    }
+
+    Map<String, dynamic> outputs;
+    try {
+      final payload = jsonDecode(resultFile.readAsStringSync());
+      if (payload is! Map || payload['outputs'] is! Map) {
+        return _failure(
+          logs,
+          stopwatch,
+          'Python execution did not return a JSON object.',
+          usage: usage,
+        );
+      }
+      outputs = Map<String, dynamic>.from(payload['outputs'] as Map);
+    } catch (_) {
+      return _failure(
+        logs,
+        stopwatch,
+        'Python execution returned a malformed JSON payload.',
+        usage: usage,
+      );
+    }
+
+    return PythonRunResult(
+      success: true,
+      canceled: false,
+      timedOut: false,
+      outputs: outputs,
+      durationMs: stopwatch.elapsedMilliseconds,
+      logs: logs,
+      errorMessage: null,
+      usage: usage,
+    );
+  }
+
+  /// Asks the run and everything it started to end, then kills what is left.
+  static void _stop(Process process) {
+    _killTree(process, ProcessSignal.sigterm);
+    Timer(killGrace, () => _killTree(process, ProcessSignal.sigkill));
+  }
+
+  static void _killTree(Process process, ProcessSignal signal) {
+    if (Platform.isWindows) {
+      try {
+        Process.runSync('taskkill', ['/PID', '${process.pid}', '/T', '/F']);
+      } catch (_) {}
+      process.kill(ProcessSignal.sigkill);
+      return;
+    }
+    // The runner put itself in a process group of its own, numbered after
+    // it. Signal the process too, in case it had not got that far.
+    try {
+      Process.killPid(-process.pid, signal);
+    } catch (_) {}
+    process.kill(signal);
   }
 
   PythonRunResult _failure(
@@ -273,38 +356,87 @@ class PythonRunner {
     ).firstMatch(logs.last);
     return match?.group(1);
   }
+}
 
-  /// Splits stderr the way the executor did: line by line, trimmed, dropping
-  /// blank lines.
-  List<String> _splitStderr(String stderr) {
-    return const LineSplitter()
-        .convert(stderr)
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-  }
-
-  /// Keeps the last [_maxLogLines] lines (tracebacks and the failure message
-  /// come last) and clips each to [_maxLogLineLength].
-  List<String> _truncateLogs(List<String> lines) {
-    final dropped = lines.length > _maxLogLines
-        ? lines.length - _maxLogLines
-        : 0;
-    final tail = lines.length > _maxLogLines
-        ? lines.sublist(lines.length - _maxLogLines)
-        : lines;
-    final kept = tail
-        .map(
-          (line) => line.length <= _maxLogLineLength
-              ? line
-              : '${line.substring(0, _maxLogLineLength)}… (truncated)',
-        )
-        .toList();
-    if (dropped > 0) {
-      return ['… ($dropped earlier log lines omitted)', ...kept];
+/// Deletes run folders a run left behind when the app quit or crashed
+/// mid-run; they can hold visitors' files. Folders younger than [olderThan]
+/// are kept, as another worker on this computer may still be using them.
+void deleteStaleRunFolders({
+  Directory? root,
+  Duration olderThan = const Duration(hours: 1),
+}) {
+  final parent = root ?? Directory.systemTemp;
+  final cutoff = DateTime.now().subtract(olderThan);
+  try {
+    for (final entry in parent.listSync(followLinks: false)) {
+      final name = entry.uri.pathSegments.lastWhere(
+        (segment) => segment.isNotEmpty,
+      );
+      if (entry is! Directory || !name.startsWith('discoman_compute_')) {
+        continue;
+      }
+      if (entry.statSync().modified.isBefore(cutoff)) {
+        try {
+          entry.deleteSync(recursive: true);
+        } catch (_) {}
+      }
     }
-    return kept;
+  } catch (_) {}
+}
+
+/// Reads [stream] line by line into [tail]; the subscription can be dropped
+/// once the output stops mattering.
+_Collecting _collect(Stream<List<int>> stream, _LogTail tail) {
+  final done = Completer<void>();
+  final subscription = stream
+      .transform(const Utf8Decoder(allowMalformed: true))
+      .transform(const LineSplitter())
+      .listen(
+        tail.add,
+        onDone: () {
+          if (!done.isCompleted) done.complete();
+        },
+        onError: (_) {},
+        cancelOnError: false,
+      );
+  return _Collecting(done.future, subscription);
+}
+
+class _Collecting {
+  _Collecting(this.future, this._subscription);
+
+  final Future<void> future;
+  final StreamSubscription<String> _subscription;
+
+  Future<void> cancel() => _subscription.cancel();
+}
+
+/// The last [_maxLogLines] non-blank lines of one stream, trimmed and each
+/// clipped to [_maxLogLineLength], as the executor kept them.
+class _LogTail {
+  final _lines = ListQueue<String>();
+  var _dropped = 0;
+
+  void add(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return;
+    _lines.add(
+      trimmed.length <= _maxLogLineLength
+          ? trimmed
+          : '${trimmed.substring(0, _maxLogLineLength)}… (truncated)',
+    );
+    if (_lines.length > _maxLogLines) {
+      _lines.removeFirst();
+      _dropped++;
+    }
   }
+
+  List<String> get lines => _lines.toList();
+
+  List<String> withOmitted() => [
+    if (_dropped > 0) '… ($_dropped earlier log lines omitted)',
+    ..._lines,
+  ];
 }
 
 /// Polls `nvidia-smi` for the graphics memory a run holds, keeping the peak.

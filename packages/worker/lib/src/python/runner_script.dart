@@ -1,16 +1,15 @@
-// AUTOMATICALLY PORTED from executor/main.py build_runner_script().
-// DO NOT EDIT BY HAND. This is a verbatim port of the Python runner the legacy
-// FastAPI executor wrote to runner.py: it reads a JSON job {entrypointName,
-// inputs} from stdin, imports user_script.py from the working directory,
-// invokes the entrypoint with **inputs, normalizes the outputs (matplotlib
-// figures -> PNG, bytes -> sniffed image/file, numpy/pandas -> JSON), and
-// writes {"outputs": ...} to result.json. User stdout is redirected to stderr
-// so it surfaces as logs and cannot corrupt the result payload.
+// Started from the Python runner the legacy executor wrote to runner.py: it
+// reads a JSON job {entrypointName, inputs} from stdin, imports
+// user_script.py from the working directory, invokes the entrypoint with
+// **inputs, normalizes the outputs (matplotlib figures -> PNG, bytes ->
+// sniffed image/file, numpy/pandas -> JSON), and writes {"outputs": ...} to
+// result.json. User stdout is redirected to stderr so it surfaces as logs and
+// cannot corrupt the result payload.
 //
 // The size limits (3MB image / 5MB file) are baked in exactly as the executor
 // injected them, so worker input and output caps stay identical.
 
-/// The Python runner script, byte-for-byte what executor/main.py produced.
+/// The Python runner script.
 const String runnerPy = r'''
 MAX_IMAGE_BYTES = 3145728
 MAX_FILE_BYTES = 5242880
@@ -26,6 +25,13 @@ import sys
 import traceback
 import typing
 from pathlib import Path
+
+# Its own process group, so stopping a run stops what it started too.
+if hasattr(os, "setpgrp"):
+    try:
+        os.setpgrp()
+    except OSError:
+        pass
 
 SOURCE_FILE = Path("user_script.py")
 # Resolved up front so a user script calling os.chdir() cannot move it.
@@ -465,7 +471,7 @@ def _load_module():
 
 
 def main():
-    payload = json.loads(sys.stdin.read() or "{}")
+    payload = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
     entrypoint_name = payload.get("entrypointName")
     inputs = payload.get("inputs") or {}
     if not isinstance(inputs, dict):

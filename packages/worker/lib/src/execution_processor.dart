@@ -22,6 +22,7 @@ class ExecutionProcessor {
     this.reportRetryDelay = const Duration(seconds: 1),
     this.externalCodeFor,
     this.onUsage,
+    this.onFailed,
     http.Client? httpClient,
   }) : _injectedScriptStore = scriptStore,
        _http = httpClient ?? http.Client();
@@ -39,6 +40,9 @@ class ExecutionProcessor {
 
   /// Told what each measured run used, by project.
   final void Function(String projectId, RunUsage usage)? onUsage;
+
+  /// Told why each run that did not succeed failed.
+  final void Function(UuidValue executionId, String message)? onFailed;
 
   final http.Client _http;
   bool _directUploads = true;
@@ -141,6 +145,8 @@ class ExecutionProcessor {
 
     final missingModule = result.missingModule;
     if (!result.success && missingModule != null) {
+      final package = pipPackageFor(missingModule);
+      final note = manualInstallNote(package);
       await _report(
         claimed.executionId,
         ExecutionOutcome(
@@ -148,8 +154,8 @@ class ExecutionProcessor {
           errorReason: 'missingPackage',
           errorMessage:
               'The script imports "$missingModule", but the Python running '
-              'it does not have it. Install it with: '
-              'python -m pip install ${pipPackageFor(missingModule)}',
+              'it does not have it. '
+              '${note ?? 'Install it with: python -m pip install $package'}',
           durationMs: result.durationMs,
           warnings: const [],
           logs: result.logs,
@@ -438,6 +444,9 @@ class ExecutionProcessor {
   }
 
   Future<void> _report(UuidValue executionId, ExecutionOutcome outcome) async {
+    if (!outcome.success && outcome.errorReason != 'canceled') {
+      onFailed?.call(executionId, outcome.errorMessage ?? 'The run failed.');
+    }
     const attempts = 3;
     for (var attempt = 1; ; attempt++) {
       try {
