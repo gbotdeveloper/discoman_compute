@@ -6,6 +6,16 @@ import 'package:test/test.dart';
 
 const _png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
 
+final _python = Platform.isWindows ? 'python' : 'python3';
+
+bool _runs(String python) {
+  try {
+    return Process.runSync(python, ['--version']).exitCode == 0;
+  } on ProcessException {
+    return false;
+  }
+}
+
 /// Runs the runner on [script] the way the worker does: the job on stdin, the
 /// result read back from result.json.
 Future<Map<String, dynamic>> _run(
@@ -23,7 +33,7 @@ Future<Map<String, dynamic>> _run(
     await file.writeAsString(module.value);
   }
 
-  final process = await Process.start('python3', [
+  final process = await Process.start(_python, [
     'runner.py',
   ], workingDirectory: dir.path);
   process.stdin.write(jsonEncode({'entrypointName': 'run', 'inputs': inputs}));
@@ -38,7 +48,7 @@ Future<Map<String, dynamic>> _run(
 }
 
 void main() {
-  final hasPython = Process.runSync('python3', ['--version']).exitCode == 0;
+  final hasPython = _runs(_python);
 
   test(
     'turns a returned list of image bytes into a list of images',
@@ -55,7 +65,7 @@ def run():
       expect(base64Decode(pages.first['base64'] as String), _png);
       expect(outputs['count'], 2);
     },
-    skip: hasPython ? false : 'python3 is not installed',
+    skip: hasPython ? false : '$_python is not installed',
   );
 
   test(
@@ -89,7 +99,7 @@ class Image:
         'photos_2.png',
       ]);
     },
-    skip: hasPython ? false : 'python3 is not installed',
+    skip: hasPython ? false : '$_python is not installed',
   );
 
   test(
@@ -102,7 +112,7 @@ def run():
 
       expect(outputs['values'], [1, 2.5, 'x']);
     },
-    skip: hasPython ? false : 'python3 is not installed',
+    skip: hasPython ? false : '$_python is not installed',
   );
 
   test(
@@ -136,7 +146,7 @@ def run(start: datetime.date, at: Optional[datetime.datetime], note: str, bad: d
         'bad': 'not a date',
       });
     },
-    skip: hasPython ? false : 'python3 is not installed',
+    skip: hasPython ? false : '$_python is not installed',
   );
 
   test(
@@ -167,7 +177,7 @@ class DataFrame:
 
       expect(outputs, {'rows': 'DataFrame', 'count': 2, 'raw': 'list'});
     },
-    skip: hasPython ? false : 'python3 is not installed',
+    skip: hasPython ? false : '$_python is not installed',
   );
 
   group('image parameters', () {
@@ -276,7 +286,7 @@ def run(
           'data': dict,
         });
       },
-      skip: hasPython ? false : 'python3 is not installed',
+      skip: hasPython ? false : '$_python is not installed',
     );
 
     test(
@@ -302,7 +312,7 @@ def run(raw: bytes):
 
         expect(outputs['raw'], 5);
       },
-      skip: hasPython ? false : 'python3 is not installed',
+      skip: hasPython ? false : '$_python is not installed',
     );
   });
 
@@ -323,6 +333,6 @@ def run():
       expect(result['name'], 'out.png');
       expect(base64Decode(result['base64'] as String), _png);
     },
-    skip: hasPython ? false : 'python3 is not installed',
+    skip: hasPython ? false : '$_python is not installed',
   );
 }
