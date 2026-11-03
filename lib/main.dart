@@ -20,6 +20,12 @@ class _DiscomanComputeAppState extends State<DiscomanComputeApp> {
   final _controller = AppController();
 
   @override
+  void initState() {
+    super.initState();
+    _controller.restoreSignIn();
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -38,6 +44,9 @@ class _DiscomanComputeAppState extends State<DiscomanComputeApp> {
         body: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
+            if (_controller.isRestoring) {
+              return const Center(child: CircularProgressIndicator());
+            }
             return _controller.isSignedIn
                 ? HomePage(controller: _controller)
                 : SignInPage(controller: _controller);

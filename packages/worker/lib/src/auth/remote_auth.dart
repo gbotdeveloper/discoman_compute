@@ -32,6 +32,7 @@ Future<WorkerSession> signIn(
   WorkerConfig config, {
   required String email,
   required String password,
+  SavedSignInStore? remember,
 }) async {
   final apiKey = config.firebaseApiKey;
   if (apiKey.isEmpty) {
@@ -44,8 +45,45 @@ Future<WorkerSession> signIn(
     throw RemoteAuthException('Email and password are both required.');
   }
 
-  final idToken = await _firebaseSignIn(apiKey, email.trim(), password);
+  final tokens = await _firebaseSignIn(apiKey, email.trim(), password);
+  final session = await _serverpodSession(config, tokens.idToken);
+  remember?.write(
+    SavedSignIn(email: email.trim(), refreshToken: tokens.refreshToken),
+  );
+  return session;
+}
 
+/// Signs the creator saved in [store] back in, or returns null when nobody
+/// is saved or Firebase no longer accepts the saved sign-in.
+///
+/// Throws [RemoteAuthException] when Firebase or Discoman cannot be reached,
+/// leaving the saved sign-in for the next try.
+Future<({WorkerSession session, String email})?> restoreSignIn(
+  WorkerConfig config,
+  SavedSignInStore store,
+) async {
+  final saved = store.read();
+  if (saved == null) return null;
+
+  final tokens = await _firebaseRefresh(
+    config.firebaseApiKey,
+    saved.refreshToken,
+  );
+  if (tokens == null) {
+    store.clear();
+    return null;
+  }
+  store.write(
+    SavedSignIn(email: saved.email, refreshToken: tokens.refreshToken),
+  );
+  final session = await _serverpodSession(config, tokens.idToken);
+  return (session: session, email: saved.email);
+}
+
+Future<WorkerSession> _serverpodSession(
+  WorkerConfig config,
+  String idToken,
+) async {
   final session = buildWorkerSession(config.serverUrl);
   try {
     final authSuccess = await session.client.firebaseIdp.login(
@@ -72,14 +110,36 @@ Future<WorkerSession> signInInteractively(WorkerConfig config) async {
 ///
 /// This is what lets the worker run later without the creator's own session.
 /// Returns the name the machine will show under in GBot.
-Future<String> enrolMachine(
+Future<String> enrolMachine(WorkerSession session, WorkerConfig config) async {
+  final created = await session.client.computeSettings
+      .createComputeClientCredential(config.hostname);
+  MachineTokenStore.defaultLocation().write(
+    created.token,
+    credentialId: created.info.credentialId.uuid,
+  );
+  return created.info.name;
+}
+
+/// Keeps this machine's stored credential when it is still live for
+/// [session]'s creator, and enrols the machine otherwise.
+///
+/// Signing in again would otherwise add another entry for the same computer.
+Future<void> ensureMachineEnrolled(
   WorkerSession session,
   WorkerConfig config,
 ) async {
-  final created = await session.client.computeSettings
-      .createComputeClientCredential(config.hostname);
-  MachineTokenStore.defaultLocation().write(created.token);
-  return created.info.name;
+  final store = MachineTokenStore.defaultLocation();
+  final credentialId = store.readCredentialId();
+  if (store.read() != null && credentialId != null) {
+    final credentials = await session.client.computeSettings
+        .listComputeClientCredentials();
+    if (credentials.any(
+      (c) => c.credentialId.uuid == credentialId && !c.revoked,
+    )) {
+      return;
+    }
+  }
+  await enrolMachine(session, config);
 }
 
 /// The `login` flow (interactive, run once per machine).
@@ -137,10 +197,47 @@ Future<void> remoteRuntimeLogin(WorkerSession session) async {
   }
 }
 
-/// Exchanges [email] + [password] for a Firebase ID token via the Identity
+typedef _FirebaseTokens = ({String idToken, String refreshToken});
+
+/// Exchanges a Firebase refresh token for fresh tokens, or returns null when
+/// Firebase rejects it (expired, revoked, or the account is disabled).
+Future<_FirebaseTokens?> _firebaseRefresh(
+  String apiKey,
+  String refreshToken,
+) async {
+  final uri = Uri.parse(
+    'https://securetoken.googleapis.com/v1/token?key=$apiKey',
+  );
+  http.Response response;
+  try {
+    response = await http.post(
+      uri,
+      body: {'grant_type': 'refresh_token', 'refresh_token': refreshToken},
+    );
+  } catch (error) {
+    throw RemoteAuthException('Could not reach Firebase to sign in: $error');
+  }
+  if (response.statusCode == 400 || response.statusCode == 401) return null;
+  if (response.statusCode == 200) {
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map &&
+        decoded['id_token'] is String &&
+        decoded['refresh_token'] is String) {
+      return (
+        idToken: decoded['id_token'] as String,
+        refreshToken: decoded['refresh_token'] as String,
+      );
+    }
+  }
+  throw RemoteAuthException(
+    'Firebase sign-in failed (HTTP ${response.statusCode}).',
+  );
+}
+
+/// Exchanges [email] + [password] for Firebase tokens via the Identity
 /// Toolkit REST API. Throws [RemoteAuthException] with a readable message on any
 /// failure.
-Future<String> _firebaseSignIn(
+Future<_FirebaseTokens> _firebaseSignIn(
   String apiKey,
   String email,
   String password,
@@ -166,8 +263,13 @@ Future<String> _firebaseSignIn(
 
   if (response.statusCode == 200) {
     final decoded = jsonDecode(response.body);
-    if (decoded is Map && decoded['idToken'] is String) {
-      return decoded['idToken'] as String;
+    if (decoded is Map &&
+        decoded['idToken'] is String &&
+        decoded['refreshToken'] is String) {
+      return (
+        idToken: decoded['idToken'] as String,
+        refreshToken: decoded['refreshToken'] as String,
+      );
     }
     throw RemoteAuthException(
       'Firebase sign-in returned an unexpected response.',

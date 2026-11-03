@@ -8,7 +8,9 @@ import '../home_path.dart';
 /// This is NOT a Serverpod session store. Remote mode never persists a
 /// Serverpod [AuthSuccess]; it persists only the long-lived machine token
 /// (a plain string) and re-exchanges it via `workerAuth.loginRemote` on every
-/// run. The file therefore holds exactly `{"machineToken": "..."}`.
+/// run. The file therefore holds `{"machineToken": "..."}`, plus the
+/// credential's id when the desktop app enrolled it, so signing in again can
+/// reuse it.
 ///
 /// Writes are atomic (temp file + rename) so a crash mid-write can never leave
 /// a half-written credentials file, and the file is locked down to `0600`.
@@ -44,9 +46,22 @@ class MachineTokenStore {
     return null;
   }
 
+  /// The server's id for the stored token, or null when it was saved without
+  /// one.
+  String? readCredentialId() {
+    if (!_file.existsSync()) return null;
+    try {
+      final decoded = jsonDecode(_file.readAsStringSync());
+      if (decoded is Map && decoded['credentialId'] is String) {
+        return decoded['credentialId'] as String;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Atomically writes [machineToken], creating `~/.discoman` if needed and
   /// restricting permissions to the owner.
-  void write(String machineToken) {
+  void write(String machineToken, {String? credentialId}) {
     final dir = _file.parent;
     if (!dir.existsSync()) {
       dir.createSync(recursive: true);
@@ -55,7 +70,7 @@ class MachineTokenStore {
 
     final tmp = File('${_file.path}.tmp');
     tmp.writeAsStringSync(
-      jsonEncode({'machineToken': machineToken}),
+      jsonEncode({'machineToken': machineToken, 'credentialId': ?credentialId}),
       flush: true,
     );
     _chmod(tmp.path, '600');
@@ -77,6 +92,72 @@ class MachineTokenStore {
       Process.runSync('chmod', [mode, path]);
     } catch (_) {
       // Best effort: on platforms without chmod the token is still written.
+    }
+  }
+}
+
+/// Who signed in to the desktop app, so reopening it does not ask again.
+class SavedSignIn {
+  const SavedSignIn({required this.email, required this.refreshToken});
+
+  final String email;
+
+  /// Firebase's refresh token; the password itself is never stored.
+  final String refreshToken;
+}
+
+/// Persists the desktop app's [SavedSignIn] at `~/.discoman/sign_in.json`,
+/// written like the machine token and deleted on sign-out.
+class SavedSignInStore {
+  SavedSignInStore(this._file);
+
+  final File _file;
+
+  factory SavedSignInStore.defaultLocation() {
+    final home = discomanHomeDirectory();
+    return SavedSignInStore(
+      File('${home.path}${Platform.pathSeparator}sign_in.json'),
+    );
+  }
+
+  SavedSignIn? read() {
+    if (!_file.existsSync()) return null;
+    try {
+      final decoded = jsonDecode(_file.readAsStringSync());
+      if (decoded is Map &&
+          decoded['email'] is String &&
+          decoded['refreshToken'] is String) {
+        return SavedSignIn(
+          email: decoded['email'] as String,
+          refreshToken: decoded['refreshToken'] as String,
+        );
+      }
+    } catch (_) {
+      // A corrupt file just means signing in again.
+    }
+    return null;
+  }
+
+  void write(SavedSignIn signIn) {
+    final dir = _file.parent;
+    if (!dir.existsSync()) {
+      dir.createSync(recursive: true);
+    }
+    MachineTokenStore._chmod(dir.path, '700');
+
+    final tmp = File('${_file.path}.tmp');
+    tmp.writeAsStringSync(
+      jsonEncode({'email': signIn.email, 'refreshToken': signIn.refreshToken}),
+      flush: true,
+    );
+    MachineTokenStore._chmod(tmp.path, '600');
+    tmp.renameSync(_file.path);
+    MachineTokenStore._chmod(_file.path, '600');
+  }
+
+  void clear() {
+    if (_file.existsSync()) {
+      _file.deleteSync();
     }
   }
 }

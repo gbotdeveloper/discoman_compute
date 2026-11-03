@@ -7,9 +7,15 @@
 /// dependency.
 library;
 
-export 'src/auth/file_auth_storage.dart' show MachineTokenStore;
+export 'src/auth/file_auth_storage.dart'
+    show MachineTokenStore, SavedSignIn, SavedSignInStore;
 export 'src/auth/remote_auth.dart'
-    show RemoteAuthException, enrolMachine, signIn;
+    show
+        RemoteAuthException,
+        enrolMachine,
+        ensureMachineEnrolled,
+        restoreSignIn,
+        signIn;
 export 'src/auth/session.dart' show WorkerSession, buildWorkerSession;
 export 'src/execution_processor.dart' show ExecutionProcessor;
 export 'src/external_code.dart'
