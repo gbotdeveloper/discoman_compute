@@ -73,4 +73,18 @@ void main() {
       isNot(fingerprintScript('def run():\n    return {"a": 1}\n')),
     );
   });
+
+  test('remembers where a script was linked from', () {
+    store.store('abc123', 'def run():\n    return {}\n');
+    expect(store.originFor('abc123'), isNull);
+
+    store.storeOrigin(
+      'abc123',
+      const ScriptOrigin(path: '/work/run.py', fingerprint: 'sha256:1'),
+    );
+
+    expect(store.originFor('abc123')?.path, '/work/run.py');
+    expect(store.originFor('abc123')?.fingerprint, 'sha256:1');
+    expect(store.linkedProjectIds(), ['abc123']);
+  });
 }

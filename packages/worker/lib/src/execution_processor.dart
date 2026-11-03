@@ -5,9 +5,11 @@ import 'package:discoman_client/discoman_client.dart';
 import 'package:http/http.dart' as http;
 
 import 'heartbeat.dart';
+import 'python/packages.dart';
 import 'python/pip_names.dart';
 import 'python/python_runner.dart';
 import 'python/run_usage.dart';
+import 'scripts/script_origin.dart';
 import 'scripts/script_store.dart';
 
 /// Runs one claimed execution end to end: Python execution (honoring cancel and
@@ -22,6 +24,9 @@ class ExecutionProcessor {
     this.reportRetryDelay = const Duration(seconds: 1),
     this.externalCodeFor,
     this.onUsage,
+    this.keepInDiscoman,
+    this.onScriptChecked,
+    this.onScriptFolderShared,
     http.Client? httpClient,
   }) : _injectedScriptStore = scriptStore,
        _http = httpClient ?? http.Client();
@@ -40,6 +45,24 @@ class ExecutionProcessor {
   /// Told what each measured run used, by project.
   final void Function(String projectId, RunUsage usage)? onUsage;
 
+  /// Sends an edited script to Discoman when its project keeps it there, as
+  /// linking does, and returns whether it was sent. Only the desktop app,
+  /// signed in as the creator, can.
+  final Future<bool> Function(
+    String projectId,
+    String source,
+    String fingerprint,
+  )?
+  keepInDiscoman;
+
+  /// Told when a run found its project's script edited since it was linked,
+  /// whether or not it could still run.
+  final void Function(String projectId)? onScriptChecked;
+
+  /// Told when a project's runs had to use the script's own folder, so they
+  /// must go one at a time.
+  final void Function(String projectId)? onScriptFolderShared;
+
   final http.Client _http;
   bool _directUploads = true;
 
@@ -55,9 +78,9 @@ class ExecutionProcessor {
       _injectedScriptStore ?? ScriptStore.defaultLocation();
 
   Future<void> process(ClaimedExecution claimed) async {
-    final String source;
+    final _Script script;
     try {
-      source = _resolveSource(claimed);
+      script = await _resolveScript(claimed);
     } on _MissingLocalScript catch (error) {
       // The run is finished here rather than left to time out: the person
       // waiting on the app should be told, and a lease that expires would
@@ -66,7 +89,7 @@ class ExecutionProcessor {
         claimed.executionId,
         ExecutionOutcome(
           success: false,
-          errorReason: 'scriptMissing',
+          errorReason: error.reason,
           errorMessage: error.message,
           warnings: const [],
           logs: const [],
@@ -79,7 +102,7 @@ class ExecutionProcessor {
 
     heartbeat.start(claimed.executionId);
     try {
-      await _runAndReport(claimed, source, inputs);
+      await _runAndReport(claimed, script, inputs);
     } finally {
       heartbeat.stop();
     }
@@ -87,7 +110,7 @@ class ExecutionProcessor {
 
   Future<void> _runAndReport(
     ClaimedExecution claimed,
-    String source,
+    _Script script,
     Map<String, dynamic> inputs,
   ) async {
     try {
@@ -109,12 +132,14 @@ class ExecutionProcessor {
     await _stampExternalCode(claimed);
 
     final result = await pythonRunner.run(
-      source: source,
+      source: script.source,
       entrypointName: claimed.entrypointName,
       inputs: inputs,
       timeoutSeconds: claimed.timeoutSeconds,
       cancelRequested: () => heartbeat.cancelRequested,
+      scriptPath: script.path,
     );
+    if (result.inScriptFolder) onScriptFolderShared?.call(claimed.projectId);
     final usage = result.usage;
     if (usage != null) {
       try {
@@ -140,7 +165,15 @@ class ExecutionProcessor {
     }
 
     final missingModule = result.missingModule;
-    if (!result.success && missingModule != null) {
+    final scriptDir = script.path == null
+        ? null
+        : File(script.path!).parent.path;
+    // A module beside the script is the creator's own: pip has nothing for it.
+    if (!result.success &&
+        missingModule != null &&
+        !isLocalModule(missingModule, scriptDir)) {
+      final package = pipPackageFor(missingModule);
+      final note = manualInstallNote(package);
       await _report(
         claimed.executionId,
         ExecutionOutcome(
@@ -148,8 +181,8 @@ class ExecutionProcessor {
           errorReason: 'missingPackage',
           errorMessage:
               'The script imports "$missingModule", but the Python running '
-              'it does not have it. Install it with: '
-              'python -m pip install ${pipPackageFor(missingModule)}',
+              'it does not have it. '
+              '${note ?? 'Install it with: python -m pip install $package'}',
           durationMs: result.durationMs,
           warnings: const [],
           logs: result.logs,
@@ -399,17 +432,75 @@ class ExecutionProcessor {
         value['sizeBytes'] is int;
   }
 
-  /// The Python to run: the server's snapshot when it has one, otherwise this
-  /// machine's own copy of the project's script.
+  /// The Python to run: the server's snapshot when it has one, otherwise the
+  /// script as it is now where it was linked from, otherwise this machine's
+  /// own copy of the project's script.
   ///
   /// A null snapshot means the creator linked the script with
   /// `discoman-compute link` and it was never uploaded, so we are the only
   /// place it exists.
-  String _resolveSource(ClaimedExecution claimed) {
+  Future<_Script> _resolveScript(ClaimedExecution claimed) async {
     final snapshot = claimed.source;
-    if (snapshot != null) return snapshot;
+    if (snapshot != null) return _Script(snapshot);
 
-    final file = scriptStore.fileFor(claimed.projectId);
+    final projectId = claimed.projectId;
+    final file = scriptStore.fileFor(projectId);
+    final origin = scriptStore.originFor(projectId);
+    if (origin != null) {
+      final check = checkScriptOrigin(
+        origin,
+        linkedSource: file.existsSync() ? file.readAsStringSync() : null,
+      );
+      if (check.state != ScriptOriginState.unchanged) {
+        onScriptChecked?.call(projectId);
+      }
+      if (!check.canRun) {
+        throw _MissingLocalScript(
+          check.message!,
+          reason: check.state == ScriptOriginState.missing
+              ? 'scriptMissing'
+              : 'scriptChanged',
+        );
+      }
+      final source = check.source!;
+      if (check.state == ScriptOriginState.updated) {
+        await _recordEdit(projectId, origin, source);
+      }
+      return _Script(source, path: origin.path);
+    }
+
+    return _Script(_readStoredCopy(file));
+  }
+
+  /// Remembers that the edited script still matches the contract, and keeps
+  /// it in Discoman when the project does.
+  Future<void> _recordEdit(
+    String projectId,
+    ScriptOrigin origin,
+    String source,
+  ) async {
+    final fingerprint = fingerprintScript(source);
+    try {
+      scriptStore.storeOrigin(
+        projectId,
+        ScriptOrigin(path: origin.path, fingerprint: fingerprint),
+      );
+    } catch (_) {
+      // Checked again on the next run.
+    }
+    try {
+      // Sent before the copy here changes, as linking does, so a sync cannot
+      // bring the older copy back over it. The copy stays as linked
+      // otherwise: it is what the contract was read from.
+      if (await keepInDiscoman?.call(projectId, source, fingerprint) ?? false) {
+        scriptStore.store(projectId, source);
+      }
+    } catch (_) {
+      // Best effort: the run goes ahead with the script as it is.
+    }
+  }
+
+  String _readStoredCopy(File file) {
     if (!file.existsSync()) {
       throw _MissingLocalScript(
         'No script is linked to this project on this machine. Run '
@@ -459,7 +550,16 @@ class ExecutionProcessor {
 
 /// Raised when a run needs this machine's copy of a script and it is not there.
 class _MissingLocalScript implements Exception {
-  _MissingLocalScript(this.message);
+  _MissingLocalScript(this.message, {this.reason = 'scriptMissing'});
 
   final String message;
+  final String reason;
+}
+
+/// The Python to run, and where it was linked from when that is known.
+class _Script {
+  _Script(this.source, {this.path});
+
+  final String source;
+  final String? path;
 }

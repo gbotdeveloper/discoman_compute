@@ -169,4 +169,160 @@ class DataFrame:
     },
     skip: hasPython ? false : 'python3 is not installed',
   );
+
+  group('image parameters', () {
+    const fakePil = {
+      'PIL/__init__.py': '',
+      'PIL/Image.py': '''
+class Image:
+    def __init__(self, data):
+        self.data = data
+        self.loaded = False
+
+    def load(self):
+        self.loaded = True
+
+
+def open(fp):
+    return Image(fp.read())
+''',
+    };
+    Map<String, Object?> file(List<int> bytes) => {
+      'kind': 'image',
+      'name': 'in.png',
+      'extension': 'png',
+      'mimeType': 'image/png',
+      'sizeBytes': bytes.length,
+      'base64': base64Encode(bytes),
+    };
+
+    test(
+      'hands each parameter the kind of image it asks for',
+      () async {
+        final outputs = await _run(
+          '''
+from typing import Optional, Sequence
+from PIL import Image
+
+def describe(value):
+    if isinstance(value, Image.Image):
+        return "image:%d:%s" % (len(value.data), value.loaded)
+    if isinstance(value, bytes):
+        return "bytes:%d" % len(value)
+    if isinstance(value, dict):
+        return "dict:" + ",".join(sorted(value))
+    return type(value).__name__
+
+def run(
+    photo: Image.Image,
+    module_photo: Image,
+    raw: bytes,
+    maybe: Optional[Image.Image],
+    photos: list[Image.Image],
+    blobs: Sequence[bytes],
+    frames: tuple[Image.Image, ...],
+    quoted: "list[Image.Image]",
+    plain_image,
+    data: dict,
+):
+    return {
+        "photo": describe(photo),
+        "module_photo": describe(module_photo),
+        "raw": describe(raw),
+        "maybe": describe(maybe),
+        "photos": [describe(item) for item in photos],
+        "blobs": [describe(item) for item in blobs],
+        "frames": [describe(item) for item in frames],
+        "quoted": [describe(item) for item in quoted],
+        "plain_image": describe(plain_image),
+        "data": describe(data),
+    }
+''',
+          modules: fakePil,
+          inputs: {
+            'photo': file([1, 2, 3]),
+            'module_photo': file([1]),
+            'raw': file([1, 2]),
+            'maybe': file([1, 2, 3, 4]),
+            'photos': [
+              file([1]),
+              file([1, 2]),
+            ],
+            'blobs': [
+              file([1]),
+            ],
+            'frames': [
+              file([1, 2, 3]),
+            ],
+            'quoted': [
+              file([1]),
+            ],
+            'plain_image': file([1]),
+            'data': file([1]),
+          },
+        );
+
+        const dict = 'dict:base64,extension,kind,mimeType,name,sizeBytes';
+        expect(outputs, {
+          'photo': 'image:3:True',
+          'module_photo': 'image:1:True',
+          'raw': 'bytes:2',
+          'maybe': 'image:4:True',
+          'photos': ['image:1:True', 'image:2:True'],
+          'blobs': ['bytes:1'],
+          'frames': ['image:3:True'],
+          'quoted': ['image:1:True'],
+          'plain_image': dict,
+          'data': dict,
+        });
+      },
+      skip: hasPython ? false : 'python3 is not installed',
+    );
+
+    test(
+      'reads the file from its path when it has one',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('runner_input');
+        addTearDown(() => dir.delete(recursive: true));
+        final path = '${dir.path}/in.png';
+        File(path).writeAsBytesSync([9, 9, 9, 9, 9]);
+
+        final outputs = await _run(
+          '''
+def run(raw: bytes):
+    return {"raw": len(raw)}
+''',
+          inputs: {
+            'raw': {
+              ...file([1]),
+              'path': path,
+            },
+          },
+        );
+
+        expect(outputs['raw'], 5);
+      },
+      skip: hasPython ? false : 'python3 is not installed',
+    );
+  });
+
+  test(
+    'reads an output returned alone by its path',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('runner_output');
+      addTearDown(() => dir.delete(recursive: true));
+      final path = '${dir.path}/out.png';
+      File(path).writeAsBytesSync(_png);
+
+      final outputs = await _run('''
+def run():
+    return {"kind": "image", "path": ${jsonEncode(path)}}
+''');
+
+      final result = outputs['result'] as Map<String, dynamic>;
+      expect(result['name'], 'out.png');
+      expect(base64Decode(result['base64'] as String), _png);
+    },
+    skip: hasPython ? false : 'python3 is not installed',
+  );
 }

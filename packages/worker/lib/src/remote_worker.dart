@@ -10,6 +10,7 @@ import 'heartbeat.dart';
 import 'machine_check.dart';
 import 'machine_id.dart';
 import 'python/python_runner.dart';
+import 'python/run_environment.dart';
 import 'scripts/script_store.dart';
 import 'scripts/script_sync.dart';
 import 'settings/usage_store.dart';
@@ -69,6 +70,7 @@ class RemoteWorker {
     MachineIdStore? machineIdStore,
     UsageStore? usageStore,
     int? parallelRuns,
+    this.keepInDiscoman,
   }) : _scriptStore = scriptStore,
        _settingsStore = settingsStore,
        _machineIdStore = machineIdStore,
@@ -83,6 +85,16 @@ class RemoteWorker {
 
   /// Overrides the saved setting, for the CLI's `--parallel`.
   final int? _parallelRuns;
+
+  /// Sends a script edited since it was linked to Discoman, when its project
+  /// keeps it there. Given by the desktop app, which is signed in as the
+  /// creator.
+  final Future<bool> Function(
+    String projectId,
+    String source,
+    String fingerprint,
+  )?
+  keepInDiscoman;
 
   /// Where linked scripts live. Resolved on first use rather than in the
   /// constructor, so a machine with no home directory can still construct one.
@@ -104,6 +116,11 @@ class RemoteWorker {
   final _log = StreamController<String>.broadcast();
   final _state = StreamController<RemoteWorkerState>.broadcast();
   final _measured = StreamController<String>.broadcast();
+  final _scriptChecked = StreamController<String>.broadcast();
+
+  /// Projects whose runs had to use the script's own folder, so they take
+  /// one run at a time here.
+  final _sharedFolderProjects = <String>{};
 
   var _currentState = RemoteWorkerState.stopped;
   WorkerSession? _session;
@@ -132,6 +149,9 @@ class RemoteWorker {
 
   /// The project of each run whose usage was just recorded in [usageStore].
   Stream<String> get measured => _measured.stream;
+
+  /// The project of each run that found its script edited since linking.
+  Stream<String> get scriptChecked => _scriptChecked.stream;
 
   /// The projects this machine is currently willing to run.
   ///
@@ -172,6 +192,7 @@ class RemoteWorker {
       throw RemoteAuthException('Could not sign in this machine: $error');
     }
 
+    await loadLoginShellPath();
     final parallelRuns = _parallelRuns ?? settingsStore.load().parallelRuns;
     final registrations = <WorkerRegistration>[];
     try {
@@ -215,6 +236,7 @@ class RemoteWorker {
     await _log.close();
     await _state.close();
     await _measured.close();
+    await _scriptChecked.close();
   }
 
   Future<void> _runAll(
@@ -239,7 +261,11 @@ class RemoteWorker {
     final processor = ExecutionProcessor(
       client: session.client,
       workerId: workerId,
-      pythonRunner: PythonRunner(_config.pythonPath, measureUsage: true),
+      pythonRunner: PythonRunner(
+        _config.pythonPath,
+        measureUsage: true,
+        extraPath: settingsStore.load().extraPath,
+      ),
       heartbeat: ExecutionHeartbeat(
         session.client,
         workerId,
@@ -251,6 +277,18 @@ class RemoteWorker {
       onUsage: (projectId, usage) {
         usageStore.record(projectId, usage);
         if (!_measured.isClosed) _measured.add(projectId);
+      },
+      keepInDiscoman: keepInDiscoman,
+      onScriptChecked: (projectId) {
+        if (!_scriptChecked.isClosed) _scriptChecked.add(projectId);
+      },
+      onScriptFolderShared: (projectId) {
+        if (_sharedFolderProjects.add(projectId)) {
+          _log.add(
+            'Runs of $projectId use its script folder itself, so they go one '
+            'at a time. See the run log for why.',
+          );
+        }
       },
     );
 
@@ -316,11 +354,10 @@ class RemoteWorker {
   /// The next run for this worker, or null when nothing it may take waits.
   Future<ClaimedExecution?> _claim(WorkerSession session, UuidValue workerId) {
     final claim = _claimTurn.then((_) async {
-      final claimable = claimableProjectIds(
-        servedProjectIds(),
-        settingsStore.load().projectRunLimits,
-        _running,
-      );
+      final claimable = claimableProjectIds(servedProjectIds(), {
+        ...settingsStore.load().projectRunLimits,
+        for (final id in _sharedFolderProjects) id: 1,
+      }, _running);
       if (claimable.isEmpty) return null;
       final claimed = await session.client.computeWorker.claimNext(
         workerId,

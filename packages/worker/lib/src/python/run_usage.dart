@@ -48,12 +48,20 @@ class RunUsage {
 /// even when the script fails.
 const String measurePy = r'''
 import json
+import os
 import runpy
 import sys
 from pathlib import Path
 
-USAGE_FILE = Path("usage.json").resolve()
-RUNNER_FILE = str(Path("runner.py").resolve())
+# Its own process group, so stopping a run stops what it started too.
+if hasattr(os, "setpgrp"):
+    try:
+        os.setpgrp()
+    except OSError:
+        pass
+
+USAGE_FILE = Path(__file__).resolve().parent / "usage.json"
+RUNNER_FILE = str(Path(__file__).resolve().parent / "runner.py")
 
 
 def _usage():

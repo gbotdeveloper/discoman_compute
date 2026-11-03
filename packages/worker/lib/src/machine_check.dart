@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:discoman_client/discoman_client.dart';
 
 import 'python/imports.dart';
@@ -36,7 +38,11 @@ Future<MachineCheckResult> runMachineCheck({
 
   final modulesByProject = {
     for (final entry in sources.entries)
-      entry.key: importedModules(entry.value),
+      entry.key: [
+        for (final module in importedModules(entry.value))
+          if (!isLocalModule(module, _scriptDir(scriptStore, entry.key)))
+            module,
+      ],
   };
   final missing = interpreter.isUsable
       ? await findMissingModules(pythonPath, {
@@ -69,4 +75,9 @@ Future<MachineCheckResult> runMachineCheck({
         ),
     ],
   );
+}
+
+String? _scriptDir(ScriptStore store, String projectId) {
+  final origin = store.originFor(projectId);
+  return origin == null ? null : File(origin.path).parent.path;
 }

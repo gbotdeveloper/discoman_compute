@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:discoman_client/discoman_client.dart';
 import 'package:discoman_worker/src/execution_processor.dart';
 import 'package:discoman_worker/src/heartbeat.dart';
 import 'package:discoman_worker/src/python/python_runner.dart';
+import 'package:discoman_worker/src/scripts/script_store.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
@@ -14,12 +16,15 @@ void main() {
     '0190d0c4-0000-7000-8000-000000000002',
   );
 
-  ClaimedExecution claimed({String inputsJson = '{}'}) => ClaimedExecution(
+  ClaimedExecution claimed({
+    String inputsJson = '{}',
+    String? source = 'def main():\n  return {}\n',
+  }) => ClaimedExecution(
     executionId: executionId,
     kind: ExecutionKind.publishedApp,
     computeMode: ComputeMode.cloud,
     projectId: 'project-1',
-    source: 'def main():\n  return {}\n',
+    source: source,
     entrypointName: 'main',
     inputsJson: inputsJson,
     timeoutSeconds: 60,
@@ -270,6 +275,149 @@ void main() {
     expect(report.errorMessage, contains('pip install opencv-python'));
   });
 
+  test(
+    'says how to get the MATLAB engine rather than pip installing it',
+    () async {
+      pythonRunner.result = PythonRunResult(
+        success: false,
+        canceled: false,
+        timedOut: false,
+        outputs: null,
+        durationMs: 5,
+        logs: const ["ModuleNotFoundError: No module named 'matlab'"],
+        errorMessage: "No module named 'matlab'",
+        missingModule: 'matlab',
+      );
+
+      await processor.process(claimed());
+
+      final report = computeWorker.reports.single;
+      expect(report.errorReason, 'missingPackage');
+      expect(report.errorMessage, contains('must match your MATLAB release'));
+    },
+  );
+
+  group('a script linked from its folder', () {
+    const linked =
+        'def main(name: str):\n    return {"greeting": "hi " + name}\n';
+    late Directory temp;
+    late ScriptStore store;
+    late File original;
+    late ExecutionProcessor local;
+    final kept = <String>[];
+
+    setUp(() {
+      kept.clear();
+      temp = Directory.systemTemp.createTempSync('processor_origin');
+      store = ScriptStore(Directory('${temp.path}/scripts'));
+      final folder = Directory('${temp.path}/project')..createSync();
+      original = File('${folder.path}/greet.py')..writeAsStringSync(linked);
+      store
+        ..store('project-1', linked)
+        ..storeOrigin(
+          'project-1',
+          ScriptOrigin(
+            path: original.path,
+            fingerprint: fingerprintScript(linked),
+          ),
+        );
+      local = ExecutionProcessor(
+        client: processor.client,
+        workerId: workerId,
+        pythonRunner: pythonRunner,
+        heartbeat: heartbeat,
+        scriptStore: store,
+        reportRetryDelay: Duration.zero,
+        keepInDiscoman: (projectId, source, fingerprint) async {
+          kept.add(source);
+          return true;
+        },
+        httpClient: MockClient((request) async => http.Response('', 201)),
+      );
+    });
+
+    tearDown(() => temp.deleteSync(recursive: true));
+
+    test('runs the script where it is', () async {
+      await local.process(claimed(source: null));
+
+      expect(pythonRunner.lastScriptPath, original.path);
+      expect(pythonRunner.lastSource, linked);
+      expect(kept, isEmpty);
+    });
+
+    test('fails the run when the script is gone', () async {
+      original.deleteSync();
+
+      await local.process(claimed(source: null));
+
+      final report = computeWorker.reports.single;
+      expect(report.errorReason, 'scriptMissing');
+      expect(report.errorMessage, contains(original.path));
+      expect(
+        report.errorMessage,
+        contains('Link it again in Discoman Compute'),
+      );
+      expect(pythonRunner.lastSource, isNull);
+    });
+
+    test('runs an edit that keeps the inputs and outputs', () async {
+      const edited =
+          'def main(name: str):\n'
+          '    # friendlier\n'
+          '    return {"greeting": "hello " + name}\n';
+      original.writeAsStringSync(edited);
+
+      await local.process(claimed(source: null));
+
+      expect(pythonRunner.lastSource, edited);
+      expect(
+        store.originFor('project-1')!.fingerprint,
+        fingerprintScript(edited),
+      );
+      expect(kept, [edited]);
+      expect(store.fileFor('project-1').readAsStringSync(), edited);
+      expect(computeWorker.reports.single.success, isTrue);
+    });
+
+    test('refuses an edit that changes the inputs', () async {
+      original.writeAsStringSync(
+        'def main(name: str, age: int):\n    return {"greeting": name}\n',
+      );
+
+      await local.process(claimed(source: null));
+
+      final report = computeWorker.reports.single;
+      expect(report.errorReason, 'scriptChanged');
+      expect(report.errorMessage, contains('inputs or outputs changed'));
+      expect(pythonRunner.lastSource, isNull);
+      expect(
+        store.originFor('project-1')!.fingerprint,
+        fingerprintScript(linked),
+      );
+    });
+
+    test('does not offer pip for a module beside the script', () async {
+      File('${original.parent.path}/helper.py').writeAsStringSync('');
+      pythonRunner.result = PythonRunResult(
+        success: false,
+        canceled: false,
+        timedOut: false,
+        outputs: null,
+        durationMs: 5,
+        logs: const ["ModuleNotFoundError: No module named 'helper'"],
+        errorMessage: "No module named 'helper'",
+        missingModule: 'helper',
+      );
+
+      await local.process(claimed(source: null));
+
+      final report = computeWorker.reports.single;
+      expect(report.errorReason, 'executorError');
+      expect(report.errorMessage, isNot(contains('pip')));
+    });
+  });
+
   test('keeps the lease alive until the result is reported', () async {
     final activeDuring = <String, bool>{};
     computeWorker
@@ -429,6 +577,8 @@ class _FakePythonRunner extends PythonRunner {
 
   final Map<String, dynamic> outputs;
   Map<String, dynamic>? lastInputs;
+  String? lastSource;
+  String? lastScriptPath;
   PythonRunResult? result;
 
   @override
@@ -438,8 +588,11 @@ class _FakePythonRunner extends PythonRunner {
     required Map<String, dynamic> inputs,
     required int timeoutSeconds,
     required bool Function() cancelRequested,
+    String? scriptPath,
   }) async {
     lastInputs = inputs;
+    lastSource = source;
+    lastScriptPath = scriptPath;
     return result ??
         PythonRunResult(
           success: true,

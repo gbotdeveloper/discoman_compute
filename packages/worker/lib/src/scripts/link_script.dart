@@ -77,7 +77,13 @@ Future<int> runLink(
     // Stored before publishing: if the call fails the creator can retry, but a
     // published contract with no script behind it would leave the project
     // pointing at a file this machine does not have.
-    final stored = ScriptStore.defaultLocation().store(projectId, source);
+    final store = ScriptStore.defaultLocation();
+    final stored = store.store(projectId, source);
+    // Runs use the script where it is, with the files beside it.
+    store.storeOrigin(
+      projectId,
+      ScriptOrigin(path: scriptFile.absolute.path, fingerprint: fingerprint),
+    );
 
     await session.client.creatorScript.publishContract(
       projectId,
@@ -85,7 +91,10 @@ Future<int> runLink(
       fingerprint,
     );
 
-    stdout.writeln('Linked. The script is kept at ${stored.path}.');
+    stdout.writeln(
+      'Linked. Runs use ${scriptFile.absolute.path} as it is, from its '
+      'folder; a copy is kept at ${stored.path}.',
+    );
     if (keptInDiscoman) {
       stdout.writeln(
         'It is also kept in Discoman, so your other computers get it.',

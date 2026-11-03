@@ -54,6 +54,51 @@ class ScriptStore {
     return target;
   }
 
+  File _originFileFor(String projectId) {
+    return File(
+      '${directory.path}${Platform.pathSeparator}$projectId.origin.json',
+    );
+  }
+
+  /// Where the script for [projectId] was linked from, or null for a script
+  /// linked before that was recorded, or copied here from Discoman.
+  ScriptOrigin? originFor(String projectId) {
+    try {
+      final file = _originFileFor(projectId);
+      if (!file.existsSync()) return null;
+      final json = jsonDecode(file.readAsStringSync());
+      if (json is! Map) return null;
+      final path = json['path'];
+      final fingerprint = json['fingerprint'];
+      if (path is! String || fingerprint is! String) return null;
+      return ScriptOrigin(path: path, fingerprint: fingerprint);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Records where the script for [projectId] lives, and the fingerprint of
+  /// the version last checked against the linked contract.
+  void storeOrigin(String projectId, ScriptOrigin origin) {
+    if (!directory.existsSync()) {
+      directory.createSync(recursive: true);
+    }
+    final target = _originFileFor(projectId);
+    final tmp = File('${target.path}.tmp');
+    tmp.writeAsStringSync(
+      jsonEncode({'path': origin.path, 'fingerprint': origin.fingerprint}),
+      flush: true,
+    );
+    _chmod(tmp.path, '600');
+    tmp.renameSync(target.path);
+  }
+
+  /// Forgets where the script for [projectId] came from.
+  void clearOrigin(String projectId) {
+    final file = _originFileFor(projectId);
+    if (file.existsSync()) file.deleteSync();
+  }
+
   /// The project ids this machine holds a script for.
   ///
   /// Read from disk on demand rather than cached: a creator setting up a second
@@ -86,4 +131,15 @@ class ScriptStore {
 String fingerprintScript(String source) {
   final normalised = source.replaceAll('\r\n', '\n');
   return 'sha256:${sha256.convert(utf8.encode(normalised))}';
+}
+
+/// The script a project was linked from on this computer. Runs use it, as it
+/// is now, from its own folder.
+class ScriptOrigin {
+  const ScriptOrigin({required this.path, required this.fingerprint});
+
+  final String path;
+
+  /// The version last known to match the linked contract.
+  final String fingerprint;
 }

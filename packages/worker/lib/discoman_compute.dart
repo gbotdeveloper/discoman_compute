@@ -37,11 +37,20 @@ export 'src/python/python_installer.dart'
         PythonInstaller,
         managedPythonVersion;
 export 'src/python/packages.dart'
-    show PackageInstallResult, installPackages, missingPackagesFor;
+    show
+        PackageInstallResult,
+        installPackages,
+        isLocalModule,
+        missingPackagesFor;
+export 'src/python/pip_names.dart' show manualInstallNote;
 export 'src/python/python_runner.dart' show PythonRunner;
+export 'src/python/run_environment.dart' show loadLoginShellPath;
 export 'src/python/run_usage.dart' show RunUsage;
 export 'src/remote_worker.dart' show RemoteWorker, RemoteWorkerState;
-export 'src/scripts/script_store.dart' show ScriptStore, fingerprintScript;
+export 'src/scripts/script_origin.dart'
+    show ScriptOriginCheck, ScriptOriginState, checkScriptOrigin;
+export 'src/scripts/script_store.dart'
+    show ScriptOrigin, ScriptStore, fingerprintScript;
 export 'src/scripts/script_sync.dart'
     show
         ScriptSyncResult,

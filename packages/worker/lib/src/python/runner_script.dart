@@ -1,25 +1,28 @@
-// AUTOMATICALLY PORTED from executor/main.py build_runner_script().
-// DO NOT EDIT BY HAND. This is a verbatim port of the Python runner the legacy
-// FastAPI executor wrote to runner.py: it reads a JSON job {entrypointName,
-// inputs} from stdin, imports user_script.py from the working directory,
-// invokes the entrypoint with **inputs, normalizes the outputs (matplotlib
-// figures -> PNG, bytes -> sniffed image/file, numpy/pandas -> JSON), and
-// writes {"outputs": ...} to result.json. User stdout is redirected to stderr
-// so it surfaces as logs and cannot corrupt the result payload.
+// Started from the Python runner the legacy executor wrote to runner.py: it
+// reads a JSON job {entrypointName, inputs, scriptFile, scriptDir} from stdin,
+// loads the script, invokes the entrypoint with **inputs, normalizes the
+// outputs (matplotlib figures -> PNG, bytes -> sniffed image/file, files named
+// by path, numpy/pandas -> JSON), and writes {"outputs": ...} to result.json
+// beside itself. User stdout is redirected to stderr so it surfaces as logs
+// and cannot corrupt the result payload.
 //
-// The size limits (3MB image / 5MB file) are baked in exactly as the executor
-// injected them, so worker input and output caps stay identical.
+// The limits match what the server keeps per run.
 
-/// The Python runner script, byte-for-byte what executor/main.py produced.
+/// The Python runner script.
 const String runnerPy = r'''
-MAX_IMAGE_BYTES = 3145728
-MAX_FILE_BYTES = 5242880
+MAX_IMAGE_BYTES = 20971520
+MAX_FILE_BYTES = 20971520
+MAX_OUTPUT_FILES = 50
+MAX_OUTPUT_BYTES = 104857600
 import base64
 import binascii
+import collections.abc
 import contextlib
 import datetime
 import importlib.util
+import inspect
 import io
+import re
 import json
 import os
 import sys
@@ -27,9 +30,17 @@ import traceback
 import typing
 from pathlib import Path
 
-SOURCE_FILE = Path("user_script.py")
-# Resolved up front so a user script calling os.chdir() cannot move it.
-RESULT_FILE = Path("result.json").resolve()
+# Its own process group, so stopping a run stops what it started too.
+if hasattr(os, "setpgrp"):
+    try:
+        os.setpgrp()
+    except OSError:
+        pass
+
+# Resolved up front so a user script calling os.chdir() cannot move them.
+RUNNER_DIR = Path(__file__).resolve().parent
+RESULT_FILE = RUNNER_DIR / "result.json"
+START_DIR = Path.cwd()
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 def _detect_image_metadata(raw_bytes):
@@ -266,6 +277,87 @@ def _normalize_runtime_file_payload(output_key, value):
     }
 
 
+def _looks_like_path_payload(value):
+    return (
+        isinstance(value, dict)
+        and value.get("kind") in ("image", "file")
+        and isinstance(value.get("path"), (str, os.PathLike))
+    )
+
+
+def _read_output_file(output_key, value):
+    path = Path(value["path"])
+    if not path.is_absolute():
+        path = START_DIR / path
+    if not path.is_file():
+        raise RuntimeError(
+            f'Output "{output_key}" names a file that does not exist: {path}'
+        )
+    limit = MAX_IMAGE_BYTES if value["kind"] == "image" else MAX_FILE_BYTES
+    if path.stat().st_size > limit:
+        noun = "Image" if value["kind"] == "image" else "File"
+        raise RuntimeError(
+            f'{noun} output "{output_key}" exceeds the supported '
+            f'{limit // (1024 * 1024)} MB size limit.'
+        )
+    name = value.get("name")
+    name = name.strip() if isinstance(name, str) and name.strip() else path.name
+    return path, path.read_bytes(), name
+
+
+def _normalize_path_payload(output_key, value):
+    path, raw_bytes, name = _read_output_file(output_key, value)
+    if value["kind"] == "image":
+        detected = _detect_image_metadata(raw_bytes)
+        if detected is None:
+            raise RuntimeError(
+                f'Image output "{output_key}" ({path.name}) is not a '
+                'supported PNG, JPEG, or WEBP image.'
+            )
+        extension, mime_type = detected
+        return _build_image_payload(
+            output_key, raw_bytes, extension, mime_type, name=name
+        )
+
+    extension = path.suffix.lower().lstrip(".")
+    if extension in _supported_file_extensions:
+        mime_type = _supported_file_mime_types[extension]
+    else:
+        detected = _detect_file_metadata(raw_bytes)
+        if detected is None:
+            raise RuntimeError(
+                f'File output "{output_key}" ({path.name}) is not a supported '
+                'PDF, CSV, TXT, JSON, or XLSX file.'
+            )
+        extension, mime_type = detected
+    return _build_file_payload(
+        output_key, raw_bytes, extension, mime_type, name=name
+    )
+
+
+def _check_output_totals(outputs):
+    assets = []
+    for value in outputs.values():
+        for item in value if isinstance(value, list) else [value]:
+            if (
+                isinstance(item, dict)
+                and item.get("kind") in ("image", "file")
+                and isinstance(item.get("base64"), str)
+            ):
+                assets.append(item)
+    if len(assets) > MAX_OUTPUT_FILES:
+        raise RuntimeError(
+            f"The run returned {len(assets)} files; at most "
+            f"{MAX_OUTPUT_FILES} files are kept per run."
+        )
+    total = sum(item.get("sizeBytes", 0) for item in assets)
+    if total > MAX_OUTPUT_BYTES:
+        raise RuntimeError(
+            f"The run's files add up to {total / (1024 * 1024):.1f} MB; at most "
+            f"{MAX_OUTPUT_BYTES // (1024 * 1024)} MB of files are kept per run."
+        )
+
+
 def _is_matplotlib_figure(value):
     return (
         value.__class__.__module__ == "matplotlib.figure"
@@ -346,6 +438,7 @@ def _is_file_output(value):
     return (
         _looks_like_runtime_image_payload(value)
         or _looks_like_runtime_file_payload(value)
+        or _looks_like_path_payload(value)
         or isinstance(value, (bytes, bytearray))
         or _is_matplotlib_figure(value)
         or _is_pil_image(value)
@@ -369,6 +462,9 @@ def _normalize_output_value(output_key, value):
 
     if _looks_like_runtime_file_payload(value):
         return _normalize_runtime_file_payload(output_key, value)
+
+    if _looks_like_path_payload(value):
+        return _normalize_path_payload(output_key, value)
 
     if isinstance(value, (bytes, bytearray)):
         raw_bytes = bytes(value)
@@ -421,7 +517,86 @@ def _annotation_target(annotation):
     return args[0] if is_union and len(args) == 1 else annotation
 
 
+_IMAGE_NAMES = {"Image.Image", "PIL.Image.Image", "Image"}
+_LIST_TEXT = re.compile(
+    r"^(?:typing\.|collections\.abc\.)?(?:list|List|Sequence|tuple|Tuple)"
+    r"\[(.+?)(?:,\s*\.\.\.)?\]$"
+)
+
+
+def _file_kind_from_text(text):
+    text = text.replace(" ", "").strip("'\"")
+    for optional in (r"^(?:typing\.)?Optional\[(.+)\]$", r"^(.+)\|None$", r"^None\|(.+)$"):
+        match = re.match(optional, text)
+        if match:
+            text = match.group(1)
+    match = _LIST_TEXT.match(text)
+    inner = match.group(1) if match else text
+    kind = "image" if inner in _IMAGE_NAMES else "bytes" if inner == "bytes" else None
+    return (kind, match is not None) if kind else None
+
+
+def _file_kind(annotation):
+    # ("image" | "bytes", is_list) when the parameter takes files as PIL
+    # images or raw bytes; None when it takes the file dict as it comes.
+    if isinstance(annotation, str):
+        return _file_kind_from_text(annotation)
+    target = _annotation_target(annotation)
+    origin = typing.get_origin(target)
+    is_list = False
+    if origin in (list, tuple, collections.abc.Sequence):
+        args = typing.get_args(target)
+        if not args:
+            return None
+        target = _annotation_target(args[0])
+        is_list = True
+    if isinstance(target, str):
+        found = _file_kind_from_text(target)
+        return (found[0], is_list) if found else None
+    if target is bytes:
+        return ("bytes", is_list)
+    if inspect.ismodule(target) and target.__name__ == "PIL.Image":
+        return ("image", is_list)
+    if (
+        inspect.isclass(target)
+        and target.__name__ == "Image"
+        and getattr(target, "__module__", "").startswith("PIL")
+    ):
+        return ("image", is_list)
+    return None
+
+
+def _input_file_bytes(value):
+    path = value.get("path")
+    if isinstance(path, str) and os.path.isfile(path):
+        return Path(path).read_bytes()
+    return base64.b64decode(value.get("base64") or "")
+
+
+def _convert_input_file(kind, value):
+    if not (isinstance(value, dict) and value.get("kind") in ("image", "file")):
+        return value
+    raw_bytes = _input_file_bytes(value)
+    if kind == "bytes":
+        return raw_bytes
+    from PIL import Image as _PILImage
+
+    image = _PILImage.open(io.BytesIO(raw_bytes))
+    image.load()
+    return image
+
+
 def _coerce_input(annotation, value):
+    found = _file_kind(annotation)
+    if found is not None:
+        kind, is_list = found
+        if is_list and isinstance(value, (list, tuple)):
+            return [_convert_input_file(kind, item) for item in value]
+        if not is_list:
+            return _convert_input_file(kind, value)
+        return value
+    if isinstance(annotation, str):
+        return value
     # Dates arrive as ISO text and tables as rows; hand the script the
     # type it asked for.
     target = _annotation_target(annotation)
@@ -443,19 +618,46 @@ def _coerce_input(annotation, value):
     return value
 
 
-def _coerce_inputs(entrypoint, inputs):
+def _parameter_annotations(entrypoint):
+    # Resolved hints where they resolve; the written annotation, possibly a
+    # string, where they do not.
     try:
         hints = typing.get_type_hints(entrypoint)
     except Exception:
-        return inputs
+        hints = {}
+    try:
+        parameters = inspect.signature(entrypoint).parameters
+    except (TypeError, ValueError):
+        parameters = {}
+    annotations = dict(hints)
+    for name, parameter in parameters.items():
+        if name not in annotations and parameter.annotation is not inspect.Parameter.empty:
+            annotations[name] = parameter.annotation
+    return annotations
+
+
+def _coerce_inputs(entrypoint, inputs):
+    hints = _parameter_annotations(entrypoint)
     return {
         key: _coerce_input(hints[key], value) if key in hints else value
         for key, value in inputs.items()
     }
 
 
-def _load_module():
-    spec = importlib.util.spec_from_file_location("user_script", SOURCE_FILE)
+def _set_up_import_path(script_file, script_dir):
+    # The runner's own folder is not the creator's: leave it off, and put
+    # the script's folder first so the files beside it import.
+    own = os.path.realpath(str(RUNNER_DIR))
+    sys.path[:] = [
+        entry for entry in sys.path if os.path.realpath(entry or ".") != own
+    ]
+    for folder in reversed([script_dir, str(Path(script_file).parent)]):
+        if folder and folder not in sys.path:
+            sys.path.insert(0, folder)
+
+
+def _load_module(script_file):
+    spec = importlib.util.spec_from_file_location("user_script", script_file)
     if spec is None or spec.loader is None:
         raise RuntimeError("Python script module could not be loaded.")
 
@@ -470,12 +672,14 @@ def main():
     inputs = payload.get("inputs") or {}
     if not isinstance(inputs, dict):
         raise RuntimeError("inputs must be a JSON object.")
+    script_file = payload.get("scriptFile") or str(START_DIR / "user_script.py")
+    _set_up_import_path(script_file, payload.get("scriptDir"))
 
     # Importing the module and calling the entrypoint both run user code,
     # which is free to print. Send that to stderr so it is surfaced as
     # logs instead of interleaving with anything we emit.
     with contextlib.redirect_stdout(sys.stderr):
-        module = _load_module()
+        module = _load_module(script_file)
         if not hasattr(module, entrypoint_name):
             raise RuntimeError(
                 f"Entrypoint '{entrypoint_name}' could not be found."
@@ -488,13 +692,14 @@ def main():
             )
 
         result = entrypoint(**_coerce_inputs(entrypoint, inputs))
-        if isinstance(result, dict) and not _looks_like_runtime_image_payload(result) and not _looks_like_runtime_file_payload(result):
+        if isinstance(result, dict) and not _looks_like_runtime_image_payload(result) and not _looks_like_runtime_file_payload(result) and not _looks_like_path_payload(result):
             outputs = {
                 str(key): _normalize_output_value(str(key), value)
                 for key, value in result.items()
             }
         else:
             outputs = {"result": _normalize_output_value("result", result)}
+        _check_output_totals(outputs)
 
     RESULT_FILE.write_text(json.dumps({"outputs": outputs}), encoding="utf-8")
 
