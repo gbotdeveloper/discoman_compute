@@ -7,9 +7,6 @@ import 'package:flutter/services.dart';
 import '../app_controller.dart';
 import 'action_button.dart';
 
-const scriptGuideUrl =
-    'https://github.com/gbotdeveloper/discoman_compute/blob/main/docs/script_guide.md';
-
 const _exampleAsset = 'examples/image_pipeline.py';
 
 const _inputsSample = '''def main(photos: list, strength: int = 2):
@@ -170,12 +167,6 @@ class _ScriptGuideDialogState extends State<ScriptGuideDialog> {
                           label: 'Save example script',
                           isPrimary: false,
                           onPressed: _saveExample,
-                        ),
-                        ActionButton(
-                          label: 'Open full guide',
-                          isPrimary: false,
-                          onPressed: () =>
-                              widget.controller.openUrl(scriptGuideUrl),
                         ),
                       ],
                     ),
