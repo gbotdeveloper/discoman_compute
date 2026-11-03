@@ -1,4 +1,5 @@
 import 'package:discoman_client/discoman_client.dart';
+import 'package:discoman_worker/discoman_compute.dart' show manualInstallNote;
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
@@ -96,10 +97,12 @@ class ProjectsPanel extends StatelessWidget {
       onLink: () => onLink(project),
       onInstall: onInstall == null
           ? null
-          : () => onInstall!(
-              controller.missingPackagesByProject[project.projectId] ??
-                  const [],
-            ),
+          : () => onInstall!([
+              for (final package
+                  in controller.missingPackagesByProject[project.projectId] ??
+                      const <String>[])
+                if (manualInstallNote(package) == null) package,
+            ]),
       externalCodeCount:
           controller.externalCode[project.projectId]?.length ?? 0,
       onEditExternalCode: onEditExternalCode == null
@@ -412,12 +415,16 @@ class ProjectRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        ActionButton(
-                          label: 'Install',
-                          isPrimary: false,
-                          onPressed: isBusy ? null : onInstall,
-                        ),
+                        if (missingPackages.any(
+                          (package) => manualInstallNote(package) == null,
+                        )) ...[
+                          const SizedBox(width: 20),
+                          ActionButton(
+                            label: 'Install',
+                            isPrimary: false,
+                            onPressed: isBusy ? null : onInstall,
+                          ),
+                        ],
                       ],
                     ),
                   ],

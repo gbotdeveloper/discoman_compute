@@ -29,7 +29,22 @@ const _pipNames = {
   'zmq': 'pyzmq',
   'Levenshtein': 'python-Levenshtein',
   'tensorflow_hub': 'tensorflow-hub',
+  'matlab': 'matlabengine',
 };
+
+/// Packages that must match something else installed on the computer, so
+/// they are never installed automatically: why, for each.
+const _manualPackages = {
+  'matlabengine':
+      'The MATLAB Engine for Python must match your MATLAB release: install '
+      'it from your MATLAB (see "Install MATLAB Engine API for Python" in the '
+      'MATLAB documentation), or with pip install matlabengine==<the version '
+      'for your release>.',
+};
+
+/// Why [package] has to be installed by hand, or null when pip can install
+/// it.
+String? manualInstallNote(String package) => _manualPackages[package];
 
 /// The pip package that provides the top-level [module].
 String pipPackageFor(String module) => _pipNames[module] ?? module;

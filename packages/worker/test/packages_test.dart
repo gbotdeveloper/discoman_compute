@@ -26,7 +26,15 @@ void main() {
     expect(missing, isEmpty);
   });
 
-  final hasPython = Process.runSync('python3', ['--version']).exitCode == 0;
+  bool runs(String python) {
+    try {
+      return Process.runSync(python, ['--version']).exitCode == 0;
+    } on ProcessException {
+      return false;
+    }
+  }
+
+  final hasPython = runs('python3');
 
   test(
     'reports a failed install and what pip printed',
