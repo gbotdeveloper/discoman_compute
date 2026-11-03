@@ -313,6 +313,24 @@ def run(photos):
     );
   });
 
+  test(
+    'the out folder is there before the script runs',
+    () async {
+      final outputs = await _run(
+        '''
+def run():
+    with open("out/note.txt", "w") as handle:
+        handle.write("hi")
+    return {"notes": ["out/note.txt"]}
+''',
+        outputTypes: {'notes': 'file'},
+      );
+
+      expect(((outputs['notes'] as List).single as Map)['name'], 'note.txt');
+    },
+    skip: hasPython ? false : '$_python is not installed',
+  );
+
   test('run must return a dict', () async {
     expect(
       await _failure('def run():\n    return 42\n'),
