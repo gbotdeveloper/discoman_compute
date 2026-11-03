@@ -3,6 +3,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
+import 'action_button.dart';
 import 'contract_review_dialog.dart';
 import 'error_banner.dart';
 import 'external_code_dialog.dart';
@@ -89,7 +90,10 @@ class HomePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SignedInHeader(email: controller.signedInAs ?? ''),
+          _SignedInHeader(
+            email: controller.signedInAs ?? '',
+            onSignOut: controller.isBusy ? null : controller.signOut,
+          ),
           if (controller.errorMessage != null) ...[
             const SizedBox(height: 16),
             ErrorBanner(message: controller.errorMessage!),
@@ -123,9 +127,10 @@ class HomePage extends StatelessWidget {
 }
 
 class _SignedInHeader extends StatelessWidget {
-  const _SignedInHeader({required this.email});
+  const _SignedInHeader({required this.email, required this.onSignOut});
 
   final String email;
+  final VoidCallback? onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +150,8 @@ class _SignedInHeader extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
+        const SizedBox(width: 12),
+        ActionButton(label: 'Sign out', isPrimary: false, onPressed: onSignOut),
       ],
     );
   }

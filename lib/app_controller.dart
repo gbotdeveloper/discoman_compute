@@ -4,8 +4,11 @@ import 'dart:io';
 import 'package:discoman_client/discoman_client.dart';
 // The engine's own `signIn` would be shadowed by this class's method, so it
 // comes in under a prefix while the types stay unprefixed.
-import 'package:discoman_worker/discoman_compute.dart' hide signIn;
-import 'package:discoman_worker/discoman_compute.dart' as engine show signIn;
+import 'package:discoman_worker/discoman_compute.dart'
+    hide restoreSignIn, signIn;
+import 'package:discoman_worker/discoman_compute.dart'
+    as engine
+    show restoreSignIn, signIn;
 import 'package:flutter/foundation.dart';
 
 /// A script the creator picked, together with the contract read from it here.
@@ -41,15 +44,18 @@ class AppController extends ChangeNotifier {
     WorkerConfig? config,
     WorkerSettingsStore? settingsStore,
     UsageStore? usageStore,
+    SavedSignInStore? signInStore,
     Future<MachineResources> Function()? readMachine,
   }) : config = config ?? WorkerConfig.resolve(),
        _settingsStore = settingsStore,
        _usageStore = usageStore,
+       _signInStore = signInStore,
        _readMachine = readMachine ?? MachineResources.read;
 
   /// Injectable so a test never writes to the creator's real home directory.
   final WorkerSettingsStore? _settingsStore;
   final UsageStore? _usageStore;
+  final SavedSignInStore? _signInStore;
   final Future<MachineResources> Function() _readMachine;
 
   late final WorkerSettingsStore settingsStore =
@@ -57,6 +63,12 @@ class AppController extends ChangeNotifier {
 
   late final UsageStore usageStore =
       _usageStore ?? UsageStore.defaultLocation();
+
+  late final SavedSignInStore signInStore =
+      _signInStore ?? SavedSignInStore.defaultLocation();
+
+  /// True while the saved sign-in is tried on launch.
+  bool isRestoring = false;
 
   /// What this computer has, read once.
   MachineResources? machine;
@@ -209,12 +221,41 @@ class AppController extends ChangeNotifier {
         config,
         email: email,
         password: password,
+        remember: signInStore,
       );
       _session = session;
       signedInAs = email.trim();
-      await enrolMachine(session, config);
+      await ensureMachineEnrolled(session, config);
       await _loadProjects();
     });
+  }
+
+  /// Signs the last creator back in without asking, if one is saved.
+  Future<void> restoreSignIn() async {
+    isRestoring = true;
+    await _run(() async {
+      final restored = await engine.restoreSignIn(config, signInStore);
+      if (restored == null) return;
+      _session = restored.session;
+      signedInAs = restored.email;
+      await ensureMachineEnrolled(restored.session, config);
+      await _loadProjects();
+    });
+    isRestoring = false;
+    _notify();
+  }
+
+  /// Stops the worker and forgets the creator. This machine keeps its
+  /// access, so signing back in reuses it rather than adding the computer
+  /// again.
+  Future<void> signOut() async {
+    await stopWorker();
+    _session?.client.close();
+    _session = null;
+    signedInAs = null;
+    projects = const [];
+    signInStore.clear();
+    _notify();
   }
 
   Future<void> refreshProjects() => _run(_loadProjects);
