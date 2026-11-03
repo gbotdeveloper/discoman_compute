@@ -1,20 +1,5 @@
 import 'package:discoman_client/discoman_client.dart';
 
-/// Parameter-name hints that mark an input as carrying an image or a file.
-const Set<String> imagePayloadWords = {
-  'image',
-  'photo',
-  'picture',
-  'screenshot',
-};
-const Set<String> filePayloadWords = {
-  'file',
-  'attachment',
-  'upload',
-  'pdf',
-  'csv',
-};
-
 // NOTE: this inference mirrors `python_contract_extractor.dart` in the discoman
 // server, which runs the same pass for projects whose script is uploaded there.
 // A creator's script is read here and never leaves this machine, so the two
@@ -41,12 +26,7 @@ ContractDraft extractContractDraft(String source) {
     source,
     entrypoint.name,
   );
-  final inputFields = _buildInputFields(
-    source,
-    entrypoint.parameters,
-    docstringBody,
-    notes,
-  );
+  final inputFields = _buildInputFields(source, entrypoint.parameters, notes);
   final outputFields = _buildOutputFields(source, entrypoint, notes);
   final docstring = _extractDocstringSummary(docstringBody);
   if (docstring != null) {
@@ -105,15 +85,20 @@ _TopLevelFunction _chooseEntrypoint(List<_TopLevelFunction> functions) {
 
 // --- Inputs ---------------------------------------------------------------
 
+/// The alias a script declares as `Images = list[str]`: a list of image paths.
+const imagesAlias = 'Images';
+
+/// The alias a script declares as `Files = list[str]`: a list of file paths.
+const filesAlias = 'Files';
+
 List<ContractInputField> _buildInputFields(
   String source,
   String parametersSource,
-  String? docstringBody,
   List<String> notes,
 ) {
   final parts = _splitParameters(parametersSource);
   final fields = <ContractInputField>[];
-  final enumExtraction = _collectTopLevelEnumStringOptions(source);
+  final enums = _collectTopLevelEnumStringOptions(source);
 
   for (var index = 0; index < parts.length; index++) {
     final trimmed = parts[index].trim();
@@ -133,67 +118,27 @@ List<ContractInputField> _buildInputFields(
     }
 
     final parameterName = match.group(1)!;
-    final annotation = match.group(2)?.trim();
     final defaultValue = match.group(3)?.trim();
-    final itemAnnotation = _listItemAnnotation(annotation);
-    final categoryResolution = _resolveCategoryOptionsFromAnnotation(
-      itemAnnotation ?? annotation,
-      enumExtraction,
-    );
-    var type = categoryResolution.options.isNotEmpty
-        ? 'category'
-        : _resolveInputFieldType(
-            parameterName,
-            itemAnnotation ?? annotation,
-            docstringBody,
-            notes,
-          );
-    if (categoryResolution.note != null) {
-      notes.add(categoryResolution.note!);
-    }
-
-    var multiple = false;
-    final listedAsset = _inferAssetListFromDocstringHints(
-      docstringBody,
+    final field = _resolveField(
       parameterName,
+      match.group(2)?.trim(),
+      enums,
+      notes,
     );
-    if (listedAsset != null) {
-      type = listedAsset;
-      multiple = true;
-      notes.add(
-        'Inferred "$parameterName" as a list of $listedAsset from inline '
-        'script guidance.',
-      );
-    } else if (itemAnnotation != null) {
-      multiple =
-          _multipleItemTypes.contains(type) ||
-          (type == 'text' && _isStrAnnotation(itemAnnotation));
-      if (!multiple && type != 'table') type = 'list';
-    } else if (type == 'list') {
-      final nameHint = _inferAssetPayloadTypeFromParameterName(parameterName);
-      if (nameHint != null) {
-        type = nameHint;
-        multiple = true;
-        notes.add(
-          'Inferred "$parameterName" as a list of $nameHint from the '
-          'parameter name.',
-        );
-      }
-    }
 
     fields.add(
       ContractInputField(
         id: 'draft-input-${index + 1}',
         parameterName: parameterName,
         label: _titleize(parameterName),
-        type: _fieldType(type),
+        type: _fieldType(field.type),
         isRequired: defaultValue == null,
-        controlHint: multiple
-            ? '${_buildControlHint(type)} (multiple)'
-            : _buildControlHint(type),
+        controlHint: field.multiple
+            ? '${_buildControlHint(field.type)} (multiple)'
+            : _buildControlHint(field.type),
         validationHint: '',
-        options: categoryResolution.options,
-        multiple: multiple,
+        options: field.options,
+        multiple: field.multiple,
       ),
     );
   }
@@ -201,39 +146,75 @@ List<ContractInputField> _buildInputFields(
   return fields;
 }
 
-String _resolveInputFieldType(
-  String parameterName,
-  String? annotation,
-  String? docstringBody,
-  List<String> notes,
-) {
-  final annotatedType = _mapAnnotationToFieldType(annotation);
-  // A DataFrame is a table of rows, never an uploaded file.
-  final isDataFrame = (annotation ?? '').toLowerCase().contains('dataframe');
-  if (annotatedType == 'table' && !isDataFrame) {
-    final docstringHint = _inferAssetPayloadTypeFromDocstringHints(
-      docstringBody,
-      parameterName,
-    );
-    if (docstringHint != null) {
-      notes.add(
-        'Inferred "$parameterName" as $docstringHint from inline script guidance.',
-      );
-      return docstringHint;
-    }
-    final nameHint = _inferAssetPayloadTypeFromParameterName(parameterName);
-    if (nameHint != null) {
-      notes.add(
-        'Inferred "$parameterName" as $nameHint from the parameter name.',
-      );
-      return nameHint;
-    }
-  }
-  return annotatedType;
+class _ResolvedField {
+  const _ResolvedField(
+    this.type, {
+    this.multiple = false,
+    this.options = const [],
+  });
+
+  final String type;
+  final bool multiple;
+  final List<String> options;
 }
 
-/// Item types a list input can collect one control at a time.
-const _multipleItemTypes = {'integer', 'decimal', 'category', 'image', 'file'};
+/// The field a parameter or an `Outputs` entry declares with [annotation].
+/// Types outside the supported set are read as text, with a note saying so.
+_ResolvedField _resolveField(
+  String name,
+  String? annotation,
+  _EnumExtractionResult enums,
+  List<String> notes,
+) {
+  final bare = _withoutOptional(annotation ?? '');
+  if (bare == imagesAlias) return const _ResolvedField('image', multiple: true);
+  if (bare == filesAlias) return const _ResolvedField('file', multiple: true);
+
+  final itemAnnotation = _listItemAnnotation(bare);
+  final category = _resolveCategoryOptionsFromAnnotation(
+    itemAnnotation ?? bare,
+    enums,
+  );
+  if (category.note != null) notes.add(category.note!);
+  if (category.options.isNotEmpty) {
+    return _ResolvedField(
+      'category',
+      multiple: itemAnnotation != null,
+      options: category.options,
+    );
+  }
+
+  // A list of rows, `list[dict]`, is a table.
+  if (itemAnnotation != null &&
+      _mapAnnotationToFieldType(itemAnnotation) == 'table') {
+    return const _ResolvedField('table');
+  }
+  final type = _mapAnnotationToFieldType(bare);
+  if (type == 'list' || (itemAnnotation != null && type != 'table')) {
+    notes.add(
+      'Lists of values are not supported, so "$name" is read as text. Use '
+      '$imagesAlias or $filesAlias for images and files.',
+    );
+    return const _ResolvedField('text');
+  }
+  return _ResolvedField(type);
+}
+
+/// [annotation] without the `Optional[...]`, `X | None` or quotes around it.
+String _withoutOptional(String annotation) {
+  var compact = annotation
+      .replaceAll(RegExp(r'\s+'), '')
+      .replaceAll(RegExp(r'''^["']|["']$'''), '');
+  final members = _splitTopLevel(
+    compact,
+    '|',
+  ).where((member) => member.toLowerCase() != 'none').toList();
+  if (members.length == 1) compact = members.single;
+  final optional = RegExp(
+    r'^(?:typing\.)?Optional\[(.*)\]$',
+  ).firstMatch(compact);
+  return optional == null ? compact : _withoutOptional(optional.group(1)!);
+}
 
 const _listAnnotationNames = {
   'list',
@@ -272,44 +253,40 @@ String? _listItemAnnotation(String? annotation) {
   return null;
 }
 
-bool _isStrAnnotation(String annotation) {
-  final lower = annotation.toLowerCase();
-  return lower.substring(lower.lastIndexOf('.') + 1) == 'str';
-}
-
 // --- Outputs --------------------------------------------------------------
+
+/// The class a script declares its outputs in, one `name: type` line each.
+const outputsClassName = 'Outputs';
 
 List<ContractOutputField> _buildOutputFields(
   String source,
   _TopLevelFunction entrypoint,
   List<String> notes,
 ) {
+  final declared = _declaredOutputs(source);
+  if (declared != null) {
+    final enums = _collectTopLevelEnumStringOptions(source);
+    return [
+      for (var i = 0; i < declared.length; i++)
+        _declaredOutputField(i, declared[i], enums, notes),
+    ];
+  }
+
   final literal = _entrypointSourceReturnLiteral(source, entrypoint.name);
   if (literal.keys.isNotEmpty) {
+    notes.add(
+      'Outputs were read from the return statement. Declare them in a class '
+      '$outputsClassName to set their types exactly.',
+    );
     return [
       for (var i = 0; i < literal.keys.length; i++)
         _literalOutputField(i, literal.keys[i], literal.typeHints),
     ];
   }
 
-  if (entrypoint.returnAnnotation != null) {
-    return [
-      ContractOutputField(
-        id: 'draft-output-1',
-        outputKey: 'result',
-        displayLabel: 'Result',
-        type: _fieldType(
-          _mapAnnotationToFieldType(entrypoint.returnAnnotation),
-        ),
-        presentationHint:
-            'Result inferred from the function return annotation.',
-      ),
-    ];
-  }
-
   notes.add(
-    'Output structure could not be inferred with confidence. A generic result '
-    'field was suggested.',
+    'Output structure could not be inferred. Declare the outputs in a class '
+    '$outputsClassName.',
   );
   return [
     ContractOutputField(
@@ -318,10 +295,58 @@ List<ContractOutputField> _buildOutputFields(
       displayLabel: 'Result',
       type: _fieldType('text'),
       presentationHint:
-          'Generic output suggested because no reliable return annotation was '
-          'found.',
+          'Generic output suggested because no outputs were declared.',
     ),
   ];
+}
+
+/// The `name: annotation` lines of a top-level `class Outputs`, or null when
+/// the script has none.
+List<(String, String)>? _declaredOutputs(String source) {
+  final header = RegExp(
+    '^class\\s+$outputsClassName\\s*(?:\\([^)]*\\))?\\s*:[^\\n]*\$',
+    multiLine: true,
+  ).firstMatch(source);
+  if (header == null) return null;
+  final body = _extractIndentedBlock(source, header.end);
+  final entries = <(String, String)>[];
+  var i = 0;
+  while (i < body.length) {
+    if (_isTripleQuotedStringStart(body, i)) {
+      i = _skipTripleQuotedString(body, i);
+      continue;
+    }
+    final lineEnd = body.indexOf('\n', i);
+    final line = body.substring(i, lineEnd == -1 ? body.length : lineEnd);
+    i = lineEnd == -1 ? body.length : lineEnd + 1;
+    final match = RegExp(
+      r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^=#]+?)\s*(?:=.*)?(?:#.*)?$',
+    ).firstMatch(line);
+    if (match != null) entries.add((match.group(1)!, match.group(2)!));
+  }
+  return entries;
+}
+
+ContractOutputField _declaredOutputField(
+  int index,
+  (String, String) entry,
+  _EnumExtractionResult enums,
+  List<String> notes,
+) {
+  final (key, annotation) = entry;
+  var field = _resolveField(key, annotation, enums, notes);
+  if (field.type == 'category') {
+    notes.add('Output "$key" is shown as text: choices only apply to inputs.');
+    field = const _ResolvedField('text');
+  }
+  return ContractOutputField(
+    id: 'draft-output-${index + 1}',
+    outputKey: key,
+    displayLabel: _titleize(key),
+    type: _fieldType(field.type),
+    presentationHint: 'Declared in class $outputsClassName.',
+    multiple: field.multiple,
+  );
 }
 
 /// An output from a literal return key. A `[]` suffix on its type hint marks a
@@ -396,9 +421,14 @@ List<_LiteralDictEntry> _extractTopLevelLiteralDictEntries(String body) {
 }
 
 _LiteralDictEntry? _parseLiteralDictEntry(String segment) {
+  // A comment after the previous entry's comma lands at the start of this one.
+  final withoutComments = segment.replaceAll(
+    RegExp(r'^\s*#.*$', multiLine: true),
+    '',
+  );
   final match = RegExp(
     r'''^["']([A-Za-z0-9_ -]+)["']\s*:\s*([\s\S]*)$''',
-  ).firstMatch(segment.trim());
+  ).firstMatch(withoutComments.trim());
   if (match == null || match.group(1) == null) return null;
   return _LiteralDictEntry(match.group(1)!, match.group(2)?.trim() ?? '');
 }
@@ -760,59 +790,6 @@ List<String> _splitTopLevel(String source, String separator) {
   }
   parts.add(buffer.toString());
   return parts;
-}
-
-String? _inferAssetPayloadTypeFromDocstringHints(
-  String? docstringBody,
-  String parameterName,
-) {
-  if (docstringBody == null) return null;
-  final pattern = RegExp(
-    '^\\s*[-*]\\s*${_escapeRegExp(parameterName)}\\s*->\\s*(image|file)\\b',
-    multiLine: true,
-    caseSensitive: false,
-  );
-  final match = pattern.firstMatch(docstringBody);
-  if (match == null) return null;
-  return match.group(1)!.toLowerCase() == 'image' ? 'image' : 'file';
-}
-
-/// Reads a `- name -> image[]` line, which declares a list of files.
-String? _inferAssetListFromDocstringHints(
-  String? docstringBody,
-  String parameterName,
-) {
-  if (docstringBody == null) return null;
-  final pattern = RegExp(
-    '^\\s*[-*]\\s*${_escapeRegExp(parameterName)}\\s*->\\s*(image|file)\\[\\]',
-    multiLine: true,
-    caseSensitive: false,
-  );
-  final match = pattern.firstMatch(docstringBody);
-  if (match == null) return null;
-  return match.group(1)!.toLowerCase();
-}
-
-String? _inferAssetPayloadTypeFromParameterName(String parameterName) {
-  final words = [
-    for (final word in _tokenizeIdentifier(parameterName))
-      word.length > 1 && word.endsWith('s')
-          ? word.substring(0, word.length - 1)
-          : word,
-  ];
-  if (words.any(imagePayloadWords.contains)) return 'image';
-  if (words.any(filePayloadWords.contains)) return 'file';
-  return null;
-}
-
-List<String> _tokenizeIdentifier(String identifier) {
-  final normalized = identifier
-      .replaceAllMapped(RegExp(r'([a-z0-9])([A-Z])'), (m) => '${m[1]}_${m[2]}')
-      .toLowerCase();
-  return normalized
-      .split(RegExp(r'[^a-z0-9]+'))
-      .where((p) => p.isNotEmpty)
-      .toList();
 }
 
 String _escapeRegExp(String value) =>
