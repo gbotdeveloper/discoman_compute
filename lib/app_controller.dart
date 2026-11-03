@@ -356,19 +356,6 @@ class AppController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Opens [url] in the browser.
-  Future<void> openUrl(String url) async {
-    try {
-      if (Platform.isMacOS) {
-        await Process.run('open', [url]);
-      } else if (Platform.isWindows) {
-        await Process.run('cmd', ['/c', 'start', '', url]);
-      } else {
-        await Process.run('xdg-open', [url]);
-      }
-    } catch (_) {}
-  }
-
   /// Installs [packages] into this computer's Python with pip.
   Future<PackageInstallResult> installMissingPackages(
     List<String> packages,
