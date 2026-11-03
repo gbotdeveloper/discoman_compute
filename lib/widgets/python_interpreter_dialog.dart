@@ -17,6 +17,7 @@ class PythonInterpreterDialog extends StatefulWidget {
     required this.initialPath,
     this.check,
     this.browse,
+    this.find,
     super.key,
   });
 
@@ -30,6 +31,9 @@ class PythonInterpreterDialog extends StatefulWidget {
   /// by tests, which cannot open a native picker.
   final Future<String?> Function()? browse;
 
+  /// Lists the Pythons on this computer. Injected by tests.
+  final List<FoundPython> Function()? find;
+
   @override
   State<PythonInterpreterDialog> createState() =>
       _PythonInterpreterDialogState();
@@ -42,6 +46,7 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
 
   InterpreterCheck? _result;
   bool _isChecking = false;
+  late final List<FoundPython> _found = (widget.find ?? findPythons)();
 
   @override
   void dispose() {
@@ -76,6 +81,11 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
     });
   }
 
+  void _pick(FoundPython python) {
+    setState(() => _path.text = python.path);
+    _check();
+  }
+
   static Future<String?> _openSystemPicker() async {
     final file = await openFile();
     return file?.path;
@@ -105,12 +115,41 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
               const SizedBox(height: 6),
               Text(
                 'The Python your scripts run with. It needs the packages they '
-                'import — a virtual environment is usually the right answer.',
+                'import: pick the one you use in Spyder or your terminal, such '
+                'as your Anaconda environment.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   height: 1.45,
                 ),
               ),
+              if (_found.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Found on this computer',
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 220),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final python in _found)
+                            _FoundPythonRow(
+                              python: python,
+                              selected: _path.text.trim() == python.path,
+                              onTap: () => _pick(python),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               TextField(
                 controller: _path,
@@ -212,6 +251,64 @@ class _CheckResult extends StatelessWidget {
                       : colorScheme.onErrorContainer,
                   height: 1.4,
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FoundPythonRow extends StatelessWidget {
+  const _FoundPythonRow({
+    required this.python,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final FoundPython python;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 18,
+              color: selected ? colorScheme.primary : colorScheme.outline,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    python.label,
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    python.path,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
