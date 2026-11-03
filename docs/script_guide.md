@@ -142,8 +142,10 @@ is now, and everything else in your script's folder is linked into it, so:
 For files somewhere else, use their full path.
 
 Other programs (MATLAB, conda tools, command line tools) are found through the
-same PATH your terminal uses. If one is still not found, add its folder under
-**Extra PATH** in Discoman Compute, or call it by its full path. Always pass a
+same PATH your terminal uses: if typing its name in a terminal runs it, your
+script can run it too. If it is not found there, call it by its full path. On
+a Mac, MATLAB is usually not on the terminal's PATH, so call it as
+`/Applications/MATLAB_R2024b.app/bin/matlab` (use your release). Always pass a
 `timeout` and capture its output, so a stuck program fails the run instead of
 holding it:
 

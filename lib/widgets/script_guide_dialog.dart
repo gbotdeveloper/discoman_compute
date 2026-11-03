@@ -134,8 +134,8 @@ class _ScriptGuideDialogState extends State<ScriptGuideDialog> {
                         'Each run gets its own folder with your script and '
                         'links to everything beside it, so imports of sibling '
                         'files, relative paths and other scripts just work. '
-                        'Programs are found through your terminal\'s PATH, '
-                        'plus Extra PATH. Write outputs next to the input, '
+                        'Programs are found through your terminal\'s PATH. '
+                        'Write outputs next to the input, '
                         'never over files in your own folder: runs can go at '
                         'once. Each output may be up to 20 MB, at most 50 '
                         'files and 100 MB per run.',

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import 'action_button.dart';
-import 'extra_path_dialog.dart';
 import 'install_python_dialog.dart';
 import 'parallel_runs_dialog.dart';
 import 'python_interpreter_dialog.dart';
@@ -66,16 +65,6 @@ class WorkerPanel extends StatelessWidget {
                 : () => _changeParallelRuns(context, controller),
             changeHint: isRunning ? 'Stop the worker to change this' : null,
           ),
-          _DetailRow(
-            label: 'Extra PATH',
-            value: controller.extraPath.isEmpty
-                ? 'None — runs use your terminal\'s PATH'
-                : controller.extraPath.join('\n'),
-            onChange: isRunning || controller.isBusy
-                ? null
-                : () => _changeExtraPath(context, controller),
-            changeHint: isRunning ? 'Stop the worker to change this' : null,
-          ),
           _DetailRow(label: 'Server', value: controller.config.serverUrl),
           const SizedBox(height: 16),
           _WorkerLog(lines: controller.log),
@@ -104,18 +93,6 @@ Future<void> _changeInterpreter(
   );
   if (picked == null) return;
   await controller.setPythonPath(picked);
-}
-
-Future<void> _changeExtraPath(
-  BuildContext context,
-  AppController controller,
-) async {
-  final picked = await showDialog<List<String>>(
-    context: context,
-    builder: (context) => ExtraPathDialog(initial: controller.extraPath),
-  );
-  if (picked == null) return;
-  controller.setExtraPath(picked);
 }
 
 String _parallelRunsLabel(AppController controller) {

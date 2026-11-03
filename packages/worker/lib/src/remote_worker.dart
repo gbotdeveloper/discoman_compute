@@ -261,11 +261,7 @@ class RemoteWorker {
     final processor = ExecutionProcessor(
       client: session.client,
       workerId: workerId,
-      pythonRunner: PythonRunner(
-        _config.pythonPath,
-        measureUsage: true,
-        extraPath: settingsStore.load().extraPath,
-      ),
+      pythonRunner: PythonRunner(_config.pythonPath, measureUsage: true),
       heartbeat: ExecutionHeartbeat(
         session.client,
         workerId,

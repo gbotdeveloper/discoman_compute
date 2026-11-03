@@ -55,10 +55,9 @@ Future<String?> _readPath(String shell, Duration timeout) async {
   }
 }
 
-/// The PATH a run gets: [extraPath] first, then the login shell's, then the
-/// inherited one, each folder once.
+/// The PATH a run gets: the login shell's, then the inherited one, each
+/// folder once.
 Map<String, String> runEnvironment({
-  List<String> extraPath = const [],
   Map<String, String>? inherited,
   String? loginShellPath,
 }) {
@@ -69,8 +68,6 @@ Map<String, String> runEnvironment({
     orElse: () => 'PATH',
   );
   final folders = <String>{
-    for (final folder in extraPath)
-      if (folder.trim().isNotEmpty) folder.trim(),
     if (!Platform.isWindows)
       for (final folder in (loginShellPath ?? _loginShellPath ?? '').split(
         separator,
