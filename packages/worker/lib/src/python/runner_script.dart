@@ -415,6 +415,9 @@ def main():
                 f"Entrypoint '{entrypoint_name}' is not callable."
             )
 
+        # Ready before the script runs, so it can save into "out/..." without
+        # making the folder, which the cloud's allowed imports cannot.
+        OUT_DIR.mkdir(exist_ok=True)
         result = entrypoint(**_coerce_inputs(entrypoint, inputs))
         outputs = _outputs(result, output_types)
         _check_totals(outputs)
