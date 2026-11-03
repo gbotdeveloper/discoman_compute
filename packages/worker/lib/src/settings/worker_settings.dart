@@ -12,6 +12,7 @@ class WorkerSettings {
     this.externalCode = const {},
     this.parallelRuns = 1,
     this.projectRunLimits = const {},
+    this.extraPath = const [],
   });
 
   /// The Python interpreter to run scripts with, or null when the creator has
@@ -38,12 +39,17 @@ class WorkerSettings {
   /// left out may use every worker.
   final Map<String, int> projectRunLimits;
 
+  /// Folders put in front of PATH for every run, for programs the scripts
+  /// call that PATH does not find.
+  final List<String> extraPath;
+
   WorkerSettings copyWith({
     String? pythonPath,
     Set<String>? pausedProjectIds,
     Map<String, List<ExternalCodeSource>>? externalCode,
     int? parallelRuns,
     Map<String, int>? projectRunLimits,
+    List<String>? extraPath,
   }) {
     return WorkerSettings(
       pythonPath: pythonPath ?? this.pythonPath,
@@ -51,6 +57,7 @@ class WorkerSettings {
       externalCode: externalCode ?? this.externalCode,
       parallelRuns: parallelRuns ?? this.parallelRuns,
       projectRunLimits: projectRunLimits ?? this.projectRunLimits,
+      extraPath: extraPath ?? this.extraPath,
     );
   }
 }
@@ -88,6 +95,7 @@ class WorkerSettingsStore {
       final external = decoded['externalCode'];
       final parallel = decoded['parallelRuns'];
       final limits = decoded['projectRunLimits'];
+      final extraPath = decoded['extraPath'];
       return WorkerSettings(
         pythonPath: (python is String && python.trim().isNotEmpty)
             ? python.trim()
@@ -118,6 +126,13 @@ class WorkerSettingsStore {
                     entry.key as String: entry.value as int,
               }
             : const {},
+        extraPath: extraPath is List
+            ? [
+                for (final folder in extraPath)
+                  if (folder is String && folder.trim().isNotEmpty)
+                    folder.trim(),
+              ]
+            : const [],
       );
     } catch (_) {
       return const WorkerSettings();
@@ -148,6 +163,7 @@ class WorkerSettingsStore {
         if (settings.parallelRuns > 1) 'parallelRuns': settings.parallelRuns,
         if (settings.projectRunLimits.isNotEmpty)
           'projectRunLimits': settings.projectRunLimits,
+        if (settings.extraPath.isNotEmpty) 'extraPath': settings.extraPath,
       }),
       flush: true,
     );
