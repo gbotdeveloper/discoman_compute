@@ -11,6 +11,7 @@ import 'machine_check.dart';
 import 'machine_id.dart';
 import 'python/python_runner.dart';
 import 'python/run_environment.dart';
+import 'python/run_folder.dart';
 import 'scripts/script_store.dart';
 import 'scripts/script_sync.dart';
 import 'settings/usage_store.dart';
@@ -193,6 +194,7 @@ class RemoteWorker {
     }
 
     await loadLoginShellPath();
+    deleteStaleRunFolders();
     final parallelRuns = _parallelRuns ?? settingsStore.load().parallelRuns;
     final registrations = <WorkerRegistration>[];
     try {
