@@ -158,6 +158,30 @@ class RunFolder {
   void delete() => deleteWithoutFollowingLinks(directory);
 }
 
+/// Deletes run folders a run left behind when the app quit or crashed
+/// mid-run; they can hold visitors' files. Folders younger than [olderThan]
+/// are kept, as another worker on this computer may still be using them.
+void deleteStaleRunFolders({
+  Directory? root,
+  Duration olderThan = const Duration(hours: 1),
+}) {
+  final parent = root ?? Directory.systemTemp;
+  final cutoff = DateTime.now().subtract(olderThan);
+  try {
+    for (final entry in parent.listSync(followLinks: false)) {
+      final name = _baseName(entry.path);
+      if (entry is! Directory ||
+          !(name.startsWith('discoman_run_') ||
+              name.startsWith('discoman_compute_'))) {
+        continue;
+      }
+      if (entry.statSync().modified.isBefore(cutoff)) {
+        deleteWithoutFollowingLinks(entry);
+      }
+    }
+  } catch (_) {}
+}
+
 /// Deletes [dir] and what it holds, removing links rather than what they
 /// point at.
 void deleteWithoutFollowingLinks(Directory dir) {
