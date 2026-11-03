@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 import 'package:http/http.dart' as http;
 
 import 'heartbeat.dart';
+import 'python/contract_extractor.dart';
 import 'python/pip_names.dart';
 import 'python/python_runner.dart';
 import 'python/run_usage.dart';
@@ -81,11 +82,19 @@ class ExecutionProcessor {
 
     final inputs = _decodeInputs(claimed.inputsJson);
 
+    // Input files are downloaded into the run folder and outputs read from it,
+    // so it lives as long as the whole run.
+    final runDir = Directory.systemTemp.createTempSync('discoman_compute_');
     heartbeat.start(claimed.executionId);
     try {
-      await _runAndReport(claimed, source, inputs);
+      await _runAndReport(claimed, source, inputs, runDir);
     } finally {
       heartbeat.stop();
+      try {
+        runDir.deleteSync(recursive: true);
+      } catch (_) {
+        // Best effort cleanup.
+      }
     }
   }
 
@@ -93,9 +102,10 @@ class ExecutionProcessor {
     ClaimedExecution claimed,
     String source,
     Map<String, dynamic> inputs,
+    Directory runDir,
   ) async {
     try {
-      inputs = await _downloadInputFiles(inputs);
+      inputs = await _downloadInputFiles(inputs, runDir);
     } catch (error) {
       await _report(
         claimed.executionId,
@@ -118,6 +128,8 @@ class ExecutionProcessor {
       inputs: inputs,
       timeoutSeconds: claimed.timeoutSeconds,
       cancelRequested: () => heartbeat.cancelRequested,
+      outputTypes: _declaredOutputTypes(source),
+      runDirectory: runDir,
     );
     final usage = result.usage;
     if (usage != null) {
@@ -229,6 +241,15 @@ class ExecutionProcessor {
     } catch (_) {}
   }
 
+  Map<String, String>? _declaredOutputTypes(String source) {
+    try {
+      return declaredOutputTypes(source);
+    } catch (_) {
+      // The runner then reads the returned values as they are.
+      return null;
+    }
+  }
+
   /// Uploads every asset-shaped output value and replaces it with the storage
   /// reference descriptor the history writer expects. A list of files is
   /// uploaded file by file, each named after the key and its position.
@@ -311,7 +332,7 @@ class ExecutionProcessor {
                 'x-ms-blob-type': 'BlockBlob',
                 'Content-Type': asset['mimeType'] as String,
               },
-              body: base64Decode(asset['base64'] as String),
+              body: await File(asset['path'] as String).readAsBytes(),
             )
             .timeout(const Duration(minutes: 2));
         if (response.statusCode != 201) {
@@ -337,30 +358,36 @@ class ExecutionProcessor {
         fileExtension: asset['extension'] as String,
         mimeType: asset['mimeType'] as String,
         sizeBytes: asset['sizeBytes'] as int,
-        base64: asset['base64'] as String,
+        base64: base64Encode(await File(asset['path'] as String).readAsBytes()),
       ),
     );
   }
 
-  /// Input files arrive as links to storage; Python receives them inline, as
-  /// before. A list of files is downloaded file by file.
+  /// Input files arrive as links to storage. Each is downloaded into
+  /// [runDir] under its own name, and Python is given its path; a list of
+  /// files becomes a list of paths.
   Future<Map<String, dynamic>> _downloadInputFiles(
     Map<String, dynamic> inputs,
+    Directory runDir,
   ) async {
+    var count = 0;
+    Future<String> save(String key, Map<dynamic, dynamic> value) =>
+        _saveInputFile(key, value, runDir, ++count);
+
     final result = <String, dynamic>{};
     for (final entry in inputs.entries) {
       final value = entry.value;
-      if (_isLinkedInputFile(value)) {
-        result[entry.key] = await _downloadInputFile(
+      if (_isInputFile(value)) {
+        result[entry.key] = await save(
           entry.key,
           value as Map<dynamic, dynamic>,
         );
       } else if (value is List &&
           value.isNotEmpty &&
-          value.every(_isLinkedInputFile)) {
+          value.every(_isInputFile)) {
         result[entry.key] = [
           for (final item in value)
-            await _downloadInputFile(entry.key, item as Map<dynamic, dynamic>),
+            await save(entry.key, item as Map<dynamic, dynamic>),
         ];
       } else {
         result[entry.key] = value;
@@ -369,36 +396,41 @@ class ExecutionProcessor {
     return result;
   }
 
-  bool _isLinkedInputFile(dynamic value) =>
+  bool _isInputFile(dynamic value) =>
       value is Map &&
       (value['kind'] == 'image' || value['kind'] == 'file') &&
-      value['base64'] is! String &&
-      value['downloadUrl'] is String;
+      (value['downloadUrl'] is String || value['base64'] is String);
 
-  Future<Map<String, dynamic>> _downloadInputFile(
+  Future<String> _saveInputFile(
     String key,
     Map<dynamic, dynamic> value,
+    Directory runDir,
+    int position,
   ) async {
-    final response = await _http
-        .get(Uri.parse(value['downloadUrl'] as String))
-        .timeout(const Duration(minutes: 2));
-    if (response.statusCode != 200) {
-      throw StateError('"$key" (HTTP ${response.statusCode})');
+    final List<int> bytes;
+    if (value['base64'] case final String inline) {
+      bytes = base64Decode(inline);
+    } else {
+      final response = await _http
+          .get(Uri.parse(value['downloadUrl'] as String))
+          .timeout(const Duration(minutes: 2));
+      if (response.statusCode != 200) {
+        throw StateError('"$key" (HTTP ${response.statusCode})');
+      }
+      bytes = response.bodyBytes;
     }
-    return {
-      'kind': value['kind'],
-      'name': value['name'],
-      'extension': value['extension'],
-      'mimeType': value['mimeType'],
-      'sizeBytes': response.bodyBytes.length,
-      'base64': base64Encode(response.bodyBytes),
-    };
+    final sep = Platform.pathSeparator;
+    final dir = Directory('${runDir.path}${sep}inputs$sep$position')
+      ..createSync(recursive: true);
+    final file = File('${dir.path}$sep${inputFileName(value)}');
+    await file.writeAsBytes(bytes);
+    return file.path;
   }
 
   bool _isAssetOutput(dynamic value) {
     return value is Map &&
         (value['kind'] == 'image' || value['kind'] == 'file') &&
-        value['base64'] is String &&
+        value['path'] is String &&
         value['name'] is String &&
         value['extension'] is String &&
         value['mimeType'] is String &&
@@ -471,4 +503,29 @@ class _MissingLocalScript implements Exception {
   _MissingLocalScript(this.message);
 
   final String message;
+}
+
+/// The name an input file is saved under: the one it was uploaded with, minus
+/// anything a file name cannot hold on Windows or macOS.
+String inputFileName(Map<dynamic, dynamic> value) {
+  final extension = '${value['extension'] ?? ''}'.replaceAll(
+    RegExp(r'[^A-Za-z0-9]'),
+    '',
+  );
+  var name = '${value['name'] ?? ''}'
+      .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
+      .trim()
+      .replaceAll(RegExp(r'^[. ]+|[. ]+$'), '');
+  if (RegExp(
+    r'^(con|prn|aux|nul|com\d|lpt\d)(\.|$)',
+    caseSensitive: false,
+  ).hasMatch(name)) {
+    name = '_$name';
+  }
+  if (name.isEmpty) name = 'input';
+  if (extension.isNotEmpty &&
+      !name.toLowerCase().endsWith('.${extension.toLowerCase()}')) {
+    name = '$name.$extension';
+  }
+  return name;
 }

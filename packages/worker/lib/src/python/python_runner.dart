@@ -58,9 +58,9 @@ class PythonRunResult {
 }
 
 /// Runs a single claimed execution's Python source with a local interpreter,
-/// a faithful port of the legacy executor's subprocess protocol: user_script.py
-/// + runner.py in a throwaway temp dir, the job JSON on stdin, the result read
-/// back from result.json, stderr collected as logs.
+/// following the legacy executor's subprocess protocol: user_script.py +
+/// runner.py in a run folder, the job JSON on stdin, the result read back from
+/// result.json, output collected as logs.
 class PythonRunner {
   PythonRunner(this.pythonPath, {this.measureUsage = false});
 
@@ -94,8 +94,13 @@ class PythonRunner {
     required Map<String, dynamic> inputs,
     required int timeoutSeconds,
     required bool Function() cancelRequested,
+    Map<String, String>? outputTypes,
+    Directory? runDirectory,
   }) async {
-    final tempDir = Directory.systemTemp.createTempSync('discoman_compute_');
+    // A caller that gives the folder keeps it, to read the output files from.
+    final tempDir =
+        runDirectory ??
+        Directory.systemTemp.createTempSync('discoman_compute_');
     final stopwatch = Stopwatch()..start();
     try {
       File(
@@ -124,7 +129,11 @@ class PythonRunner {
           process,
           tempDir,
           stopwatch,
-          job: {'entrypointName': entrypointName, 'inputs': inputs},
+          job: {
+            'entrypointName': entrypointName,
+            'inputs': inputs,
+            'outputTypes': ?outputTypes,
+          },
           timeoutSeconds: timeoutSeconds,
           cancelRequested: cancelRequested,
         );
@@ -132,10 +141,12 @@ class PythonRunner {
         _running.remove(process);
       }
     } finally {
-      try {
-        tempDir.deleteSync(recursive: true);
-      } catch (_) {
-        // Best effort cleanup.
+      if (runDirectory == null) {
+        try {
+          tempDir.deleteSync(recursive: true);
+        } catch (_) {
+          // Best effort cleanup.
+        }
       }
     }
   }

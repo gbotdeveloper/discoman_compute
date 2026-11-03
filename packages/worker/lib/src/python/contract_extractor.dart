@@ -300,6 +300,18 @@ List<ContractOutputField> _buildOutputFields(
   ];
 }
 
+/// Each output a script declares in its `class Outputs`, by key, with the
+/// [PythonFieldType] name it is shown as. Null when the script declares none.
+Map<String, String>? declaredOutputTypes(String source) {
+  final declared = _declaredOutputs(source);
+  if (declared == null) return null;
+  final enums = _collectTopLevelEnumStringOptions(source);
+  return {
+    for (final (i, entry) in declared.indexed)
+      entry.$1: _declaredOutputField(i, entry, enums, []).type.name,
+  };
+}
+
 /// The `name: annotation` lines of a top-level `class Outputs`, or null when
 /// the script has none.
 List<(String, String)>? _declaredOutputs(String source) {
