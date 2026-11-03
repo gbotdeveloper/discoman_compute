@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:discoman_worker/src/python/packages.dart';
@@ -67,4 +68,21 @@ void main() {
     },
     skip: hasPython ? false : 'python3 is not installed',
   );
+
+  test('a module beside the script is not missing', () async {
+    final dir = Directory.systemTemp.createTempSync('discoman_packages');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    File('${dir.path}/helper.py').writeAsStringSync('');
+    Directory('${dir.path}/tools').createSync();
+
+    final packages = await missingPackagesFor(
+      '/usr/bin/python3',
+      'import helper\nimport tools.paths\nimport cv2\n',
+      scriptDir: dir.path,
+      runProcess: (executable, arguments) async =>
+          ProcessResult(0, 0, jsonEncode(arguments.skip(2).toList()), ''),
+    );
+
+    expect(packages, ['opencv-python']);
+  });
 }

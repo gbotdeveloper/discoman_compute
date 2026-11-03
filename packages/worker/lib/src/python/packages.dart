@@ -4,12 +4,22 @@ import 'dart:io';
 
 import 'imports.dart';
 import 'pip_names.dart';
+import 'run_environment.dart';
 
 typedef RunProcess =
     Future<ProcessResult> Function(String executable, List<String> arguments);
 
 typedef StartProcess =
     Future<Process> Function(String executable, List<String> arguments);
+
+/// Whether [module] is a `<module>.py` file or a `<module>/` package in
+/// [scriptDir], the folder the script is kept in, so it is the creator's own
+/// code rather than something pip installs.
+bool isLocalModule(String module, String? scriptDir) {
+  if (scriptDir == null) return false;
+  final base = '$scriptDir${Platform.pathSeparator}$module';
+  return File('$base.py').existsSync() || Directory(base).existsSync();
+}
 
 /// Which of [modules] the interpreter at [pythonPath] cannot import. Only
 /// looks them up, so no module code runs. Empty when the lookup itself fails.
@@ -19,7 +29,16 @@ Future<Set<String>> findMissingModules(
   RunProcess? runProcess,
 }) async {
   if (modules.isEmpty) return const {};
-  final run = runProcess ?? (exe, args) => Process.run(exe, args);
+  // Looked up from a neutral folder: wherever this program was started from
+  // says nothing about what a run can import.
+  final run =
+      runProcess ??
+      (exe, args) => Process.run(
+        exe,
+        args,
+        workingDirectory: Directory.systemTemp.path,
+        environment: runEnvironment(),
+      );
   const lookup =
       'import importlib.util, json, sys\n'
       'print(json.dumps([m for m in sys.argv[1:] '
@@ -35,13 +54,18 @@ Future<Set<String>> findMissingModules(
 }
 
 /// The pip packages [source] needs that the interpreter at [pythonPath]
-/// does not have.
+/// does not have. Modules beside the script in [scriptDir] are its own, and
+/// never counted.
 Future<List<String>> missingPackagesFor(
   String pythonPath,
   String source, {
+  String? scriptDir,
   RunProcess? runProcess,
 }) async {
-  final modules = importedModules(source);
+  final modules = [
+    for (final module in importedModules(source))
+      if (!isLocalModule(module, scriptDir)) module,
+  ];
   final missing = await findMissingModules(
     pythonPath,
     modules,
@@ -72,7 +96,9 @@ Future<PackageInstallResult> installPackages(
   required void Function(String line) onOutput,
   StartProcess? startProcess,
 }) async {
-  final start = startProcess ?? (exe, args) => Process.start(exe, args);
+  final start =
+      startProcess ??
+      (exe, args) => Process.start(exe, args, environment: runEnvironment());
   final Process process;
   try {
     process = await start(pythonPath, [

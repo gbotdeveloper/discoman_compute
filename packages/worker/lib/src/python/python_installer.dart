@@ -228,7 +228,9 @@ class PythonInstaller {
       final guessed = pipPackagesFor(modules.where(missing.contains))
           .where(
             (name) =>
-                !basePythonPackages.contains(name) && !packages.contains(name),
+                !basePythonPackages.contains(name) &&
+                !packages.contains(name) &&
+                manualInstallNote(name) == null,
           )
           .toList();
       final confirmed = guessed.isEmpty || confirmGuessed == null
