@@ -1,11 +1,13 @@
 import 'package:discoman_client/discoman_client.dart';
-import 'package:discoman_worker/discoman_compute.dart' show ExternalCodeSource;
+import 'package:discoman_worker/discoman_compute.dart'
+    show ExternalCodeSource, manualInstallNote;
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import 'action_button.dart';
 import 'error_banner.dart';
 import 'parallel_runs_dialog.dart';
+import 'script_guide_dialog.dart';
 import 'section_card.dart';
 
 /// Everything about one project on this computer: whether it runs here, how
@@ -99,10 +101,21 @@ class _ProjectBody extends StatelessWidget {
           const SizedBox(height: 20),
           SectionCard(
             title: 'Script',
-            trailing: ActionButton(
-              label: isLinked ? 'Replace script' : 'Link a script',
-              isPrimary: !isLinked,
-              onPressed: controller.isBusy ? null : onLink,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ActionButton(
+                  label: 'How to write a script',
+                  isPrimary: false,
+                  onPressed: () => showScriptGuide(context, controller),
+                ),
+                const SizedBox(width: 10),
+                ActionButton(
+                  label: isLinked ? 'Replace script' : 'Link a script',
+                  isPrimary: !isLinked,
+                  onPressed: controller.isBusy ? null : onLink,
+                ),
+              ],
             ),
             child: _ScriptDetails(
               controller: controller,
@@ -331,16 +344,55 @@ class _ScriptDetails extends StatelessWidget {
     final id = project.projectId;
     final isLinked = controller.linkedProjectIds.contains(id);
     final missing = controller.missingPackagesByProject[id] ?? const [];
+    final installable = [
+      for (final package in missing)
+        if (manualInstallNote(package) == null) package,
+    ];
+    final origin = isLinked ? controller.scriptOrigins[id] : null;
+    final problem = isLinked ? controller.scriptProblems[id] : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _MutedText(
-          isLinked
-              ? 'Its script is on this computer.'
-              : 'No script on this computer yet.',
-        ),
+        if (origin == null)
+          _MutedText(
+            isLinked
+                ? 'Its script is on this computer.'
+                : 'No script on this computer yet.',
+          )
+        else ...[
+          const _MutedText(
+            'Runs use this script as it is, with the files beside it:',
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: SelectableText(
+                  origin.path,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'Menlo',
+                    fontFamilyFallback: const ['Consolas', 'monospace'],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              ActionButton(
+                label: 'Show in folder',
+                isPrimary: false,
+                onPressed: () => controller.showInFolder(origin.path),
+              ),
+            ],
+          ),
+        ],
+        if (problem != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            problem,
+            style: textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+          ),
+        ],
         if (project.keepsScriptInDiscoman ?? false) ...[
           const SizedBox(height: 8),
           const _MutedText(
@@ -359,14 +411,23 @@ class _ScriptDetails extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
-              ActionButton(
-                label: 'Install',
-                isPrimary: false,
-                onPressed: controller.isBusy ? null : () => onInstall(missing),
-              ),
+              if (installable.isNotEmpty) ...[
+                const SizedBox(width: 20),
+                ActionButton(
+                  label: 'Install',
+                  isPrimary: false,
+                  onPressed: controller.isBusy
+                      ? null
+                      : () => onInstall(installable),
+                ),
+              ],
             ],
           ),
+          for (final package in missing)
+            if (manualInstallNote(package) case final note?) ...[
+              const SizedBox(height: 8),
+              _MutedText(note),
+            ],
         ],
       ],
     );

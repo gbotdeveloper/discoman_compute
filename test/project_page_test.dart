@@ -5,6 +5,7 @@ import 'package:discoman_compute/app_controller.dart';
 import 'package:discoman_compute/app_theme.dart';
 import 'package:discoman_compute/widgets/project_page.dart';
 import 'package:discoman_compute/widgets/projects_panel.dart';
+import 'package:discoman_compute/widgets/script_guide_dialog.dart';
 import 'package:discoman_worker/discoman_compute.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,7 @@ void main() {
     WidgetTester tester, {
     WorkerSettings settings = const WorkerSettings(),
     Map<String, List<RunUsage>> usage = const {},
+    void Function(AppController controller)? configure,
   }) async {
     tester.view.physicalSize = const Size(1200, 1400);
     tester.view.devicePixelRatio = 1;
@@ -37,6 +39,7 @@ void main() {
       ..linkedProjectIds = {'p1'}
       ..machine = const MachineResources(cores: 9, ramBytes: 16 * _gb)
       ..usageByProject = usage;
+    configure?.call(controller);
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
@@ -138,5 +141,68 @@ void main() {
     );
     await tester.tap(find.text('BMI Index'));
     expect(opened, isTrue);
+  });
+
+  testWidgets('shows where the script runs from and why it cannot', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      configure: (controller) => controller
+        ..scriptOrigins = {
+          'p1': const ScriptOrigin(
+            path: '/work/bmi/bmi.py',
+            fingerprint: 'sha256:1',
+          ),
+        }
+        ..scriptProblems = {
+          'p1':
+              "The script's inputs or outputs changed — link it again in "
+              'Discoman Compute.',
+        }
+        ..missingPackagesByProject = {
+          'p1': ['matlabengine'],
+        },
+    );
+
+    expect(find.text('/work/bmi/bmi.py'), findsOneWidget);
+    expect(find.text('Show in folder'), findsOneWidget);
+    expect(find.textContaining('inputs or outputs changed'), findsOneWidget);
+    expect(
+      find.textContaining('must match your MATLAB release'),
+      findsOneWidget,
+    );
+    expect(find.text('Install'), findsNothing);
+  });
+
+  testWidgets('the script guide saves the example script', (tester) async {
+    final controller = await pump(tester);
+    final temp = Directory.systemTemp.createTempSync('script_guide_test');
+    addTearDown(() => temp.deleteSync(recursive: true));
+    final target = '${temp.path}/example.py';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(Brightness.light),
+        home: ScriptGuideDialog(
+          controller: controller,
+          saveTo: () async => target,
+        ),
+      ),
+    );
+    await tester.tap(find.text('Save example script'));
+    for (
+      var i = 0;
+      i < 50 && find.text('Saved to $target').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+
+    expect(File(target).readAsStringSync(), contains('- photos -> image[]'));
+    expect(find.text('Saved to $target'), findsOneWidget);
   });
 }

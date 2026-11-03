@@ -1,8 +1,10 @@
 import 'package:discoman_client/discoman_client.dart';
+import 'package:discoman_worker/discoman_compute.dart' show manualInstallNote;
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import 'action_button.dart';
+import 'script_guide_dialog.dart';
 import 'section_card.dart';
 
 /// The creator's projects, and which of them run a script from this machine.
@@ -47,11 +49,22 @@ class ProjectsPanel extends StatelessWidget {
 
     return SectionCard(
       title: 'Your projects',
-      trailing: ActionButton(
-        label: 'Refresh',
-        icon: Icons.refresh_rounded,
-        isPrimary: false,
-        onPressed: controller.isBusy ? null : controller.refreshProjects,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ActionButton(
+            label: 'How to write a script',
+            isPrimary: false,
+            onPressed: () => showScriptGuide(context, controller),
+          ),
+          const SizedBox(width: 10),
+          ActionButton(
+            label: 'Refresh',
+            icon: Icons.refresh_rounded,
+            isPrimary: false,
+            onPressed: controller.isBusy ? null : controller.refreshProjects,
+          ),
+        ],
       ),
       child: controller.projects.isEmpty
           ? _EmptyProjects(isBusy: controller.isBusy)
@@ -93,13 +106,16 @@ class ProjectsPanel extends StatelessWidget {
       isServed: !controller.pausedProjectIds.contains(project.projectId),
       missingPackages:
           controller.missingPackagesByProject[project.projectId] ?? const [],
+      scriptProblem: controller.scriptProblems[project.projectId],
       onLink: () => onLink(project),
       onInstall: onInstall == null
           ? null
-          : () => onInstall!(
-              controller.missingPackagesByProject[project.projectId] ??
-                  const [],
-            ),
+          : () => onInstall!([
+              for (final package
+                  in controller.missingPackagesByProject[project.projectId] ??
+                      const <String>[])
+                if (manualInstallNote(package) == null) package,
+            ]),
       externalCodeCount:
           controller.externalCode[project.projectId]?.length ?? 0,
       onEditExternalCode: onEditExternalCode == null
@@ -193,6 +209,7 @@ class ProjectRow extends StatelessWidget {
     required this.onLink,
     required this.onServedChanged,
     this.missingPackages = const [],
+    this.scriptProblem,
     this.onInstall,
     this.externalCodeCount = 0,
     this.onEditExternalCode,
@@ -223,6 +240,9 @@ class ProjectRow extends StatelessWidget {
   /// Pip packages this project's script needs and this computer lacks.
   final List<String> missingPackages;
   final VoidCallback? onInstall;
+
+  /// Why the linked script cannot run as it is now.
+  final String? scriptProblem;
 
   /// How many pieces of code outside Discoman are recorded for it here.
   final int externalCodeCount;
@@ -394,6 +414,28 @@ class ProjectRow extends StatelessWidget {
                       ],
                     ),
                   ],
+                  if (canClaim && scriptProblem != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: iconSize,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            scriptProblem!,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (canClaim && missingPackages.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Row(
@@ -412,12 +454,16 @@ class ProjectRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        ActionButton(
-                          label: 'Install',
-                          isPrimary: false,
-                          onPressed: isBusy ? null : onInstall,
-                        ),
+                        if (missingPackages.any(
+                          (package) => manualInstallNote(package) == null,
+                        )) ...[
+                          const SizedBox(width: 20),
+                          ActionButton(
+                            label: 'Install',
+                            isPrimary: false,
+                            onPressed: isBusy ? null : onInstall,
+                          ),
+                        ],
                       ],
                     ),
                   ],

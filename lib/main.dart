@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:discoman_worker/discoman_compute.dart'
+    show PythonRunner, loadLoginShellPath;
 import 'package:flutter/material.dart';
 
 import 'app_controller.dart';
@@ -6,6 +11,8 @@ import 'widgets/home_page.dart';
 import 'widgets/sign_in_page.dart';
 
 void main() {
+  // Read before the first run, so runs find what the terminal finds.
+  unawaited(loadLoginShellPath());
   runApp(const DiscomanComputeApp());
 }
 
@@ -19,14 +26,24 @@ class DiscomanComputeApp extends StatefulWidget {
 class _DiscomanComputeAppState extends State<DiscomanComputeApp> {
   final _controller = AppController();
 
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    // Runs are in process groups of their own, so they would outlive the app.
+    _lifecycle = AppLifecycleListener(
+      onExitRequested: () async {
+        PythonRunner.killAll();
+        return AppExitResponse.exit;
+      },
+    );
     _controller.restoreSignIn();
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _controller.dispose();
     super.dispose();
   }

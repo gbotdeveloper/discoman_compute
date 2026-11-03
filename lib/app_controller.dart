@@ -85,6 +85,7 @@ class AppController extends ChangeNotifier {
   StreamSubscription<String>? _logSubscription;
   StreamSubscription<RemoteWorkerState>? _stateSubscription;
   StreamSubscription<String>? _measuredSubscription;
+  StreamSubscription<String>? _scriptCheckedSubscription;
 
   /// The signed-in creator's email, or null while signed out.
   String? signedInAs;
@@ -121,6 +122,13 @@ class AppController extends ChangeNotifier {
   /// Pip packages each linked script needs that this computer's Python
   /// lacks. Projects missing nothing are left out.
   Map<String, List<String>> missingPackagesByProject = const {};
+
+  /// Where each project's script was linked from on this computer. Projects
+  /// linked before that was recorded are left out.
+  Map<String, ScriptOrigin> scriptOrigins = const {};
+
+  /// Why a project's linked script cannot run as it is now, by project.
+  Map<String, String> scriptProblems = const {};
 
   /// Whether a pip install is running.
   bool isInstalling = false;
@@ -266,6 +274,7 @@ class AppController extends ChangeNotifier {
     projects = await session.client.creatorScript.listProjects();
     await _syncScripts(session);
     _refreshLinkedProjects();
+    refreshScriptOrigins();
     await refreshMissingPackages();
     await refreshUsage();
   }
@@ -281,21 +290,99 @@ class AppController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Re-reads where each linked script lives and whether it still runs.
+  void refreshScriptOrigins() {
+    final store = ScriptStore.defaultLocation();
+    final origins = <String, ScriptOrigin>{};
+    final problems = <String, String>{};
+    for (final projectId in linkedProjectIds) {
+      final origin = store.originFor(projectId);
+      if (origin == null) continue;
+      origins[projectId] = origin;
+      final copy = store.fileFor(projectId);
+      final check = checkScriptOrigin(
+        origin,
+        linkedSource: copy.existsSync() ? copy.readAsStringSync() : null,
+      );
+      if (!check.canRun) problems[projectId] = check.message!;
+    }
+    scriptOrigins = origins;
+    scriptProblems = problems;
+    _notify();
+  }
+
+  /// The script [projectId] runs, as it is now, and the folder it is in.
+  (String, String?)? _currentScript(ScriptStore store, String projectId) {
+    final origin = store.originFor(projectId);
+    if (origin != null && File(origin.path).existsSync()) {
+      return (
+        File(origin.path).readAsStringSync(),
+        File(origin.path).parent.path,
+      );
+    }
+    final file = store.fileFor(projectId);
+    if (!file.existsSync()) return null;
+    return (file.readAsStringSync(), null);
+  }
+
   /// Re-reads which packages the linked scripts need and Python lacks.
   Future<void> refreshMissingPackages() async {
     final store = ScriptStore.defaultLocation();
     final missing = <String, List<String>>{};
     for (final projectId in linkedProjectIds) {
-      final file = store.fileFor(projectId);
-      if (!file.existsSync()) continue;
+      final script = _currentScript(store, projectId);
+      if (script == null) continue;
       final packages = await missingPackagesFor(
         config.pythonPath,
-        file.readAsStringSync(),
+        script.$1,
+        scriptDir: script.$2,
       );
       if (packages.isNotEmpty) missing[projectId] = packages;
     }
     missingPackagesByProject = missing;
     _notify();
+  }
+
+  /// Folders put in front of PATH for every run.
+  List<String> get extraPath {
+    try {
+      return settingsStore.load().extraPath;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Takes effect on the next start, like the interpreter.
+  void setExtraPath(List<String> folders) {
+    final store = settingsStore;
+    store.save(store.load().copyWith(extraPath: folders));
+    _notify();
+  }
+
+  /// Shows [path] in the Finder or Explorer.
+  Future<void> showInFolder(String path) async {
+    try {
+      if (Platform.isMacOS) {
+        await Process.run('open', ['-R', path]);
+      } else if (Platform.isWindows) {
+        await Process.run('explorer', ['/select,', path]);
+      } else {
+        await Process.run('xdg-open', [File(path).parent.path]);
+      }
+    } catch (_) {}
+  }
+
+  /// Opens [url] in the browser.
+  Future<void> openUrl(String url) async {
+    try {
+      if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+      } else if (Platform.isWindows) {
+        await Process.run('cmd', ['/c', 'start', '', url]);
+      } else {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (_) {}
   }
 
   /// Installs [packages] into this computer's Python with pip.
@@ -374,7 +461,11 @@ class AppController extends ChangeNotifier {
         path: path,
         source: source,
         draft: extractContractDraft(source),
-        missingPackages: await missingPackagesFor(config.pythonPath, source),
+        missingPackages: await missingPackagesFor(
+          config.pythonPath,
+          source,
+          scriptDir: File(path).absolute.parent.path,
+        ),
       );
     });
   }
@@ -403,7 +494,16 @@ class AppController extends ChangeNotifier {
       );
       // Stored before publishing: a contract published against a script this
       // machine does not have would leave the project pointing at nothing.
-      ScriptStore.defaultLocation().store(projectId, picked.source);
+      final store = ScriptStore.defaultLocation()
+        ..store(projectId, picked.source);
+      // Runs use the script where it is, with the files beside it.
+      store.storeOrigin(
+        projectId,
+        ScriptOrigin(
+          path: File(picked.path).absolute.path,
+          fingerprint: fingerprint,
+        ),
+      );
       _refreshLinkedProjects();
       await session.client.creatorScript.publishContract(
         projectId,
@@ -426,8 +526,9 @@ class AppController extends ChangeNotifier {
     final store = ScriptStore.defaultLocation();
     final modules = {
       for (final projectId in linkedProjectIds)
-        if (store.fileFor(projectId).existsSync())
-          ...importedModules(store.fileFor(projectId).readAsStringSync()),
+        if (_currentScript(store, projectId) case (final source, final dir))
+          for (final module in importedModules(source))
+            if (!isLocalModule(module, dir)) module,
     }.toList();
     final result = await (installer ?? PythonInstaller()).install(
       modules: modules,
@@ -466,6 +567,7 @@ class AppController extends ChangeNotifier {
       config,
       settingsStore: _settingsStore,
       usageStore: _usageStore,
+      keepInDiscoman: _keepEditInDiscoman,
     );
     _worker = worker;
     _logSubscription = worker.log.listen(_appendLog);
@@ -476,8 +578,28 @@ class AppController extends ChangeNotifier {
     _measuredSubscription = worker.measured.listen(
       (_) => unawaited(refreshUsage()),
     );
+    _scriptCheckedSubscription = worker.scriptChecked.listen(
+      (_) => refreshScriptOrigins(),
+    );
 
     await _run(worker.start);
+  }
+
+  /// Sends a script edited since linking to Discoman when its project keeps
+  /// it there, as linking does.
+  Future<bool> _keepEditInDiscoman(
+    String projectId,
+    String source,
+    String fingerprint,
+  ) async {
+    final session = _session;
+    if (session == null) return false;
+    return keepInDiscomanIfChosen(
+      session.client,
+      projectId: projectId,
+      source: source,
+      fingerprint: fingerprint,
+    );
   }
 
   Future<void> stopWorker() async {
@@ -528,9 +650,11 @@ class AppController extends ChangeNotifier {
     await _logSubscription?.cancel();
     await _stateSubscription?.cancel();
     await _measuredSubscription?.cancel();
+    await _scriptCheckedSubscription?.cancel();
     _logSubscription = null;
     _stateSubscription = null;
     _measuredSubscription = null;
+    _scriptCheckedSubscription = null;
     await _worker?.dispose();
     _worker = null;
     workerState = RemoteWorkerState.stopped;
@@ -540,6 +664,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    PythonRunner.killAll();
     unawaited(_disposeWorker());
     _session?.client.close();
     super.dispose();
