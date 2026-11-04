@@ -55,20 +55,30 @@ Future<String?> _readPath(String shell, Duration timeout) async {
   }
 }
 
-/// The PATH a run gets: the login shell's, then the inherited one, each
-/// folder once.
+/// The PATH a run gets: the folders of the environment [pythonPath] lives in,
+/// then the login shell's, then the inherited one, each folder once.
+///
+/// A conda environment or a venv is set up the way `conda activate` or
+/// `activate` would, so its packages find the libraries they ship.
 Map<String, String> runEnvironment({
   Map<String, String>? inherited,
   String? loginShellPath,
+  String? pythonPath,
+  bool? isWindows,
 }) {
   final base = inherited ?? Platform.environment;
-  final separator = Platform.isWindows ? ';' : ':';
+  final windows = isWindows ?? Platform.isWindows;
+  final separator = windows ? ';' : ':';
   final key = base.keys.firstWhere(
     (name) => name.toUpperCase() == 'PATH',
     orElse: () => 'PATH',
   );
+  final activated = pythonPath == null
+      ? null
+      : _activatedEnvironment(pythonPath, windows);
   final folders = <String>{
-    if (!Platform.isWindows)
+    ...?activated?.folders,
+    if (!windows)
       for (final folder in (loginShellPath ?? _loginShellPath ?? '').split(
         separator,
       ))
@@ -76,5 +86,57 @@ Map<String, String> runEnvironment({
     for (final folder in (base[key] ?? '').split(separator))
       if (folder.isNotEmpty) folder,
   };
-  return {key: folders.join(separator)};
+  return {...?activated?.variables, key: folders.join(separator)};
+}
+
+typedef _Activated = ({List<String> folders, Map<String, String> variables});
+
+_Activated? _activatedEnvironment(String pythonPath, bool windows) {
+  final sep = windows ? r'\' : '/';
+  String parent(String path) {
+    final index = path.lastIndexOf(windows ? RegExp(r'[\\/]') : '/');
+    return index <= 0 ? path : path.substring(0, index);
+  }
+
+  String name(String path) => path.substring(parent(path).length + 1);
+
+  final dir = parent(pythonPath);
+  final last = name(dir).toLowerCase();
+  final prefix = (windows ? last == 'scripts' : last == 'bin')
+      ? parent(dir)
+      : dir;
+  String join(List<String> parts) => [prefix, ...parts].join(sep);
+
+  if (Directory(join(['conda-meta'])).existsSync()) {
+    final envsParent = parent(prefix);
+    final isEnv = name(envsParent).toLowerCase() == 'envs';
+    return (
+      folders: windows
+          ? [
+              prefix,
+              join(['Library', 'mingw-w64', 'bin']),
+              join(['Library', 'usr', 'bin']),
+              join(['Library', 'bin']),
+              join(['Scripts']),
+              join(['bin']),
+            ]
+          : [
+              join(['bin']),
+            ],
+      variables: {
+        'CONDA_PREFIX': prefix,
+        'CONDA_DEFAULT_ENV': isEnv ? name(prefix) : 'base',
+        'CONDA_SHLVL': '1',
+      },
+    );
+  }
+  if (File(join(['pyvenv.cfg'])).existsSync()) {
+    return (
+      folders: [
+        join([windows ? 'Scripts' : 'bin']),
+      ],
+      variables: {'VIRTUAL_ENV': prefix},
+    );
+  }
+  return null;
 }

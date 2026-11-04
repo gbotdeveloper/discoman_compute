@@ -28,7 +28,7 @@ Future<Set<String>> findMissingModules(
         exe,
         args,
         workingDirectory: Directory.systemTemp.path,
-        environment: runEnvironment(),
+        environment: runEnvironment(pythonPath: pythonPath),
       );
   const lookup =
       'import importlib.util, json, sys\n'
@@ -84,7 +84,11 @@ Future<PackageInstallResult> installPackages(
 }) async {
   final start =
       startProcess ??
-      (exe, args) => Process.start(exe, args, environment: runEnvironment());
+      (exe, args) => Process.start(
+        exe,
+        args,
+        environment: runEnvironment(pythonPath: pythonPath),
+      );
   final Process process;
   try {
     process = await start(pythonPath, [
