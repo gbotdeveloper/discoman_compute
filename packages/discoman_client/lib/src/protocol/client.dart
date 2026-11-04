@@ -514,6 +514,22 @@ class EndpointCreatorScript extends _i2.EndpointRef {
     },
   );
 
+  /// Keeps a script the creator uploaded in the web app in Discoman, for every
+  /// computer they run Discoman Compute on, and records its contract as
+  /// linking it on a computer would. The script still runs only on those
+  /// computers.
+  _i3.Future<void> keepScriptInDiscoman(
+    String projectId,
+    String source,
+  ) => caller.callServerEndpoint<void>(
+    'creatorScript',
+    'keepScriptInDiscoman',
+    {
+      'projectId': projectId,
+      'source': source,
+    },
+  );
+
   /// Moves a project's waiting runs into the cloud, after its script has been
   /// uploaded.
   ///
