@@ -121,7 +121,10 @@ class PythonRunner {
         workingDirectory: tempDir.path,
         // UTF-8 both ways, whatever the computer's language: Windows would
         // otherwise use its code page and garble names like "görüntü".
-        environment: {...runEnvironment(), 'PYTHONUTF8': '1'},
+        environment: {
+          ...runEnvironment(pythonPath: pythonPath),
+          'PYTHONUTF8': '1',
+        },
       );
       _running.add(process);
       try {

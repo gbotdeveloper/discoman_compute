@@ -21,41 +21,91 @@ const _release =
     'https://github.com/astral-sh/python-build-standalone/'
     'releases/download/20261003';
 
-/// The Python the installer puts on a machine.
+/// The Python the installer puts on a machine unless another is chosen: the
+/// one Discoman's cloud runs, so a script that runs here runs there.
 const managedPythonVersion = '3.11.17';
 
-const _builds = {
-  Abi.macosArm64: PythonBuild(
-    url:
-        '$_release/cpython-3.11.17+20261003-aarch64-apple-darwin-install_only.tar.gz',
-    sha256: '3663b71c18364eccfbad74c4f21f9f6149e40b07329cd776287410cc1da5d612',
-  ),
-  Abi.macosX64: PythonBuild(
-    url:
-        '$_release/cpython-3.11.17+20261003-x86_64-apple-darwin-install_only.tar.gz',
-    sha256: '4338dc0c2b954f20ca6437406db5b806626c69bae3cafeec43f1b7d57dd72a88',
-  ),
-  Abi.windowsX64: PythonBuild(
-    url:
-        '$_release/cpython-3.11.17+20261003-x86_64-pc-windows-msvc-install_only.tar.gz',
-    sha256: '0f7defa7a0ed99b61e0df0bba5027474711521f1307cc3830c2f456401beeed5',
-  ),
-  Abi.windowsArm64: PythonBuild(
-    url:
-        '$_release/cpython-3.11.17+20261003-aarch64-pc-windows-msvc-install_only.tar.gz',
-    sha256: '4a3aac3c777333185a53e866b75d9bfe411b4e89a9230019bccbe5e58ca277e8',
-  ),
-  Abi.linuxX64: PythonBuild(
-    url:
-        '$_release/cpython-3.11.17+20261003-x86_64-unknown-linux-gnu-install_only.tar.gz',
-    sha256: 'c624af93ad62a596806bbd2404e1fb80744a407ca7279854445ede16d93858b8',
-  ),
-  Abi.linuxArm64: PythonBuild(
-    url:
-        '$_release/cpython-3.11.17+20261003-aarch64-unknown-linux-gnu-install_only.tar.gz',
-    sha256: '2238f0556d3a9777d42261b1e4d7b9834d56f111d3dd879a0647c27c824cc31d',
-  ),
+/// The Pythons the installer offers, oldest first.
+const managedPythonVersions = ['3.11.17', '3.12.15', '3.13.16', '3.14.8'];
+
+const _targets = {
+  Abi.macosArm64: 'aarch64-apple-darwin',
+  Abi.macosX64: 'x86_64-apple-darwin',
+  Abi.windowsX64: 'x86_64-pc-windows-msvc',
+  Abi.windowsArm64: 'aarch64-pc-windows-msvc',
+  Abi.linuxX64: 'x86_64-unknown-linux-gnu',
+  Abi.linuxArm64: 'aarch64-unknown-linux-gnu',
 };
+
+const _sha256 = {
+  '3.11.17': {
+    Abi.macosArm64:
+        '3663b71c18364eccfbad74c4f21f9f6149e40b07329cd776287410cc1da5d612',
+    Abi.macosX64:
+        '4338dc0c2b954f20ca6437406db5b806626c69bae3cafeec43f1b7d57dd72a88',
+    Abi.windowsX64:
+        '0f7defa7a0ed99b61e0df0bba5027474711521f1307cc3830c2f456401beeed5',
+    Abi.windowsArm64:
+        '4a3aac3c777333185a53e866b75d9bfe411b4e89a9230019bccbe5e58ca277e8',
+    Abi.linuxX64:
+        'c624af93ad62a596806bbd2404e1fb80744a407ca7279854445ede16d93858b8',
+    Abi.linuxArm64:
+        '2238f0556d3a9777d42261b1e4d7b9834d56f111d3dd879a0647c27c824cc31d',
+  },
+  '3.12.15': {
+    Abi.macosArm64:
+        '316a463172740e71d8dca1f2730784e325f3f720941137b5d674d5801a632213',
+    Abi.macosX64:
+        'a8fd7a91852f19b6d959793ef41fad048631ccb2a334a9ecdf573255298f7978',
+    Abi.windowsX64:
+        '4b6f0beebbb695a0f3ea237b8c3eaa5bd424f47a7bc25b2fbe3a43390c770f08',
+    Abi.windowsArm64:
+        '2de96a340fecdabe215094345ed3aea1b473e858bd098360f2253299e18f24d2',
+    Abi.linuxX64:
+        'f937814031eab4698ca6d07ec606ede1825768f3f3e99af76d9db3900bee03c5',
+    Abi.linuxArm64:
+        '95c01982c9fcb9d95b0acfdb5eb8a6e0099dd11edf062314a474228d93f2b765',
+  },
+  '3.13.16': {
+    Abi.macosArm64:
+        'd8975d7df4f08f7b1c7aafcdfacbddcec3d366415f2c1a72b2466b6850815933',
+    Abi.macosX64:
+        '8e9cb087305bfb8969f68a905f79f41469d4aa5220c1aa71ada7fc9953bdba0f',
+    Abi.windowsX64:
+        '5e100ee3d592ff500f4408a624f054d202e32d9dba8a12b2226bef81083fd778',
+    Abi.windowsArm64:
+        '701acbb2639168c03e3bf12feb189e6dcd3cf96ec2abaa333745cc7d1e28fd2e',
+    Abi.linuxX64:
+        '0a0272910b10417c659a9312fb3f2d7a6d774da7bd510999be7a3ba83273dc1f',
+    Abi.linuxArm64:
+        '6477121f22904963a066ac8ff89983baae781510815590e894daa3c11ce86652',
+  },
+  '3.14.8': {
+    Abi.macosArm64:
+        'd15291f940cfecd2e54010d5e37d2e03aa192f076a65d26ab741372fff2dabfe',
+    Abi.macosX64:
+        '4b25eec9616cf363ad7181b2e8098f76fc453705fce22322da2502c9e16f44a9',
+    Abi.windowsX64:
+        '74fd19aac6ef6014be21e5de293c68ae4e54608cf19f6bf559f185943eb35b3a',
+    Abi.windowsArm64:
+        '0f681df7bc4a6b12cbd1db7929a04bf22df5ce3d625acae2fd061ec4ec2ca1ac',
+    Abi.linuxX64:
+        '371b6c281bbb09b29279e9e3a2996bab4ae2ea03cca52bf869f8bd89286b0ae8',
+    Abi.linuxArm64:
+        'abc0c8dd54a144909a5e4905737bc33f244cb17ce8afc4a7b0791ee1e006ae23',
+  },
+};
+
+/// The download of Python [version] for [abi], or null if there is none.
+PythonBuild? pythonBuildFor(String version, Abi abi) {
+  final target = _targets[abi];
+  final sha = _sha256[version]?[abi];
+  if (target == null || sha == null) return null;
+  return PythonBuild(
+    url: '$_release/cpython-$version+20261003-$target-install_only.tar.gz',
+    sha256: sha,
+  );
+}
 
 /// The packages Discoman's cloud has, so a script that runs there runs here.
 const basePythonPackages = ['numpy', 'pandas', 'matplotlib', 'Pillow'];
@@ -102,13 +152,14 @@ class PythonInstaller {
   PythonInstaller({
     Directory? home,
     PythonBuild? build,
+    String version = managedPythonVersion,
     http.Client? httpClient,
     StartProcess? startProcess,
     RunProcess? runProcess,
     bool? isWindows,
     this.retryDelay = const Duration(seconds: 2),
   }) : _home = home,
-       _build = build ?? _builds[Abi.current()],
+       _build = build ?? pythonBuildFor(version, Abi.current()),
        _injectedHttp = httpClient,
        _startProcess = startProcess,
        _runProcess = runProcess,

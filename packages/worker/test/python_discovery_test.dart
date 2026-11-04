@@ -49,6 +49,28 @@ void main() {
     testOn: '!windows',
   );
 
+  test("finds a researcher's Anaconda environments on Windows", () {
+    void exe(String relative) =>
+        File('${home.path}\\$relative').createSync(recursive: true);
+    exe(r'anaconda3\python.exe');
+    exe(r'anaconda3\envs\matlabpy\python.exe');
+
+    final found = findPythons(
+      environment: {'USERPROFILE': home.path, 'LOCALAPPDATA': ''},
+      isWindows: true,
+      includeSystem: false,
+    );
+
+    expect(found.map((p) => p.label), [
+      'Anaconda · base',
+      'Anaconda · matlabpy',
+    ]);
+    expect(
+      found[1].path,
+      '${home.path}\\anaconda3\\envs\\matlabpy\\python.exe',
+    );
+  }, testOn: 'windows');
+
   test('finds nothing in an empty home', () {
     expect(
       findPythons(

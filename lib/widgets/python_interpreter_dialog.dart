@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:discoman_worker/discoman_compute.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +20,7 @@ class PythonInterpreterDialog extends StatefulWidget {
     this.check,
     this.browse,
     this.find,
+    this.onInstallManaged,
     super.key,
   });
 
@@ -34,19 +37,37 @@ class PythonInterpreterDialog extends StatefulWidget {
   /// Lists the Pythons on this computer. Injected by tests.
   final List<FoundPython> Function()? find;
 
+  /// When given, Discoman's own Python is not installed and the dialog offers
+  /// to install it.
+  final VoidCallback? onInstallManaged;
+
   @override
   State<PythonInterpreterDialog> createState() =>
       _PythonInterpreterDialogState();
 }
 
 class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
+  late final List<FoundPython> _found = (widget.find ?? findPythons)();
+
+  /// The found Python picked, or null while the creator types a path.
+  late FoundPython? _chosen = _found
+      .where((python) => python.path == widget.initialPath.trim())
+      .firstOrNull;
+
   late final TextEditingController _path = TextEditingController(
-    text: widget.initialPath,
+    text: _chosen == null ? widget.initialPath : '',
   );
 
   InterpreterCheck? _result;
   bool _isChecking = false;
-  late final List<FoundPython> _found = (widget.find ?? findPythons)();
+
+  String get _selectedPath => _chosen?.path ?? _path.text.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    if (_selectedPath.isNotEmpty) _check();
+  }
 
   @override
   void dispose() {
@@ -55,16 +76,17 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
   }
 
   Future<void> _check() async {
-    if (_isChecking) return;
+    final path = _selectedPath;
     setState(() {
       _isChecking = true;
       _result = null;
     });
 
     final check = widget.check ?? (path) => checkInterpreter(path);
-    final result = await check(_path.text);
+    final result = await check(path);
 
-    if (!mounted) return;
+    // A later pick or edit has its own check coming.
+    if (!mounted || path != _selectedPath) return;
     setState(() {
       _isChecking = false;
       _result = result;
@@ -82,8 +104,16 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
   }
 
   void _pick(FoundPython python) {
-    setState(() => _path.text = python.path);
+    setState(() => _chosen = python);
     _check();
+  }
+
+  void _typePath() {
+    setState(() {
+      _chosen = null;
+      _isChecking = false;
+      _result = null;
+    });
   }
 
   static Future<String?> _openSystemPicker() async {
@@ -96,11 +126,12 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final result = _result;
+    final typing = _chosen == null;
 
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,9 +145,8 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
               ),
               const SizedBox(height: 6),
               Text(
-                'The Python your scripts run with. It needs the packages they '
-                'import: pick the one you use in Spyder or your terminal, such '
-                'as your Anaconda environment.',
+                'The Python your scripts run with. Pick one that has the '
+                'packages your scripts import.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   height: 1.45,
@@ -131,58 +161,77 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Flexible(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 220),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final python in _found)
-                            _FoundPythonRow(
-                              python: python,
-                              selected: _path.text.trim() == python.path,
-                              onTap: () => _pick(python),
-                            ),
-                        ],
-                      ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final python in _found)
+                          _PythonChoiceRow(
+                            title: python.label,
+                            subtitle: python.path,
+                            selected: _chosen == python,
+                            onTap: () => _pick(python),
+                          ),
+                        _PythonChoiceRow(
+                          title: 'Enter a path',
+                          selected: typing,
+                          onTap: _typePath,
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
-              const SizedBox(height: 18),
-              TextField(
-                controller: _path,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Path',
-                  border: OutlineInputBorder(),
-                  hintText: '/usr/bin/python3',
+              if (typing) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _path,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Path',
+                    border: const OutlineInputBorder(),
+                    hintText: Platform.isWindows
+                        ? r'C:\path\to\python.exe'
+                        : '/usr/bin/python3',
+                  ),
+                  onSubmitted: (_) => _check(),
+                  // Whatever was checked was the old text.
+                  onChanged: (_) => setState(() {
+                    _result = null;
+                    _isChecking = false;
+                  }),
                 ),
-                onSubmitted: (_) => _check(),
-                onChanged: (_) {
-                  if (_result != null) setState(() => _result = null);
-                },
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  ActionButton(
-                    label: 'Browse…',
-                    isPrimary: false,
-                    onPressed: _browse,
-                  ),
-                  const SizedBox(width: 10),
-                  ActionButton(
-                    label: _isChecking ? 'Checking…' : 'Check',
-                    isPrimary: false,
-                    onPressed: _isChecking ? null : _check,
-                  ),
-                ],
-              ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    ActionButton(
+                      label: 'Browse…',
+                      isPrimary: false,
+                      onPressed: _browse,
+                    ),
+                    const SizedBox(width: 10),
+                    ActionButton(
+                      label: _isChecking ? 'Checking…' : 'Check',
+                      isPrimary: false,
+                      onPressed: _isChecking || _path.text.trim().isEmpty
+                          ? null
+                          : _check,
+                    ),
+                  ],
+                ),
+              ],
               if (result != null) ...[
                 const SizedBox(height: 14),
                 _CheckResult(result: result),
+              ] else if (_isChecking && !typing) ...[
+                const SizedBox(height: 14),
+                Text('Checking…', style: textTheme.bodySmall),
+              ],
+              if (widget.onInstallManaged != null) ...[
+                const SizedBox(height: 16),
+                _InstallManagedOffer(onInstall: widget.onInstallManaged!),
               ],
               const SizedBox(height: 20),
               Row(
@@ -196,18 +245,60 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                   const SizedBox(width: 10),
                   ActionButton(
                     label: 'Use this Python',
+                    // Only a path that has just passed the check: a typo
+                    // would otherwise surface as a visitor's failed run.
                     // Expanded before it leaves this dialog: a stored `~` is
                     // meaningless to the process that will run it later.
-                    onPressed: _path.text.trim().isEmpty
+                    onPressed: _isChecking || !(result?.isUsable ?? false)
                         ? null
                         : () => Navigator.of(
                             context,
-                          ).pop(expandHomePath(_path.text)),
+                          ).pop(expandHomePath(_selectedPath)),
                   ),
                 ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InstallManagedOffer extends StatelessWidget {
+  const _InstallManagedOffer({required this.onInstall});
+
+  final VoidCallback onInstall;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'No Python, or yours gives trouble? Discoman can download '
+                'Python ${_short(managedPythonVersions.first)}–'
+                '${_short(managedPythonVersions.last)} for you.',
+                style: textTheme.bodySmall?.copyWith(height: 1.4),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ActionButton(
+              label: 'Install Python',
+              isPrimary: false,
+              onPressed: onInstall,
+            ),
+          ],
         ),
       ),
     );
@@ -260,14 +351,16 @@ class _CheckResult extends StatelessWidget {
   }
 }
 
-class _FoundPythonRow extends StatelessWidget {
-  const _FoundPythonRow({
-    required this.python,
+class _PythonChoiceRow extends StatelessWidget {
+  const _PythonChoiceRow({
+    required this.title,
+    this.subtitle,
     required this.selected,
     required this.onTap,
   });
 
-  final FoundPython python;
+  final String title;
+  final String? subtitle;
   final bool selected;
   final VoidCallback onTap;
 
@@ -296,18 +389,19 @@ class _FoundPythonRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    python.label,
+                    title,
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Text(
-                    python.path,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -317,3 +411,5 @@ class _FoundPythonRow extends StatelessWidget {
     );
   }
 }
+
+String _short(String version) => version.split('.').take(2).join('.');

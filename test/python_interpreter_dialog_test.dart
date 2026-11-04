@@ -22,6 +22,7 @@ void main() {
     Future<InterpreterCheck> Function(String)? check,
     Future<String?> Function()? browse,
     List<FoundPython> found = const [],
+    VoidCallback? onInstallManaged,
   }) async {
     String? popped;
     await tester.pumpWidget(
@@ -36,9 +37,10 @@ void main() {
                     context: context,
                     builder: (_) => PythonInterpreterDialog(
                       initialPath: initialPath,
-                      check: check,
+                      check: check ?? (_) => replying(stdout: 'Python 3.11.9'),
                       browse: browse,
                       find: () => found,
+                      onInstallManaged: onInstallManaged,
                     ),
                   );
                 },
@@ -111,6 +113,42 @@ void main() {
     expect(find.textContaining('ready to run'), findsNothing);
   });
 
+  testWidgets('the current interpreter is checked on opening', (tester) async {
+    await pump(tester);
+
+    expect(find.textContaining('Python 3.11.9'), findsWidgets);
+  });
+
+  testWidgets('Use this Python waits for a passing check', (tester) async {
+    await pump(tester, check: (_) => replying(stdout: 'hello'));
+
+    await tester.tap(find.text('Use this Python'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PythonInterpreterDialog), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '/opt/typed/python3');
+    await tester.pump();
+    await tester.tap(find.text('Use this Python'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PythonInterpreterDialog), findsOneWidget);
+  });
+
+  testWidgets('offers Discoman\'s Python only when asked to', (tester) async {
+    var installs = 0;
+    await pump(tester, onInstallManaged: () => installs++);
+
+    await tester.tap(find.text('Install Python'));
+    expect(installs, 1);
+  });
+
+  testWidgets('no install offer when Discoman\'s Python is there', (
+    tester,
+  ) async {
+    await pump(tester);
+
+    expect(find.text('Install Python'), findsNothing);
+  });
+
   testWidgets('confirming returns the path to the caller', (tester) async {
     await pump(tester, initialPath: '/usr/bin/python3');
 
@@ -129,21 +167,21 @@ void main() {
     expect(find.byType(PythonInterpreterDialog), findsNothing);
   });
 
-  testWidgets('picking a Python found on the computer checks it', (
+  const imaging = FoundPython(
+    path: '/Users/me/anaconda3/envs/imaging/bin/python',
+    label: 'Anaconda · imaging',
+  );
+
+  testWidgets('picking a found Python checks it with no path to type', (
     tester,
   ) async {
     String? checked;
     await pump(
       tester,
-      found: const [
-        FoundPython(
-          path: '/Users/me/anaconda3/envs/imaging/bin/python',
-          label: 'Anaconda · imaging',
-        ),
-      ],
+      found: const [imaging],
       check: (path) {
         checked = path;
-        return replying(stdout: '3.11.9\n');
+        return replying(stdout: 'Python 3.11.9');
       },
     );
 
@@ -151,13 +189,36 @@ void main() {
     await tester.tap(find.text('Anaconda · imaging'));
     await tester.pumpAndSettle();
 
-    expect(checked, '/Users/me/anaconda3/envs/imaging/bin/python');
-    expect(
-      find.widgetWithText(
-        TextField,
-        '/Users/me/anaconda3/envs/imaging/bin/python',
-      ),
-      findsOneWidget,
-    );
+    expect(checked, imaging.path);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Check'), findsNothing);
+    expect(find.text('Browse…'), findsNothing);
+
+    await tester.tap(find.text('Use this Python'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PythonInterpreterDialog), findsNothing);
+  });
+
+  testWidgets('opens on the found Python already in use', (tester) async {
+    await pump(tester, initialPath: imaging.path, found: const [imaging]);
+
+    expect(find.byType(TextField), findsNothing);
+    expect(find.textContaining('Python 3.11.9'), findsWidgets);
+  });
+
+  testWidgets('entering a path brings the field, Browse and Check', (
+    tester,
+  ) async {
+    await pump(tester, initialPath: imaging.path, found: const [imaging]);
+
+    await tester.tap(find.text('Enter a path'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Browse…'), findsOneWidget);
+    // Nothing typed yet, so nothing checked and nothing to use.
+    await tester.tap(find.text('Use this Python'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PythonInterpreterDialog), findsOneWidget);
   });
 }

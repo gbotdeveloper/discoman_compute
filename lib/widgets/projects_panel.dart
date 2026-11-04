@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import 'action_button.dart';
-import 'script_guide_dialog.dart';
 import 'section_card.dart';
 
 /// The creator's projects, and which of them run a script from this machine.
@@ -49,22 +48,11 @@ class ProjectsPanel extends StatelessWidget {
 
     return SectionCard(
       title: 'Your projects',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ActionButton(
-            label: 'How to write a script',
-            isPrimary: false,
-            onPressed: () => showScriptGuide(context, controller),
-          ),
-          const SizedBox(width: 10),
-          ActionButton(
-            label: 'Refresh',
-            icon: Icons.refresh_rounded,
-            isPrimary: false,
-            onPressed: controller.isBusy ? null : controller.refreshProjects,
-          ),
-        ],
+      trailing: ActionButton(
+        label: 'Refresh',
+        icon: Icons.refresh_rounded,
+        isPrimary: false,
+        onPressed: controller.isBusy ? null : controller.refreshProjects,
       ),
       child: controller.projects.isEmpty
           ? _EmptyProjects(isBusy: controller.isBusy)
