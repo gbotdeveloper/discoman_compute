@@ -108,8 +108,7 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
               Text(
                 'Discoman downloads its own Python into ~/.discoman/python, '
                 'with numpy, pandas, matplotlib, Pillow and whatever your '
-                'linked scripts import. Other Pythons on this computer are '
-                'left alone.',
+                'linked scripts import.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   height: 1.45,
@@ -425,12 +424,6 @@ class _VersionPicker extends StatelessWidget {
                 onSelected: (_) => onSelected(version),
               ),
           ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Python ${short(managedPythonVersion)} is what Discoman\'s cloud runs. '
-          'Pick another if your scripts or their packages need it.',
-          style: textTheme.bodySmall?.copyWith(height: 1.4),
         ),
       ],
     );
