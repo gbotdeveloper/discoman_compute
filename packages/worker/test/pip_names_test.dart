@@ -14,4 +14,10 @@ void main() {
       'PyYAML',
     ]);
   });
+
+  test('names the MATLAB engine package and never installs it', () {
+    expect(pipPackageFor('matlab'), 'matlabengine');
+    expect(manualInstallNote('matlabengine'), contains('MATLAB release'));
+    expect(manualInstallNote('numpy'), isNull);
+  });
 }

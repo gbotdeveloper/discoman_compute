@@ -1,5 +1,6 @@
 import 'package:discoman_client/discoman_client.dart';
-import 'package:discoman_worker/discoman_compute.dart' show ExternalCodeSource;
+import 'package:discoman_worker/discoman_compute.dart'
+    show ExternalCodeSource, manualInstallNote;
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
@@ -331,6 +332,10 @@ class _ScriptDetails extends StatelessWidget {
     final id = project.projectId;
     final isLinked = controller.linkedProjectIds.contains(id);
     final missing = controller.missingPackagesByProject[id] ?? const [];
+    final installable = [
+      for (final package in missing)
+        if (manualInstallNote(package) == null) package,
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,14 +364,23 @@ class _ScriptDetails extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
-              ActionButton(
-                label: 'Install',
-                isPrimary: false,
-                onPressed: controller.isBusy ? null : () => onInstall(missing),
-              ),
+              if (installable.isNotEmpty) ...[
+                const SizedBox(width: 20),
+                ActionButton(
+                  label: 'Install',
+                  isPrimary: false,
+                  onPressed: controller.isBusy
+                      ? null
+                      : () => onInstall(installable),
+                ),
+              ],
             ],
           ),
+          for (final package in missing)
+            if (manualInstallNote(package) case final note?) ...[
+              const SizedBox(height: 8),
+              _MutedText(note),
+            ],
         ],
       ],
     );

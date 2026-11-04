@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:discoman_client/discoman_client.dart';
 import 'package:discoman_worker/src/execution_processor.dart';
@@ -14,12 +15,15 @@ void main() {
     '0190d0c4-0000-7000-8000-000000000002',
   );
 
-  ClaimedExecution claimed({String inputsJson = '{}'}) => ClaimedExecution(
+  ClaimedExecution claimed({
+    String inputsJson = '{}',
+    String source = 'def main():\n  return {}\n',
+  }) => ClaimedExecution(
     executionId: executionId,
     kind: ExecutionKind.publishedApp,
     computeMode: ComputeMode.cloud,
     projectId: 'project-1',
-    source: 'def main():\n  return {}\n',
+    source: source,
     entrypointName: 'main',
     inputsJson: inputsJson,
     timeoutSeconds: 60,
@@ -47,7 +51,7 @@ void main() {
         'extension': 'png',
         'mimeType': 'image/png',
         'sizeBytes': 3,
-        'base64': 'AAAA',
+        'path': 'chart.png',
       },
     });
     processor = ExecutionProcessor(
@@ -77,6 +81,7 @@ void main() {
       final outputs =
           jsonDecode(computeWorker.reports.single.outputsJson!) as Map;
       expect(outputs['chart']['storagePath'], 'outputs/published/x/chart.png');
+      expect(outputs['chart'], isNot(contains('path')));
     },
   );
 
@@ -113,6 +118,22 @@ void main() {
     expect(computeWorker.reports.single.errorReason, 'outputUploadFailed');
   });
 
+  test('passes the outputs class Outputs declares to the runner', () async {
+    await processor.process(
+      claimed(
+        source:
+            'Images = list[str]\n\n'
+            'class Outputs:\n    charts: Images\n    total: int\n\n'
+            'def main():\n  return {}\n',
+      ),
+    );
+
+    expect(pythonRunner.lastOutputTypes, {
+      'charts': 'image',
+      'total': 'integer',
+    });
+  });
+
   test('hands Python the input files it downloads', () async {
     storageResponse = (request) async => http.Response.bytes([1, 2, 3], 200);
 
@@ -134,17 +155,11 @@ void main() {
     );
 
     expect(requests.first.method, 'GET');
-    expect(pythonRunner.lastInputs, {
-      'photo': {
-        'kind': 'image',
-        'name': 'cat.png',
-        'extension': 'png',
-        'mimeType': 'image/png',
-        'sizeBytes': 3,
-        'base64': base64Encode([1, 2, 3]),
-      },
-      'count': 2,
-    });
+    final photo = pythonRunner.lastInputs!['photo'] as String;
+    expect(photo, endsWith('${_sep}inputs${_sep}1${_sep}cat.png'));
+    expect(pythonRunner.inputBytes[photo], [1, 2, 3]);
+    expect(pythonRunner.lastInputs!['count'], 2);
+    expect(Directory(File(photo).parent.parent.path).existsSync(), isFalse);
   });
 
   test('hands Python a list of input files in order', () async {
@@ -169,17 +184,22 @@ void main() {
       ),
     );
 
-    final photos = (pythonRunner.lastInputs!['photos'] as List)
-        .cast<Map<String, dynamic>>();
-    expect(photos.map((photo) => photo['name']), ['a.png', 'b.png']);
+    final photos = (pythonRunner.lastInputs!['photos'] as List).cast<String>();
+    expect(photos.map((photo) => photo.split(_sep).last), ['a.png', 'b.png']);
     expect(
-      photos.map(
-        (photo) => utf8.decode(base64Decode(photo['base64'] as String)),
-      ),
+      photos.map((photo) => utf8.decode(pythonRunner.inputBytes[photo]!)),
       ['a.png', 'b.png'],
     );
-    expect(photos.every((photo) => !photo.containsKey('downloadUrl')), isTrue);
     expect(pythonRunner.lastInputs!['tags'], ['x', 'y']);
+  });
+
+  test('saves an input under a name every system accepts', () {
+    expect(
+      inputFileName({'name': 'Ekran görüntüsü: 1/2.png', 'extension': 'png'}),
+      'Ekran görüntüsü_ 1_2.png',
+    );
+    expect(inputFileName({'name': 'CON', 'extension': 'txt'}), '_CON.txt');
+    expect(inputFileName({'name': '', 'extension': 'jpg'}), 'input.jpg');
   });
 
   test('fails the run when an input file cannot be downloaded', () async {
@@ -429,6 +449,8 @@ class _FakePythonRunner extends PythonRunner {
 
   final Map<String, dynamic> outputs;
   Map<String, dynamic>? lastInputs;
+  Map<String, String>? lastOutputTypes;
+  final inputBytes = <String, List<int>>{};
   PythonRunResult? result;
 
   @override
@@ -438,17 +460,43 @@ class _FakePythonRunner extends PythonRunner {
     required Map<String, dynamic> inputs,
     required int timeoutSeconds,
     required bool Function() cancelRequested,
+    Map<String, String>? outputTypes,
+    Directory? runDirectory,
   }) async {
     lastInputs = inputs;
+    lastOutputTypes = outputTypes;
+    for (final value in inputs.values) {
+      for (final path in value is List ? value : [value]) {
+        if (path is String && File(path).existsSync()) {
+          inputBytes[path] = File(path).readAsBytesSync();
+        }
+      }
+    }
+    // Writes each output file the runner would have, into the run folder.
+    Object? written(Object? value) {
+      if (value is List) return [for (final item in value) written(item)];
+      if (value is Map && value['path'] is String) {
+        final file = File('${runDirectory!.path}$_sep${value['path']}')
+          ..writeAsBytesSync(base64Decode('AAAA'));
+        return {...value, 'path': file.path};
+      }
+      return value;
+    }
+
+    final produced = {
+      for (final entry in outputs.entries) entry.key: written(entry.value),
+    };
     return result ??
         PythonRunResult(
           success: true,
           canceled: false,
           timedOut: false,
-          outputs: outputs,
+          outputs: produced,
           durationMs: 5,
           logs: const [],
           errorMessage: null,
         );
   }
 }
+
+final _sep = Platform.pathSeparator;

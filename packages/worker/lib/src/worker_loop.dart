@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'auth/remote_auth.dart';
+import 'python/python_runner.dart';
 import 'remote_worker.dart';
 import 'worker_config.dart';
 
@@ -31,6 +32,9 @@ Future<int> runWorker(WorkerConfig config, {int? parallelRuns}) async {
   // so the machine deregisters instead of waiting out its lease.
   final stopped = Completer<void>();
   final sigint = ProcessSignal.sigint.watch().listen((_) {
+    // Runs are in process groups of their own, so the terminal's Ctrl+C no
+    // longer reaches them.
+    PythonRunner.killAll();
     if (!stopped.isCompleted) stopped.complete();
   });
 

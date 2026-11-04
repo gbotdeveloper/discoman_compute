@@ -9,10 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   /// Builds a real [InterpreterCheck] without launching anything, so these
   /// tests do not depend on which Pythons the machine happens to have.
-  Future<InterpreterCheck> replying({
-    int exitCode = 0,
-    String stdout = '',
-  }) {
+  Future<InterpreterCheck> replying({int exitCode = 0, String stdout = ''}) {
     return checkInterpreter(
       '/fake/python3',
       runProcess: (_, _) async => ProcessResult(0, exitCode, stdout, ''),
@@ -24,6 +21,7 @@ void main() {
     String initialPath = '/usr/bin/python3',
     Future<InterpreterCheck> Function(String)? check,
     Future<String?> Function()? browse,
+    List<FoundPython> found = const [],
   }) async {
     String? popped;
     await tester.pumpWidget(
@@ -40,6 +38,7 @@ void main() {
                       initialPath: initialPath,
                       check: check,
                       browse: browse,
+                      find: () => found,
                     ),
                   );
                 },
@@ -62,10 +61,7 @@ void main() {
   });
 
   testWidgets('a working interpreter is reported as ready', (tester) async {
-    await pump(
-      tester,
-      check: (_) => replying(stdout: 'Python 3.11.9'),
-    );
+    await pump(tester, check: (_) => replying(stdout: 'Python 3.11.9'));
 
     await tester.tap(find.text('Check'));
     await tester.pumpAndSettle();
@@ -79,10 +75,7 @@ void main() {
   });
 
   testWidgets('a path that is not Python is reported as such', (tester) async {
-    await pump(
-      tester,
-      check: (_) => replying(stdout: 'hello'),
-    );
+    await pump(tester, check: (_) => replying(stdout: 'hello'));
 
     await tester.tap(find.text('Check'));
     await tester.pumpAndSettle();
@@ -134,5 +127,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PythonInterpreterDialog), findsNothing);
+  });
+
+  testWidgets('picking a Python found on the computer checks it', (
+    tester,
+  ) async {
+    String? checked;
+    await pump(
+      tester,
+      found: const [
+        FoundPython(
+          path: '/Users/me/anaconda3/envs/imaging/bin/python',
+          label: 'Anaconda · imaging',
+        ),
+      ],
+      check: (path) {
+        checked = path;
+        return replying(stdout: '3.11.9\n');
+      },
+    );
+
+    expect(find.text('Found on this computer'), findsOneWidget);
+    await tester.tap(find.text('Anaconda · imaging'));
+    await tester.pumpAndSettle();
+
+    expect(checked, '/Users/me/anaconda3/envs/imaging/bin/python');
+    expect(
+      find.widgetWithText(
+        TextField,
+        '/Users/me/anaconda3/envs/imaging/bin/python',
+      ),
+      findsOneWidget,
+    );
   });
 }

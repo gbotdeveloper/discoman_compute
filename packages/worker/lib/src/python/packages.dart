@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'imports.dart';
 import 'pip_names.dart';
+import 'run_environment.dart';
 
 typedef RunProcess =
     Future<ProcessResult> Function(String executable, List<String> arguments);
@@ -19,7 +20,16 @@ Future<Set<String>> findMissingModules(
   RunProcess? runProcess,
 }) async {
   if (modules.isEmpty) return const {};
-  final run = runProcess ?? (exe, args) => Process.run(exe, args);
+  // Looked up from a neutral folder: wherever this program was started from
+  // says nothing about what a run can import.
+  final run =
+      runProcess ??
+      (exe, args) => Process.run(
+        exe,
+        args,
+        workingDirectory: Directory.systemTemp.path,
+        environment: runEnvironment(),
+      );
   const lookup =
       'import importlib.util, json, sys\n'
       'print(json.dumps([m for m in sys.argv[1:] '
@@ -72,7 +82,9 @@ Future<PackageInstallResult> installPackages(
   required void Function(String line) onOutput,
   StartProcess? startProcess,
 }) async {
-  final start = startProcess ?? (exe, args) => Process.start(exe, args);
+  final start =
+      startProcess ??
+      (exe, args) => Process.start(exe, args, environment: runEnvironment());
   final Process process;
   try {
     process = await start(pythonPath, [
