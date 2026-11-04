@@ -26,6 +26,7 @@ enum _Phase { ready, installing, done, failed }
 
 class _InstallPythonDialogState extends State<InstallPythonDialog> {
   _Phase _phase = _Phase.ready;
+  String _version = managedPythonVersion;
   PythonInstallStep? _step;
   double? _downloaded;
   String? _error;
@@ -52,6 +53,7 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
         },
         confirmGuessed: _confirmGuessed,
         installer: widget.installer,
+        version: _version,
       );
       if (!mounted) return;
       setState(() {
@@ -95,7 +97,9 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Install Python $managedPythonVersion',
+                _phase == _Phase.ready
+                    ? 'Install Python'
+                    : 'Install Python $_version',
                 style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -111,7 +115,13 @@ class _InstallPythonDialogState extends State<InstallPythonDialog> {
                   height: 1.45,
                 ),
               ),
-              if (_phase != _Phase.ready) ...[
+              if (_phase == _Phase.ready) ...[
+                const SizedBox(height: 18),
+                _VersionPicker(
+                  selected: _version,
+                  onSelected: (version) => setState(() => _version = version),
+                ),
+              ] else ...[
                 const SizedBox(height: 18),
                 for (final step in PythonInstallStep.values)
                   _StepLine(
@@ -383,6 +393,46 @@ class _GuessedPackagesDialogState extends State<_GuessedPackagesDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _VersionPicker extends StatelessWidget {
+  const _VersionPicker({required this.selected, required this.onSelected});
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    String short(String version) => version.split('.').take(2).join('.');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Version', style: textTheme.labelLarge),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final version in managedPythonVersions)
+              ChoiceChip(
+                label: Text(short(version)),
+                selected: version == selected,
+                onSelected: (_) => onSelected(version),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Python ${short(managedPythonVersion)} is what Discoman\'s cloud runs. '
+          'Pick another if your scripts or their packages need it.',
+          style: textTheme.bodySmall?.copyWith(height: 1.4),
+        ),
+      ],
     );
   }
 }

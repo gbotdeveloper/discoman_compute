@@ -287,7 +287,8 @@ class _InstallManagedOffer extends StatelessWidget {
             Expanded(
               child: Text(
                 'No Python, or yours gives trouble? Discoman can download '
-                'one for you.',
+                'Python ${_short(managedPythonVersions.first)}–'
+                '${_short(managedPythonVersions.last)} for you.',
                 style: textTheme.bodySmall?.copyWith(height: 1.4),
               ),
             ),
@@ -410,3 +411,5 @@ class _PythonChoiceRow extends StatelessWidget {
     );
   }
 }
+
+String _short(String version) => version.split('.').take(2).join('.');

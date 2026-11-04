@@ -35,7 +35,8 @@ export 'src/python/python_installer.dart'
         PythonInstallResult,
         PythonInstallStep,
         PythonInstaller,
-        managedPythonVersion;
+        managedPythonVersion,
+        managedPythonVersions;
 export 'src/python/packages.dart'
     show PackageInstallResult, installPackages, missingPackagesFor;
 export 'src/python/pip_names.dart' show manualInstallNote;

@@ -422,6 +422,7 @@ class AppController extends ChangeNotifier {
     void Function(PythonInstallProgress progress) onProgress, {
     Future<List<String>> Function(List<String> packages)? confirmGuessed,
     PythonInstaller? installer,
+    String version = managedPythonVersion,
   }) async {
     final store = ScriptStore.defaultLocation();
     final modules = {
@@ -429,11 +430,12 @@ class AppController extends ChangeNotifier {
         if (store.fileFor(projectId).existsSync())
           ...importedModules(store.fileFor(projectId).readAsStringSync()),
     }.toList();
-    final result = await (installer ?? PythonInstaller()).install(
-      modules: modules,
-      confirmGuessed: confirmGuessed,
-      onProgress: onProgress,
-    );
+    final result = await (installer ?? PythonInstaller(version: version))
+        .install(
+          modules: modules,
+          confirmGuessed: confirmGuessed,
+          onProgress: onProgress,
+        );
     await setPythonPath(result.path);
     return result;
   }
