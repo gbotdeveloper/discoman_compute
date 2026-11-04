@@ -55,7 +55,7 @@ class _ParallelRunsDialogState extends State<ParallelRunsDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Workers',
+                'Concurrent workers',
                 style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),

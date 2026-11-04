@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:discoman_worker/discoman_compute.dart';
 import 'package:flutter/material.dart';
 
@@ -50,15 +52,16 @@ class WorkerPanel extends StatelessWidget {
                 ? null
                 : () => _changeInterpreter(context, controller),
             changeHint: isRunning ? 'Stop the worker to change this' : null,
+            changeLabel: 'Choose Python',
             onInstall:
                 isRunning ||
                     controller.isBusy ||
-                    _usesInstalledManagedPython(controller)
+                    !_offersManagedPython(controller)
                 ? null
                 : () => _installPython(context, controller),
           ),
           _DetailRow(
-            label: 'Workers',
+            label: 'Concurrent workers',
             value: _parallelRunsLabel(controller),
             onChange: isRunning || controller.isBusy
                 ? null
@@ -74,30 +77,44 @@ class WorkerPanel extends StatelessWidget {
   }
 }
 
-/// Whether Discoman's own Python is the one in use and is still there to
-/// run, so installing it again would change nothing.
-bool _usesInstalledManagedPython(AppController controller) {
-  final installer = PythonInstaller();
-  return controller.config.pythonPath == installer.executablePath &&
-      installer.isInstalled;
+/// Whether to offer installing Discoman's own Python beside the Python row:
+/// only while it is not installed and no Python of the creator's is chosen.
+/// The bare default command counts as none chosen.
+bool _offersManagedPython(AppController controller) {
+  if (PythonInstaller().isInstalled) return false;
+  final path = controller.config.pythonPath.trim();
+  final chosen = path.contains('/') || path.contains(r'\');
+  return !chosen || !File(path).existsSync();
 }
 
 Future<void> _changeInterpreter(
   BuildContext context,
   AppController controller,
 ) async {
+  var install = false;
   final picked = await showDialog<String>(
     context: context,
-    builder: (context) =>
-        PythonInterpreterDialog(initialPath: controller.config.pythonPath),
+    builder: (dialogContext) => PythonInterpreterDialog(
+      initialPath: controller.config.pythonPath,
+      onInstallManaged: PythonInstaller().isInstalled
+          ? null
+          : () {
+              install = true;
+              Navigator.of(dialogContext).pop();
+            },
+    ),
   );
+  if (install && context.mounted) {
+    await _installPython(context, controller);
+    return;
+  }
   if (picked == null) return;
   await controller.setPythonPath(picked);
 }
 
 String _parallelRunsLabel(AppController controller) {
   final runs = controller.parallelRuns;
-  return runs == 1 ? '1 worker' : '$runs workers';
+  return '$runs';
 }
 
 Future<void> _changeParallelRuns(
@@ -218,6 +235,7 @@ class _DetailRow extends StatelessWidget {
     required this.value,
     this.onChange,
     this.changeHint,
+    this.changeLabel = 'Change',
     this.onInstall,
   });
 
@@ -229,6 +247,8 @@ class _DetailRow extends StatelessWidget {
 
   /// Why the change action is unavailable, when it is.
   final String? changeHint;
+
+  final String changeLabel;
 
   /// When given, the row offers to install Discoman's own Python.
   final VoidCallback? onInstall;
@@ -257,7 +277,7 @@ class _DetailRow extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 70,
+                  width: 150,
                   child: Text(
                     label,
                     style: textTheme.bodySmall?.copyWith(
@@ -278,7 +298,7 @@ class _DetailRow extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 if (onChange != null)
-                  _RowAction(label: 'Change', onTap: onChange!)
+                  _RowAction(label: changeLabel, onTap: onChange!)
                 else if (changeHint != null)
                   Text(changeHint!, style: labelStyle),
               ],

@@ -18,6 +18,7 @@ class PythonInterpreterDialog extends StatefulWidget {
     this.check,
     this.browse,
     this.find,
+    this.onInstallManaged,
     super.key,
   });
 
@@ -34,6 +35,10 @@ class PythonInterpreterDialog extends StatefulWidget {
   /// Lists the Pythons on this computer. Injected by tests.
   final List<FoundPython> Function()? find;
 
+  /// When given, Discoman's own Python is not installed and the dialog offers
+  /// to install it.
+  final VoidCallback? onInstallManaged;
+
   @override
   State<PythonInterpreterDialog> createState() =>
       _PythonInterpreterDialogState();
@@ -47,6 +52,12 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
   InterpreterCheck? _result;
   bool _isChecking = false;
   late final List<FoundPython> _found = (widget.find ?? findPythons)();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialPath.trim().isNotEmpty) _check();
+  }
 
   @override
   void dispose() {
@@ -100,7 +111,7 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,9 +125,8 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
               ),
               const SizedBox(height: 6),
               Text(
-                'The Python your scripts run with. It needs the packages they '
-                'import: pick the one you use in Spyder or your terminal, such '
-                'as your Anaconda environment.',
+                'The Python your scripts run with. Pick one that has the '
+                'packages your scripts import.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   height: 1.45,
@@ -131,21 +141,19 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Flexible(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 220),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final python in _found)
-                            _FoundPythonRow(
-                              python: python,
-                              selected: _path.text.trim() == python.path,
-                              onTap: () => _pick(python),
-                            ),
-                        ],
-                      ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final python in _found)
+                          _FoundPythonRow(
+                            python: python,
+                            selected: _path.text.trim() == python.path,
+                            onTap: () => _pick(python),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -184,6 +192,10 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                 const SizedBox(height: 14),
                 _CheckResult(result: result),
               ],
+              if (widget.onInstallManaged != null) ...[
+                const SizedBox(height: 16),
+                _InstallManagedOffer(onInstall: widget.onInstallManaged!),
+              ],
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -198,7 +210,9 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                     label: 'Use this Python',
                     // Expanded before it leaves this dialog: a stored `~` is
                     // meaningless to the process that will run it later.
-                    onPressed: _path.text.trim().isEmpty
+                    // Only a path that has just passed the check: a typo
+                    // would otherwise surface as a visitor's failed run.
+                    onPressed: _isChecking || !(result?.isUsable ?? false)
                         ? null
                         : () => Navigator.of(
                             context,
@@ -208,6 +222,47 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InstallManagedOffer extends StatelessWidget {
+  const _InstallManagedOffer({required this.onInstall});
+
+  final VoidCallback onInstall;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'No Python of your own, or yours gives trouble? Discoman can '
+                'install Python $managedPythonVersion with numpy, pandas, '
+                'matplotlib and Pillow, apart from the others on this '
+                'computer.',
+                style: textTheme.bodySmall?.copyWith(height: 1.4),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ActionButton(
+              label: 'Install Python',
+              isPrimary: false,
+              onPressed: onInstall,
+            ),
+          ],
         ),
       ),
     );
