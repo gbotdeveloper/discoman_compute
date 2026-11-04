@@ -167,21 +167,21 @@ void main() {
     expect(find.byType(PythonInterpreterDialog), findsNothing);
   });
 
-  testWidgets('picking a Python found on the computer checks it', (
+  const imaging = FoundPython(
+    path: '/Users/me/anaconda3/envs/imaging/bin/python',
+    label: 'Anaconda · imaging',
+  );
+
+  testWidgets('picking a found Python checks it with no path to type', (
     tester,
   ) async {
     String? checked;
     await pump(
       tester,
-      found: const [
-        FoundPython(
-          path: '/Users/me/anaconda3/envs/imaging/bin/python',
-          label: 'Anaconda · imaging',
-        ),
-      ],
+      found: const [imaging],
       check: (path) {
         checked = path;
-        return replying(stdout: '3.11.9\n');
+        return replying(stdout: 'Python 3.11.9');
       },
     );
 
@@ -189,13 +189,36 @@ void main() {
     await tester.tap(find.text('Anaconda · imaging'));
     await tester.pumpAndSettle();
 
-    expect(checked, '/Users/me/anaconda3/envs/imaging/bin/python');
-    expect(
-      find.widgetWithText(
-        TextField,
-        '/Users/me/anaconda3/envs/imaging/bin/python',
-      ),
-      findsOneWidget,
-    );
+    expect(checked, imaging.path);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Check'), findsNothing);
+    expect(find.text('Browse…'), findsNothing);
+
+    await tester.tap(find.text('Use this Python'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PythonInterpreterDialog), findsNothing);
+  });
+
+  testWidgets('opens on the found Python already in use', (tester) async {
+    await pump(tester, initialPath: imaging.path, found: const [imaging]);
+
+    expect(find.byType(TextField), findsNothing);
+    expect(find.textContaining('Python 3.11.9'), findsWidgets);
+  });
+
+  testWidgets('entering a path brings the field, Browse and Check', (
+    tester,
+  ) async {
+    await pump(tester, initialPath: imaging.path, found: const [imaging]);
+
+    await tester.tap(find.text('Enter a path'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Browse…'), findsOneWidget);
+    // Nothing typed yet, so nothing checked and nothing to use.
+    await tester.tap(find.text('Use this Python'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PythonInterpreterDialog), findsOneWidget);
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:discoman_worker/discoman_compute.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -45,18 +47,26 @@ class PythonInterpreterDialog extends StatefulWidget {
 }
 
 class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
+  late final List<FoundPython> _found = (widget.find ?? findPythons)();
+
+  /// The found Python picked, or null while the creator types a path.
+  late FoundPython? _chosen = _found
+      .where((python) => python.path == widget.initialPath.trim())
+      .firstOrNull;
+
   late final TextEditingController _path = TextEditingController(
-    text: widget.initialPath,
+    text: _chosen == null ? widget.initialPath : '',
   );
 
   InterpreterCheck? _result;
   bool _isChecking = false;
-  late final List<FoundPython> _found = (widget.find ?? findPythons)();
+
+  String get _selectedPath => _chosen?.path ?? _path.text.trim();
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialPath.trim().isNotEmpty) _check();
+    if (_selectedPath.isNotEmpty) _check();
   }
 
   @override
@@ -66,16 +76,17 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
   }
 
   Future<void> _check() async {
-    if (_isChecking) return;
+    final path = _selectedPath;
     setState(() {
       _isChecking = true;
       _result = null;
     });
 
     final check = widget.check ?? (path) => checkInterpreter(path);
-    final result = await check(_path.text);
+    final result = await check(path);
 
-    if (!mounted) return;
+    // A later pick or edit has its own check coming.
+    if (!mounted || path != _selectedPath) return;
     setState(() {
       _isChecking = false;
       _result = result;
@@ -93,8 +104,16 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
   }
 
   void _pick(FoundPython python) {
-    setState(() => _path.text = python.path);
+    setState(() => _chosen = python);
     _check();
+  }
+
+  void _typePath() {
+    setState(() {
+      _chosen = null;
+      _isChecking = false;
+      _result = null;
+    });
   }
 
   static Future<String?> _openSystemPicker() async {
@@ -107,6 +126,7 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final result = _result;
+    final typing = _chosen == null;
 
     return Dialog(
       child: ConstrainedBox(
@@ -142,55 +162,72 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                 ),
                 const SizedBox(height: 6),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 220),
+                  constraints: const BoxConstraints(maxHeight: 260),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         for (final python in _found)
-                          _FoundPythonRow(
-                            python: python,
-                            selected: _path.text.trim() == python.path,
+                          _PythonChoiceRow(
+                            title: python.label,
+                            subtitle: python.path,
+                            selected: _chosen == python,
                             onTap: () => _pick(python),
                           ),
+                        _PythonChoiceRow(
+                          title: 'Enter a path',
+                          selected: typing,
+                          onTap: _typePath,
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
-              const SizedBox(height: 18),
-              TextField(
-                controller: _path,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Path',
-                  border: OutlineInputBorder(),
-                  hintText: '/usr/bin/python3',
+              if (typing) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _path,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Path',
+                    border: const OutlineInputBorder(),
+                    hintText: Platform.isWindows
+                        ? r'C:\path\to\python.exe'
+                        : '/usr/bin/python3',
+                  ),
+                  onSubmitted: (_) => _check(),
+                  // Whatever was checked was the old text.
+                  onChanged: (_) => setState(() {
+                    _result = null;
+                    _isChecking = false;
+                  }),
                 ),
-                onSubmitted: (_) => _check(),
-                onChanged: (_) {
-                  if (_result != null) setState(() => _result = null);
-                },
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  ActionButton(
-                    label: 'Browse…',
-                    isPrimary: false,
-                    onPressed: _browse,
-                  ),
-                  const SizedBox(width: 10),
-                  ActionButton(
-                    label: _isChecking ? 'Checking…' : 'Check',
-                    isPrimary: false,
-                    onPressed: _isChecking ? null : _check,
-                  ),
-                ],
-              ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    ActionButton(
+                      label: 'Browse…',
+                      isPrimary: false,
+                      onPressed: _browse,
+                    ),
+                    const SizedBox(width: 10),
+                    ActionButton(
+                      label: _isChecking ? 'Checking…' : 'Check',
+                      isPrimary: false,
+                      onPressed: _isChecking || _path.text.trim().isEmpty
+                          ? null
+                          : _check,
+                    ),
+                  ],
+                ),
+              ],
               if (result != null) ...[
                 const SizedBox(height: 14),
                 _CheckResult(result: result),
+              ] else if (_isChecking && !typing) ...[
+                const SizedBox(height: 14),
+                Text('Checking…', style: textTheme.bodySmall),
               ],
               if (widget.onInstallManaged != null) ...[
                 const SizedBox(height: 16),
@@ -208,15 +245,15 @@ class _PythonInterpreterDialogState extends State<PythonInterpreterDialog> {
                   const SizedBox(width: 10),
                   ActionButton(
                     label: 'Use this Python',
-                    // Expanded before it leaves this dialog: a stored `~` is
-                    // meaningless to the process that will run it later.
                     // Only a path that has just passed the check: a typo
                     // would otherwise surface as a visitor's failed run.
+                    // Expanded before it leaves this dialog: a stored `~` is
+                    // meaningless to the process that will run it later.
                     onPressed: _isChecking || !(result?.isUsable ?? false)
                         ? null
                         : () => Navigator.of(
                             context,
-                          ).pop(expandHomePath(_path.text)),
+                          ).pop(expandHomePath(_selectedPath)),
                   ),
                 ],
               ),
@@ -249,10 +286,8 @@ class _InstallManagedOffer extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'No Python of your own, or yours gives trouble? Discoman can '
-                'install Python $managedPythonVersion with numpy, pandas, '
-                'matplotlib and Pillow, apart from the others on this '
-                'computer.',
+                'No Python, or yours gives trouble? Discoman can download '
+                'one for you.',
                 style: textTheme.bodySmall?.copyWith(height: 1.4),
               ),
             ),
@@ -315,14 +350,16 @@ class _CheckResult extends StatelessWidget {
   }
 }
 
-class _FoundPythonRow extends StatelessWidget {
-  const _FoundPythonRow({
-    required this.python,
+class _PythonChoiceRow extends StatelessWidget {
+  const _PythonChoiceRow({
+    required this.title,
+    this.subtitle,
     required this.selected,
     required this.onTap,
   });
 
-  final FoundPython python;
+  final String title;
+  final String? subtitle;
   final bool selected;
   final VoidCallback onTap;
 
@@ -351,18 +388,19 @@ class _FoundPythonRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    python.label,
+                    title,
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Text(
-                    python.path,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
