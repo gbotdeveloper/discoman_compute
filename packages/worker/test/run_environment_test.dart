@@ -113,6 +113,17 @@ void main() {
       expect(env['PATH']!.split(pathSep).first, [prefix, bin].join(sep));
     });
 
+    test('a Python named without a folder changes nothing', () {
+      expect(
+        runEnvironment(
+          inherited: inherited,
+          loginShellPath: '',
+          pythonPath: 'python3',
+        ),
+        {'PATH': 'inherited'},
+      );
+    });
+
     test('a plain Python changes nothing', () {
       final python = make(['python', 'python.exe'], file: true);
 

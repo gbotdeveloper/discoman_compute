@@ -93,14 +93,16 @@ typedef _Activated = ({List<String> folders, Map<String, String> variables});
 
 _Activated? _activatedEnvironment(String pythonPath, bool windows) {
   final sep = windows ? r'\' : '/';
+  final separators = windows ? RegExp(r'[\\/]') : RegExp('/');
   String parent(String path) {
-    final index = path.lastIndexOf(windows ? RegExp(r'[\\/]') : '/');
-    return index <= 0 ? path : path.substring(0, index);
+    final index = path.lastIndexOf(separators);
+    return index <= 0 ? '' : path.substring(0, index);
   }
 
-  String name(String path) => path.substring(parent(path).length + 1);
+  String name(String path) => path.substring(path.lastIndexOf(separators) + 1);
 
   final dir = parent(pythonPath);
+  if (dir.isEmpty) return null;
   final last = name(dir).toLowerCase();
   final prefix = (windows ? last == 'scripts' : last == 'bin')
       ? parent(dir)
