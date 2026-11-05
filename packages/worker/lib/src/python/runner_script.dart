@@ -34,6 +34,78 @@ if hasattr(os, "setpgrp"):
     except OSError:
         pass
 
+# On Windows, a job object instead: every process this one starts, and every
+# process those start, joins it, and Windows ends them all the moment this
+# process ends. A MATLAB or a solver the script launched goes with it, which
+# taskkill's tree walk misses once the launcher that started it has exited.
+if os.name == "nt":
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        _kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+        _kernel32.CreateJobObjectW.argtypes = [wintypes.LPVOID, wintypes.LPCWSTR]
+        _kernel32.SetInformationJobObject.restype = wintypes.BOOL
+        _kernel32.SetInformationJobObject.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+        ]
+        _kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+        _kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        _kernel32.GetCurrentProcess.argtypes = []
+
+        class _IoCounters(ctypes.Structure):
+            _fields_ = [
+                ("ReadOperationCount", ctypes.c_ulonglong),
+                ("WriteOperationCount", ctypes.c_ulonglong),
+                ("OtherOperationCount", ctypes.c_ulonglong),
+                ("ReadTransferCount", ctypes.c_ulonglong),
+                ("WriteTransferCount", ctypes.c_ulonglong),
+                ("OtherTransferCount", ctypes.c_ulonglong),
+            ]
+
+        class _BasicLimits(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_longlong),
+                ("PerJobUserTimeLimit", ctypes.c_longlong),
+                ("LimitFlags", wintypes.DWORD),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", wintypes.DWORD),
+                ("Affinity", ctypes.c_size_t),
+                ("PriorityClass", wintypes.DWORD),
+                ("SchedulingClass", wintypes.DWORD),
+            ]
+
+        class _ExtendedLimits(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", _BasicLimits),
+                ("IoInfo", _IoCounters),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t),
+            ]
+
+        # Kept open for the life of this process: closing the last handle is
+        # what ends the job, and with it every process inside.
+        _JOB = _kernel32.CreateJobObjectW(None, None)
+        if _JOB:
+            _limits = _ExtendedLimits()
+            # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            _limits.BasicLimitInformation.LimitFlags = 0x2000
+            # JobObjectExtendedLimitInformation
+            _kernel32.SetInformationJobObject(
+                _JOB, 9, ctypes.byref(_limits), ctypes.sizeof(_limits)
+            )
+            _kernel32.AssignProcessToJobObject(_JOB, _kernel32.GetCurrentProcess())
+    except Exception:
+        pass
+
 SOURCE_FILE = Path("user_script.py")
 # Resolved up front so a user script calling os.chdir() cannot move them.
 RESULT_FILE = Path("result.json").resolve()

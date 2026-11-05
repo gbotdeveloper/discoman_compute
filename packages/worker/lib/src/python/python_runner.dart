@@ -204,6 +204,9 @@ class PythonRunner {
     timeoutTimer.cancel();
     cancelTimer.cancel();
     vram?.stop();
+    // A run's processes end with the run, whichever way it ended: a program
+    // the script started and forgot must not keep the creator's computer busy.
+    _killTree(process, ProcessSignal.sigkill);
     // Something the script started may still hold the pipes open; its output
     // is not worth hanging the worker for.
     await Future.wait([
