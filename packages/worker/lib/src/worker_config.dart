@@ -3,7 +3,7 @@ import 'dart:io';
 import 'settings/worker_settings.dart';
 
 /// The worker build/version string reported to the server on `register`.
-const String workerVersion = '0.3.0';
+const String workerVersion = '0.3.2';
 
 /// All configuration the worker resolves from CLI arguments and the
 /// environment. Arguments win over environment variables, which win over the
