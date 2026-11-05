@@ -91,6 +91,12 @@ const imagesAlias = 'Images';
 /// The alias a script declares as `Files = list[str]`: a list of file paths.
 const filesAlias = 'Files';
 
+/// The alias a script declares as `Image = str`: the path to one image.
+const imageAlias = 'Image';
+
+/// The alias a script declares as `File = str`: the path to one file.
+const fileAlias = 'File';
+
 List<ContractInputField> _buildInputFields(
   String source,
   String parametersSource,
@@ -169,6 +175,8 @@ _ResolvedField _resolveField(
   final bare = _withoutOptional(annotation ?? '');
   if (bare == imagesAlias) return const _ResolvedField('image', multiple: true);
   if (bare == filesAlias) return const _ResolvedField('file', multiple: true);
+  if (bare == imageAlias) return const _ResolvedField('image');
+  if (bare == fileAlias) return const _ResolvedField('file');
 
   final itemAnnotation = _listItemAnnotation(bare);
   final category = _resolveCategoryOptionsFromAnnotation(

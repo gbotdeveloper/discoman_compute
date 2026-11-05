@@ -146,6 +146,44 @@ def run(photos: Images, reports: Optional[Files] = None, label: str = ""):
       expect(fields[1].isRequired, isFalse);
     });
 
+    test('reads Image and File as one path', () {
+      const source = '''
+Image = str
+File = str
+
+def run(photo: Image, report: Optional[File] = None):
+    return {"r": 1}
+''';
+      final fields = extractContractDraft(source).inputFields;
+      expect(fields.map((f) => [f.parameterName, f.type, f.multiple]), [
+        ['photo', PythonFieldType.image, false],
+        ['report', PythonFieldType.file, false],
+      ]);
+      expect(fields.first.controlHint, 'Image upload field');
+      expect(fields[1].isRequired, isFalse);
+    });
+
+    test('reads Image and File outputs as one path', () {
+      const source = '''
+Image = str
+File = str
+
+
+class Outputs:
+    chart: Image
+    report: File
+
+
+def run() -> Outputs:
+    return {}
+''';
+      final outputs = extractContractDraft(source).outputFields;
+      expect(outputs.map((f) => [f.outputKey, f.type, f.multiple]), [
+        ['chart', PythonFieldType.image, false],
+        ['report', PythonFieldType.file, false],
+      ]);
+    });
+
     test('no longer guesses images from names or docstrings', () {
       const source = '''
 def run(photo: dict, scans):
