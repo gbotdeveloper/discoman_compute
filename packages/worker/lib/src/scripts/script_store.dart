@@ -35,11 +35,13 @@ class ScriptStore {
   }
 
   /// Copies [source] in as the script for [projectId], replacing any previous
-  /// one, and returns the stored file.
+  /// one, and returns the stored file. [sourcePath], the file it was read
+  /// from, is remembered beside it so runs can import the modules kept next
+  /// to the original.
   ///
   /// Written through a temp file and renamed, so an interrupted copy cannot
   /// leave a truncated script that would fail at run time rather than here.
-  File store(String projectId, String source) {
+  File store(String projectId, String source, {String? sourcePath}) {
     if (!directory.existsSync()) {
       directory.createSync(recursive: true);
     }
@@ -51,8 +53,26 @@ class ScriptStore {
     _chmod(tmp.path, '600');
     tmp.renameSync(target.path);
     _chmod(target.path, '600');
+    if (sourcePath != null) {
+      _sourcePathFileFor(projectId).writeAsStringSync(sourcePath, flush: true);
+    }
     return target;
   }
+
+  /// The folder the script for [projectId] was linked from, when it was
+  /// linked on this machine and that folder still exists. Runs put it on
+  /// PYTHONPATH, so `import helper` finds a helper.py kept next to the script.
+  Directory? sourceDirectoryFor(String projectId) {
+    final file = _sourcePathFileFor(projectId);
+    if (!file.existsSync()) return null;
+    final path = file.readAsStringSync().trim();
+    if (path.isEmpty) return null;
+    final folder = File(path).parent;
+    return folder.existsSync() ? folder : null;
+  }
+
+  File _sourcePathFileFor(String projectId) =>
+      File('${directory.path}${Platform.pathSeparator}$projectId.source');
 
   /// The project ids this machine holds a script for.
   ///

@@ -33,6 +33,40 @@ void main() {
     );
   });
 
+  group('sourceDirectoryFor', () {
+    test('is the folder the script was linked from', () {
+      final folder = Directory('${temp.path}/work')..createSync();
+      final script = File('${folder.path}/script.py')..writeAsStringSync('');
+
+      store.store('abc123', '', sourcePath: script.path);
+
+      expect(store.sourceDirectoryFor('abc123')?.path, folder.path);
+      expect(store.linkedProjectIds(), ['abc123']);
+    });
+
+    test('is null for a script that was not linked here', () {
+      store.store('abc123', '');
+
+      expect(store.sourceDirectoryFor('abc123'), isNull);
+    });
+
+    test('is null once that folder is gone', () {
+      final folder = Directory('${temp.path}/work')..createSync();
+      store.store('abc123', '', sourcePath: '${folder.path}/script.py');
+      folder.deleteSync(recursive: true);
+
+      expect(store.sourceDirectoryFor('abc123'), isNull);
+    });
+
+    test('survives a copy from Discoman replacing the script', () {
+      final folder = Directory('${temp.path}/work')..createSync();
+      store.store('abc123', 'v1', sourcePath: '${folder.path}/script.py');
+      store.store('abc123', 'v2');
+
+      expect(store.sourceDirectoryFor('abc123')?.path, folder.path);
+    });
+  });
+
   group('linkedProjectIds', () {
     test('lists the projects this machine holds a script for', () {
       store.store('abc123', 'def run():\n    return {}\n');

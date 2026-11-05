@@ -116,7 +116,10 @@ the server could not be reached. Check your connection, then sign in again.
 
 **`ModuleNotFoundError`** — your script imports a package your Python does not
 have. Install it into that interpreter, or point the app at one that has it
-(**This computer → Python → Change**).
+(**This computer → Python → Change**). Your own modules are different: each
+run copies the linked script into a fresh folder, but the folder you linked it
+from is on `PYTHONPATH`, so `import helper` finds a `helper.py` (or a package
+folder) kept next to the script. Link the script again if you move it.
 
 **The client never shows as online** — check that the project's Compute setting
 is "My own machine", and that the worker is started.

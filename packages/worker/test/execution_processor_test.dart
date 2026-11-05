@@ -5,6 +5,7 @@ import 'package:discoman_client/discoman_client.dart';
 import 'package:discoman_worker/src/execution_processor.dart';
 import 'package:discoman_worker/src/heartbeat.dart';
 import 'package:discoman_worker/src/python/python_runner.dart';
+import 'package:discoman_worker/src/scripts/script_store.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
@@ -116,6 +117,32 @@ void main() {
     await processor.process(claimed());
 
     expect(computeWorker.reports.single.errorReason, 'outputUploadFailed');
+  });
+
+  test('hands the runner the folder the script was linked from', () async {
+    final temp = Directory.systemTemp.createTempSync('discoman_processor');
+    addTearDown(() => temp.deleteSync(recursive: true));
+    final work = Directory('${temp.path}${_sep}work')..createSync();
+    final store = ScriptStore(Directory('${temp.path}${_sep}scripts'))
+      ..store(
+        'project-1',
+        'def main():\n  return {}\n',
+        sourcePath: '${work.path}${_sep}script.py',
+      );
+    final linked = ExecutionProcessor(
+      client: _FakeClient()..fake = computeWorker,
+      workerId: workerId,
+      pythonRunner: pythonRunner,
+      heartbeat: heartbeat,
+      scriptStore: store,
+      reportRetryDelay: Duration.zero,
+    );
+
+    await linked.process(claimed());
+    expect(pythonRunner.lastExtraPythonPath, work.path);
+
+    await processor.process(claimed());
+    expect(pythonRunner.lastExtraPythonPath, isNull);
   });
 
   test('passes the outputs class Outputs declares to the runner', () async {
@@ -450,6 +477,7 @@ class _FakePythonRunner extends PythonRunner {
   final Map<String, dynamic> outputs;
   Map<String, dynamic>? lastInputs;
   Map<String, String>? lastOutputTypes;
+  String? lastExtraPythonPath;
   final inputBytes = <String, List<int>>{};
   PythonRunResult? result;
 
@@ -462,9 +490,11 @@ class _FakePythonRunner extends PythonRunner {
     required bool Function() cancelRequested,
     Map<String, String>? outputTypes,
     Directory? runDirectory,
+    String? extraPythonPath,
   }) async {
     lastInputs = inputs;
     lastOutputTypes = outputTypes;
+    lastExtraPythonPath = extraPythonPath;
     for (final value in inputs.values) {
       for (final path in value is List ? value : [value]) {
         if (path is String && File(path).existsSync()) {

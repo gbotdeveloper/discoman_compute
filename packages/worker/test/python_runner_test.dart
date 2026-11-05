@@ -55,6 +55,29 @@ void main() {
     skip: hasPython ? false : 'python3 is not installed',
   );
 
+  test(
+    'imports modules from the folder the script was linked from',
+    () async {
+      final folder = Directory.systemTemp.createTempSync('discoman_linked');
+      addTearDown(() => folder.deleteSync(recursive: true));
+      File('${folder.path}/helper.py').writeAsStringSync('VALUE = 6\n');
+
+      final result = await PythonRunner('python3').run(
+        source:
+            'import helper\n\ndef main():\n    return {"value": helper.VALUE}\n',
+        entrypointName: 'main',
+        inputs: const {},
+        timeoutSeconds: 30,
+        cancelRequested: () => false,
+        extraPythonPath: folder.path,
+      );
+
+      expect(result.success, isTrue);
+      expect(result.outputs?['value'], 6);
+    },
+    skip: hasPython ? false : 'python3 is not installed',
+  );
+
   group('measuring', () {
     final python = Platform.isWindows ? 'python' : 'python3';
     final canMeasure = _runs(python);

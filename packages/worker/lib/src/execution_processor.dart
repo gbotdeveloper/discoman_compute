@@ -130,6 +130,7 @@ class ExecutionProcessor {
       cancelRequested: () => heartbeat.cancelRequested,
       outputTypes: _declaredOutputTypes(source),
       runDirectory: runDir,
+      extraPythonPath: _linkedSourceDirectory(claimed.projectId),
     );
     final usage = result.usage;
     if (usage != null) {
@@ -435,6 +436,17 @@ class ExecutionProcessor {
         value['extension'] is String &&
         value['mimeType'] is String &&
         value['sizeBytes'] is int;
+  }
+
+  /// The folder the project's script was linked from on this machine, so a
+  /// run can import the modules kept next to it. Null when the script was
+  /// never linked here, or where there is no home directory to look in.
+  String? _linkedSourceDirectory(String projectId) {
+    try {
+      return scriptStore.sourceDirectoryFor(projectId)?.path;
+    } on StateError {
+      return null;
+    }
   }
 
   /// The Python to run: the server's snapshot when it has one, otherwise this

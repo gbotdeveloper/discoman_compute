@@ -89,6 +89,23 @@ Map<String, String> runEnvironment({
   return {...?activated?.variables, key: folders.join(separator)};
 }
 
+/// The PYTHONPATH entry a run gets: [folder] first, then whatever the
+/// environment already had, under the name it already used.
+Map<String, String> pythonPathWith(
+  String folder, {
+  Map<String, String>? inherited,
+  bool? isWindows,
+}) {
+  final base = inherited ?? Platform.environment;
+  final separator = (isWindows ?? Platform.isWindows) ? ';' : ':';
+  final key = base.keys.firstWhere(
+    (name) => name.toUpperCase() == 'PYTHONPATH',
+    orElse: () => 'PYTHONPATH',
+  );
+  final existing = base[key] ?? '';
+  return {key: existing.isEmpty ? folder : '$folder$separator$existing'};
+}
+
 typedef _Activated = ({List<String> folders, Map<String, String> variables});
 
 _Activated? _activatedEnvironment(String pythonPath, bool windows) {

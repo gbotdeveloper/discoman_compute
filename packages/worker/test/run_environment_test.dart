@@ -22,6 +22,26 @@ void main() {
     expect(env, {'Path': r'C:\Windows'});
   }, testOn: 'windows');
 
+  test('puts the linked folder first on PYTHONPATH', () {
+    expect(
+      pythonPathWith(
+        '/work',
+        inherited: {'PYTHONPATH': '/lib'},
+        isWindows: false,
+      ),
+      {'PYTHONPATH': '/work:/lib'},
+    );
+    expect(
+      pythonPathWith(
+        r'C:\work',
+        inherited: {'PythonPath': ''},
+        isWindows: true,
+      ),
+      {'PythonPath': r'C:\work'},
+    );
+    expect(pythonPathWith('/work', inherited: {}), {'PYTHONPATH': '/work'});
+  });
+
   test('reads the login shell PATH without failing', () async {
     await loadLoginShellPath();
 

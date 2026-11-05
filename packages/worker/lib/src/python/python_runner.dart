@@ -96,6 +96,7 @@ class PythonRunner {
     required bool Function() cancelRequested,
     Map<String, String>? outputTypes,
     Directory? runDirectory,
+    String? extraPythonPath,
   }) async {
     // A caller that gives the folder keeps it, to read the output files from.
     final tempDir =
@@ -124,6 +125,9 @@ class PythonRunner {
         environment: {
           ...runEnvironment(pythonPath: pythonPath),
           'PYTHONUTF8': '1',
+          // The folder the script was linked from, so `import helper` finds
+          // the helper.py kept next to it.
+          if (extraPythonPath != null) ...pythonPathWith(extraPythonPath),
         },
       );
       _running.add(process);

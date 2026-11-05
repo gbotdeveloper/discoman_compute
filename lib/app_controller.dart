@@ -403,7 +403,11 @@ class AppController extends ChangeNotifier {
       );
       // Stored before publishing: a contract published against a script this
       // machine does not have would leave the project pointing at nothing.
-      ScriptStore.defaultLocation().store(projectId, picked.source);
+      ScriptStore.defaultLocation().store(
+        projectId,
+        picked.source,
+        sourcePath: picked.path,
+      );
       _refreshLinkedProjects();
       await session.client.creatorScript.publishContract(
         projectId,
