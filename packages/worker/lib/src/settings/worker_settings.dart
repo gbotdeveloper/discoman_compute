@@ -4,6 +4,10 @@ import 'dart:io';
 import '../external_code.dart';
 import '../home_path.dart';
 
+/// Whether the desktop app follows the system's light or dark setting, or
+/// picks one itself. The CLI has no use for it.
+enum ThemePreference { system, light, dark }
+
 /// Preferences a creator sets once and both front ends honour.
 class WorkerSettings {
   const WorkerSettings({
@@ -12,6 +16,7 @@ class WorkerSettings {
     this.externalCode = const {},
     this.parallelRuns = 1,
     this.projectRunLimits = const {},
+    this.theme = ThemePreference.system,
   });
 
   /// The Python interpreter to run scripts with, or null when the creator has
@@ -38,12 +43,16 @@ class WorkerSettings {
   /// left out may use every worker.
   final Map<String, int> projectRunLimits;
 
+  /// How the desktop app's window looks.
+  final ThemePreference theme;
+
   WorkerSettings copyWith({
     String? pythonPath,
     Set<String>? pausedProjectIds,
     Map<String, List<ExternalCodeSource>>? externalCode,
     int? parallelRuns,
     Map<String, int>? projectRunLimits,
+    ThemePreference? theme,
   }) {
     return WorkerSettings(
       pythonPath: pythonPath ?? this.pythonPath,
@@ -51,6 +60,7 @@ class WorkerSettings {
       externalCode: externalCode ?? this.externalCode,
       parallelRuns: parallelRuns ?? this.parallelRuns,
       projectRunLimits: projectRunLimits ?? this.projectRunLimits,
+      theme: theme ?? this.theme,
     );
   }
 }
@@ -88,6 +98,7 @@ class WorkerSettingsStore {
       final external = decoded['externalCode'];
       final parallel = decoded['parallelRuns'];
       final limits = decoded['projectRunLimits'];
+      final theme = decoded['theme'];
       return WorkerSettings(
         pythonPath: (python is String && python.trim().isNotEmpty)
             ? python.trim()
@@ -118,6 +129,11 @@ class WorkerSettingsStore {
                     entry.key as String: entry.value as int,
               }
             : const {},
+        theme:
+            ThemePreference.values
+                .where((value) => value.name == theme)
+                .firstOrNull ??
+            ThemePreference.system,
       );
     } catch (_) {
       return const WorkerSettings();
@@ -148,6 +164,8 @@ class WorkerSettingsStore {
         if (settings.parallelRuns > 1) 'parallelRuns': settings.parallelRuns,
         if (settings.projectRunLimits.isNotEmpty)
           'projectRunLimits': settings.projectRunLimits,
+        if (settings.theme != ThemePreference.system)
+          'theme': settings.theme.name,
       }),
       flush: true,
     );

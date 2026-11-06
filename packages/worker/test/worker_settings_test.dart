@@ -48,6 +48,31 @@ void main() {
     expect(leftovers, isEmpty);
   });
 
+  group('theme', () {
+    test('defaults to following the system', () {
+      expect(store.load().theme, ThemePreference.system);
+    });
+
+    test('survives a round trip', () {
+      store.save(const WorkerSettings(theme: ThemePreference.dark));
+
+      expect(store.load().theme, ThemePreference.dark);
+    });
+
+    test('following the system writes no key at all', () {
+      store.save(const WorkerSettings(pythonPath: '/p'));
+
+      expect(store.file.readAsStringSync(), isNot(contains('theme')));
+    });
+
+    test('an unknown value reads as following the system', () {
+      store.file.parent.createSync(recursive: true);
+      store.file.writeAsStringSync('{"theme": "sepia"}');
+
+      expect(store.load().theme, ThemePreference.system);
+    });
+  });
+
   group('paused projects', () {
     test('survive a round trip', () {
       store.save(const WorkerSettings(pausedProjectIds: {'b', 'a'}));

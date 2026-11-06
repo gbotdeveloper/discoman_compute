@@ -45,17 +45,20 @@ class AppController extends ChangeNotifier {
     WorkerSettingsStore? settingsStore,
     UsageStore? usageStore,
     SavedSignInStore? signInStore,
+    MachineIdStore? machineIdStore,
     Future<MachineResources> Function()? readMachine,
   }) : config = config ?? WorkerConfig.resolve(),
        _settingsStore = settingsStore,
        _usageStore = usageStore,
        _signInStore = signInStore,
+       _machineIdStore = machineIdStore,
        _readMachine = readMachine ?? MachineResources.read;
 
   /// Injectable so a test never writes to the creator's real home directory.
   final WorkerSettingsStore? _settingsStore;
   final UsageStore? _usageStore;
   final SavedSignInStore? _signInStore;
+  final MachineIdStore? _machineIdStore;
   final Future<MachineResources> Function() _readMachine;
 
   late final WorkerSettingsStore settingsStore =
@@ -66,6 +69,10 @@ class AppController extends ChangeNotifier {
 
   late final SavedSignInStore signInStore =
       _signInStore ?? SavedSignInStore.defaultLocation();
+
+  /// The id this computer goes by in Discoman, shared with the worker.
+  late final MachineIdStore machineIdStore =
+      _machineIdStore ?? MachineIdStore.defaultLocation();
 
   /// True while the saved sign-in is tried on launch.
   bool isRestoring = false;
@@ -145,6 +152,22 @@ class AppController extends ChangeNotifier {
   /// which looks online but never runs — worse than refusing to start.
   bool get canServeAnything =>
       linkedProjectIds.any((id) => !pausedProjectIds.contains(id));
+
+  /// How the window looks: following the system, or light or dark.
+  ThemePreference get theme {
+    try {
+      return settingsStore.load().theme;
+    } catch (_) {
+      return ThemePreference.system;
+    }
+  }
+
+  /// Applies at once, and is remembered for the next launch.
+  void setTheme(ThemePreference theme) {
+    final store = settingsStore;
+    store.save(store.load().copyWith(theme: theme));
+    _notify();
+  }
 
   /// How many runs this computer takes at once.
   int get parallelRuns {
@@ -491,6 +514,23 @@ class AppController extends ChangeNotifier {
     if (worker == null) return;
     await _run(worker.stop);
     await _disposeWorker();
+  }
+
+  /// Removes this computer's finished runs from Discoman, so the dashboard
+  /// no longer lists them, and empties the log. Returns how many runs went,
+  /// or null when it failed; [errorMessage] then says why. Queued and
+  /// running runs stay.
+  Future<int?> clearRunHistory() async {
+    final session = _session;
+    if (session == null) return null;
+    int? removed;
+    await _run(() async {
+      removed = await session.client.computeSettings.clearMachineRuns(
+        machineIdStore.read(),
+      );
+      log.clear();
+    });
+    return removed;
   }
 
   void _appendLog(String line) {

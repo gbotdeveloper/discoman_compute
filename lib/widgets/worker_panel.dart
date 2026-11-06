@@ -70,6 +70,25 @@ class WorkerPanel extends StatelessWidget {
           ),
           _DetailRow(label: 'Server', value: controller.config.serverUrl),
           const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Log',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              _RowAction(
+                label: 'Clear history',
+                onTap: controller.isBusy
+                    ? null
+                    : () => _clearHistory(context, controller),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           _WorkerLog(lines: controller.log),
         ],
       ),
@@ -141,6 +160,45 @@ Future<void> _changeParallelRuns(
   );
   if (picked == null) return;
   controller.setParallelRuns(picked);
+}
+
+/// Asks before removing this computer's finished runs from Discoman, since
+/// the dashboard loses them too, then says how many went.
+Future<void> _clearHistory(
+  BuildContext context,
+  AppController controller,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text("Clear this computer's history?"),
+      content: const Text(
+        'Its finished runs are removed from Discoman, so the dashboard no '
+        'longer lists them, and the log below is emptied. Runs that are '
+        'queued or running stay.',
+      ),
+      actions: [
+        ActionButton(
+          label: 'Cancel',
+          isPrimary: false,
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+        ActionButton(
+          label: 'Clear',
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final removed = await controller.clearRunHistory();
+  // A failure shows in the error banner; nothing to add here.
+  if (removed == null || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(removed == 1 ? 'Removed 1 run.' : 'Removed $removed runs.'),
+    ),
+  );
 }
 
 Future<void> _installPython(BuildContext context, AppController controller) {
@@ -314,30 +372,35 @@ class _RowAction extends StatelessWidget {
   const _RowAction({required this.label, required this.onTap});
 
   final String label;
-  final VoidCallback onTap;
+
+  /// Null disables the action and greys it out.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
+    return Opacity(
+      opacity: onTap == null ? 0.5 : 1,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
