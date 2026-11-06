@@ -10,6 +10,7 @@ import 'external_code_dialog.dart';
 import 'install_packages_dialog.dart';
 import 'project_page.dart';
 import 'projects_panel.dart';
+import 'theme_switch.dart';
 import 'worker_panel.dart';
 
 /// The window once the creator is signed in: their projects, and the worker.
@@ -93,6 +94,7 @@ class HomePage extends StatelessWidget {
           _SignedInHeader(
             email: controller.signedInAs ?? '',
             onSignOut: controller.isBusy ? null : controller.signOut,
+            themeSwitch: ThemeSwitch(controller: controller),
           ),
           if (controller.errorMessage != null) ...[
             const SizedBox(height: 16),
@@ -127,10 +129,15 @@ class HomePage extends StatelessWidget {
 }
 
 class _SignedInHeader extends StatelessWidget {
-  const _SignedInHeader({required this.email, required this.onSignOut});
+  const _SignedInHeader({
+    required this.email,
+    required this.onSignOut,
+    required this.themeSwitch,
+  });
 
   final String email;
   final VoidCallback? onSignOut;
+  final Widget themeSwitch;
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +151,8 @@ class _SignedInHeader extends StatelessWidget {
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
+        themeSwitch,
+        const SizedBox(width: 16),
         Text(
           email,
           style: textTheme.bodySmall?.copyWith(

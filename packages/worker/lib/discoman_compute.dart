@@ -22,6 +22,7 @@ export 'src/external_code.dart'
     show ExternalCodeSource, readExternalCode, readExternalCodeVersion;
 export 'src/heartbeat.dart' show ExecutionHeartbeat;
 export 'src/home_path.dart' show expandHomePath;
+export 'src/machine_id.dart' show MachineIdStore;
 export 'src/machine_resources.dart'
     show MachineResources, suggestedParallelRuns;
 export 'src/python/contract_extractor.dart' show extractContractDraft;
@@ -54,5 +55,9 @@ export 'src/scripts/script_sync.dart'
         syncScripts;
 export 'src/settings/usage_store.dart' show UsageStore;
 export 'src/settings/worker_settings.dart'
-    show WorkerSettings, WorkerSettingsStore, loadWorkerSettingsOrEmpty;
+    show
+        ThemePreference,
+        WorkerSettings,
+        WorkerSettingsStore,
+        loadWorkerSettingsOrEmpty;
 export 'src/worker_config.dart' show WorkerConfig, workerVersion;

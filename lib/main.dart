@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:discoman_worker/discoman_compute.dart'
-    show PythonRunner, loadLoginShellPath;
+    show PythonRunner, ThemePreference, loadLoginShellPath;
 import 'package:flutter/material.dart';
 
 import 'app_controller.dart';
@@ -50,24 +50,26 @@ class _DiscomanComputeAppState extends State<DiscomanComputeApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Discoman Compute',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(Brightness.light),
-      darkTheme: buildAppTheme(Brightness.dark),
-      home: Scaffold(
-        // Only which page is shown depends on this rebuild; each page
-        // subscribes to the controller for its own contents.
-        body: ListenableBuilder(
-          listenable: _controller,
-          builder: (context, _) {
-            if (_controller.isRestoring) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return _controller.isSignedIn
-                ? HomePage(controller: _controller)
-                : SignInPage(controller: _controller);
-          },
+    // Only the theme and which page is shown depend on this rebuild; each
+    // page subscribes to the controller for its own contents.
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) => MaterialApp(
+        title: 'Discoman Compute',
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(Brightness.light),
+        darkTheme: buildAppTheme(Brightness.dark),
+        themeMode: switch (_controller.theme) {
+          ThemePreference.system => ThemeMode.system,
+          ThemePreference.light => ThemeMode.light,
+          ThemePreference.dark => ThemeMode.dark,
+        },
+        home: Scaffold(
+          body: _controller.isRestoring
+              ? const Center(child: CircularProgressIndicator())
+              : _controller.isSignedIn
+              ? HomePage(controller: _controller)
+              : SignInPage(controller: _controller),
         ),
       ),
     );

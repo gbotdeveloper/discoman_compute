@@ -166,6 +166,17 @@ class EndpointComputeSettings extends _i2.EndpointRef {
         {},
       );
 
+  /// Deletes the finished runs the caller's computer [machineId] did, and
+  /// returns how many went. Called by Discoman Compute on that computer.
+  /// Queued and running runs stay; a computer Discoman has never seen has
+  /// nothing to clear.
+  _i3.Future<int> clearMachineRuns(String machineId) =>
+      caller.callServerEndpoint<int>(
+        'computeSettings',
+        'clearMachineRuns',
+        {'machineId': machineId},
+      );
+
   /// Mints a new machine credential for the caller's compute client. The
   /// plaintext token is returned exactly once; only its hash is stored.
   _i3.Future<_i9.CreatedComputeClientCredential> createComputeClientCredential(

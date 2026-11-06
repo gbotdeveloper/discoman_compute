@@ -54,13 +54,19 @@ The window has two parts:
   another and checks it before you commit to it. Leave the worker started. In
   GBot, the **Compute** section of your project's Publish step will show the
   client as online. While it is stopped, requests to your apps wait in the queue
-  rather than failing — they run as soon as you start it again.
+  rather than failing — they run as soon as you start it again. **Clear
+  history** removes this computer's finished runs from Discoman, so the
+  dashboard no longer lists them, and empties the log; runs that are queued or
+  running stay.
 - **Your projects** — pick one and choose **Link a script**. The app reads the
   `.py` file you select, shows you the inputs and outputs it found, and asks you
   to confirm. Only that list is sent; the script is copied to
   `~/.discoman/scripts/` and stays here.
 
 Link again whenever you change what your script takes or returns.
+
+The three buttons at the top right choose how the window looks: following
+your system's light or dark setting, always light, or always dark.
 
 ## On a machine with no screen
 
