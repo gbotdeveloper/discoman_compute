@@ -57,8 +57,8 @@ import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dar
     as _i38;
 import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
     as _i39;
-import 'package:http/http.dart' as _i47;
-import 'protocol.dart' as _i48;
+import 'package:http/http.dart' as _i52;
+import 'protocol.dart' as _i53;
 
 /// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider
 /// endpoint is made available on the server.
@@ -608,10 +608,10 @@ class Client extends _i2.ServerpodClientShared {
     onFailedCall,
     Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i47.Client? httpClientOverride,
+    _i52.Client? httpClientOverride,
   }) : super(
          host,
-         _i48.Protocol(),
+         _i53.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
