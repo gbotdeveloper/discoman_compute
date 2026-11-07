@@ -35,28 +35,28 @@ import 'execution/models/machine_check_view.dart' as _i33;
 import 'execution/models/machine_report.dart' as _i34;
 import 'execution/models/worker_last_run.dart' as _i36;
 import 'execution/models/worker_registration.dart' as _i37;
-import 'runtime/contract_draft.dart' as _i39;
-import 'runtime/contract_input_field.dart' as _i40;
-import 'runtime/contract_output_field.dart' as _i41;
-import 'runtime/creator_project_summary.dart' as _i42;
-import 'runtime/python_field_type.dart' as _i48;
-import 'runtime/script_location.dart' as _i49;
-import 'runtime/script_run_exception.dart' as _i50;
-import 'runtime/synced_script_info.dart' as _i53;
+import 'runtime/contract_draft.dart' as _i40;
+import 'runtime/contract_input_field.dart' as _i41;
+import 'runtime/contract_output_field.dart' as _i42;
+import 'runtime/creator_project_summary.dart' as _i43;
+import 'runtime/python_field_type.dart' as _i55;
+import 'runtime/script_location.dart' as _i56;
+import 'runtime/script_run_exception.dart' as _i57;
+import 'runtime/synced_script_info.dart' as _i60;
 import 'package:discoman_client/src/protocol/execution/models/compute_worker_info.dart'
-    as _i56;
-import 'package:discoman_client/src/protocol/execution/models/compute_client_credential_info.dart'
-    as _i57;
-import 'package:discoman_client/src/protocol/execution/models/external_code_version.dart'
-    as _i58;
-import 'package:discoman_client/src/protocol/runtime/synced_script_info.dart'
-    as _i59;
-import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
     as _i63;
-import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
+import 'package:discoman_client/src/protocol/execution/models/compute_client_credential_info.dart'
+    as _i64;
+import 'package:discoman_client/src/protocol/execution/models/external_code_version.dart'
     as _i65;
-import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
+import 'package:discoman_client/src/protocol/runtime/synced_script_info.dart'
     as _i66;
+import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
+    as _i70;
+import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart'
+    as _i74;
+import 'package:serverpod_auth_core_client/serverpod_auth_core_client.dart'
+    as _i75;
 export 'execution/models/claimed_execution.dart';
 export 'execution/models/claimed_machine_check.dart';
 export 'execution/models/compute_client_credential_info.dart';
@@ -193,29 +193,29 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i37.WorkerRegistration) {
       return _i37.WorkerRegistration.fromJson(data) as T;
     }
-    if (t == _i39.ContractDraft) {
-      return _i39.ContractDraft.fromJson(data) as T;
+    if (t == _i40.ContractDraft) {
+      return _i40.ContractDraft.fromJson(data) as T;
     }
-    if (t == _i40.ContractInputField) {
-      return _i40.ContractInputField.fromJson(data) as T;
+    if (t == _i41.ContractInputField) {
+      return _i41.ContractInputField.fromJson(data) as T;
     }
-    if (t == _i41.ContractOutputField) {
-      return _i41.ContractOutputField.fromJson(data) as T;
+    if (t == _i42.ContractOutputField) {
+      return _i42.ContractOutputField.fromJson(data) as T;
     }
-    if (t == _i42.CreatorProjectSummary) {
-      return _i42.CreatorProjectSummary.fromJson(data) as T;
+    if (t == _i43.CreatorProjectSummary) {
+      return _i43.CreatorProjectSummary.fromJson(data) as T;
     }
-    if (t == _i48.PythonFieldType) {
-      return _i48.PythonFieldType.fromJson(data) as T;
+    if (t == _i55.PythonFieldType) {
+      return _i55.PythonFieldType.fromJson(data) as T;
     }
-    if (t == _i49.ScriptLocation) {
-      return _i49.ScriptLocation.fromJson(data) as T;
+    if (t == _i56.ScriptLocation) {
+      return _i56.ScriptLocation.fromJson(data) as T;
     }
-    if (t == _i50.ScriptRunException) {
-      return _i50.ScriptRunException.fromJson(data) as T;
+    if (t == _i57.ScriptRunException) {
+      return _i57.ScriptRunException.fromJson(data) as T;
     }
-    if (t == _i53.SyncedScriptInfo) {
-      return _i53.SyncedScriptInfo.fromJson(data) as T;
+    if (t == _i60.SyncedScriptInfo) {
+      return _i60.SyncedScriptInfo.fromJson(data) as T;
     }
     if (t == _i1.getType<_i2.ClaimedExecution?>()) {
       return (data != null ? _i2.ClaimedExecution.fromJson(data) : null) as T;
@@ -306,33 +306,33 @@ class Protocol extends _i1.SerializationManager {
       return (data != null ? _i37.WorkerRegistration.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i39.ContractDraft?>()) {
-      return (data != null ? _i39.ContractDraft.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i40.ContractDraft?>()) {
+      return (data != null ? _i40.ContractDraft.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i40.ContractInputField?>()) {
-      return (data != null ? _i40.ContractInputField.fromJson(data) : null)
+    if (t == _i1.getType<_i41.ContractInputField?>()) {
+      return (data != null ? _i41.ContractInputField.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i41.ContractOutputField?>()) {
-      return (data != null ? _i41.ContractOutputField.fromJson(data) : null)
+    if (t == _i1.getType<_i42.ContractOutputField?>()) {
+      return (data != null ? _i42.ContractOutputField.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i42.CreatorProjectSummary?>()) {
-      return (data != null ? _i42.CreatorProjectSummary.fromJson(data) : null)
+    if (t == _i1.getType<_i43.CreatorProjectSummary?>()) {
+      return (data != null ? _i43.CreatorProjectSummary.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i48.PythonFieldType?>()) {
-      return (data != null ? _i48.PythonFieldType.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i55.PythonFieldType?>()) {
+      return (data != null ? _i55.PythonFieldType.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i49.ScriptLocation?>()) {
-      return (data != null ? _i49.ScriptLocation.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i56.ScriptLocation?>()) {
+      return (data != null ? _i56.ScriptLocation.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i50.ScriptRunException?>()) {
-      return (data != null ? _i50.ScriptRunException.fromJson(data) : null)
+    if (t == _i1.getType<_i57.ScriptRunException?>()) {
+      return (data != null ? _i57.ScriptRunException.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i53.SyncedScriptInfo?>()) {
-      return (data != null ? _i53.SyncedScriptInfo.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i60.SyncedScriptInfo?>()) {
+      return (data != null ? _i60.SyncedScriptInfo.fromJson(data) : null) as T;
     }
     if (t == Map<String, String?>) {
       return (data as Map).map(
@@ -398,56 +398,56 @@ class Protocol extends _i1.SerializationManager {
               .toList()
           as T;
     }
-    if (t == List<_i40.ContractInputField>) {
+    if (t == List<_i41.ContractInputField>) {
       return (data as List)
-              .map((e) => deserialize<_i40.ContractInputField>(e))
+              .map((e) => deserialize<_i41.ContractInputField>(e))
               .toList()
           as T;
     }
-    if (t == List<_i41.ContractOutputField>) {
+    if (t == List<_i42.ContractOutputField>) {
       return (data as List)
-              .map((e) => deserialize<_i41.ContractOutputField>(e))
+              .map((e) => deserialize<_i42.ContractOutputField>(e))
               .toList()
           as T;
     }
-    if (t == List<_i56.ComputeWorkerInfo>) {
+    if (t == List<_i63.ComputeWorkerInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i56.ComputeWorkerInfo>(e))
+              .map((e) => deserialize<_i63.ComputeWorkerInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i57.ComputeClientCredentialInfo>) {
+    if (t == List<_i64.ComputeClientCredentialInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i57.ComputeClientCredentialInfo>(e))
+              .map((e) => deserialize<_i64.ComputeClientCredentialInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i58.ExternalCodeVersion>) {
+    if (t == List<_i65.ExternalCodeVersion>) {
       return (data as List)
-              .map((e) => deserialize<_i58.ExternalCodeVersion>(e))
+              .map((e) => deserialize<_i65.ExternalCodeVersion>(e))
               .toList()
           as T;
     }
-    if (t == List<_i59.SyncedScriptInfo>) {
+    if (t == List<_i66.SyncedScriptInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i59.SyncedScriptInfo>(e))
+              .map((e) => deserialize<_i66.SyncedScriptInfo>(e))
               .toList()
           as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i63.CreatorProjectSummary>) {
+    if (t == List<_i70.CreatorProjectSummary>) {
       return (data as List)
-              .map((e) => deserialize<_i63.CreatorProjectSummary>(e))
+              .map((e) => deserialize<_i70.CreatorProjectSummary>(e))
               .toList()
           as T;
     }
     try {
-      return _i65.Protocol().deserialize<T>(data, t);
+      return _i74.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     try {
-      return _i66.Protocol().deserialize<T>(data, t);
+      return _i75.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     return super.deserialize<T>(data, t);
   }
@@ -477,14 +477,14 @@ class Protocol extends _i1.SerializationManager {
       _i34.MachineReport => 'MachineReport',
       _i36.WorkerLastRun => 'WorkerLastRun',
       _i37.WorkerRegistration => 'WorkerRegistration',
-      _i39.ContractDraft => 'ContractDraft',
-      _i40.ContractInputField => 'ContractInputField',
-      _i41.ContractOutputField => 'ContractOutputField',
-      _i42.CreatorProjectSummary => 'CreatorProjectSummary',
-      _i48.PythonFieldType => 'PythonFieldType',
-      _i49.ScriptLocation => 'ScriptLocation',
-      _i50.ScriptRunException => 'ScriptRunException',
-      _i53.SyncedScriptInfo => 'SyncedScriptInfo',
+      _i40.ContractDraft => 'ContractDraft',
+      _i41.ContractInputField => 'ContractInputField',
+      _i42.ContractOutputField => 'ContractOutputField',
+      _i43.CreatorProjectSummary => 'CreatorProjectSummary',
+      _i55.PythonFieldType => 'PythonFieldType',
+      _i56.ScriptLocation => 'ScriptLocation',
+      _i57.ScriptRunException => 'ScriptRunException',
+      _i60.SyncedScriptInfo => 'SyncedScriptInfo',
       _ => null,
     };
   }
@@ -545,30 +545,30 @@ class Protocol extends _i1.SerializationManager {
         return 'WorkerLastRun';
       case _i37.WorkerRegistration():
         return 'WorkerRegistration';
-      case _i39.ContractDraft():
+      case _i40.ContractDraft():
         return 'ContractDraft';
-      case _i40.ContractInputField():
+      case _i41.ContractInputField():
         return 'ContractInputField';
-      case _i41.ContractOutputField():
+      case _i42.ContractOutputField():
         return 'ContractOutputField';
-      case _i42.CreatorProjectSummary():
+      case _i43.CreatorProjectSummary():
         return 'CreatorProjectSummary';
-      case _i48.PythonFieldType():
+      case _i55.PythonFieldType():
         return 'PythonFieldType';
-      case _i49.ScriptLocation():
+      case _i56.ScriptLocation():
         return 'ScriptLocation';
-      case _i50.ScriptRunException():
+      case _i57.ScriptRunException():
         return 'ScriptRunException';
-      case _i53.SyncedScriptInfo():
+      case _i60.SyncedScriptInfo():
         return 'SyncedScriptInfo';
     }
-    className = _i65.Protocol().getClassNameForObject(data);
+    className = _i74.Protocol().getClassNameForObject(data);
     if (className != null) {
       return className.contains('.')
           ? className
           : 'serverpod_auth_idp.$className';
     }
-    className = _i66.Protocol().getClassNameForObject(data);
+    className = _i75.Protocol().getClassNameForObject(data);
     if (className != null) {
       return className.contains('.')
           ? className
@@ -653,43 +653,43 @@ class Protocol extends _i1.SerializationManager {
       return deserialize<_i37.WorkerRegistration>(data['data']);
     }
     if (dataClassName == 'ContractDraft') {
-      return deserialize<_i39.ContractDraft>(data['data']);
+      return deserialize<_i40.ContractDraft>(data['data']);
     }
     if (dataClassName == 'ContractInputField') {
-      return deserialize<_i40.ContractInputField>(data['data']);
+      return deserialize<_i41.ContractInputField>(data['data']);
     }
     if (dataClassName == 'ContractOutputField') {
-      return deserialize<_i41.ContractOutputField>(data['data']);
+      return deserialize<_i42.ContractOutputField>(data['data']);
     }
     if (dataClassName == 'CreatorProjectSummary') {
-      return deserialize<_i42.CreatorProjectSummary>(data['data']);
+      return deserialize<_i43.CreatorProjectSummary>(data['data']);
     }
     if (dataClassName == 'PythonFieldType') {
-      return deserialize<_i48.PythonFieldType>(data['data']);
+      return deserialize<_i55.PythonFieldType>(data['data']);
     }
     if (dataClassName == 'ScriptLocation') {
-      return deserialize<_i49.ScriptLocation>(data['data']);
+      return deserialize<_i56.ScriptLocation>(data['data']);
     }
     if (dataClassName == 'ScriptRunException') {
-      return deserialize<_i50.ScriptRunException>(data['data']);
+      return deserialize<_i57.ScriptRunException>(data['data']);
     }
     if (dataClassName == 'SyncedScriptInfo') {
-      return deserialize<_i53.SyncedScriptInfo>(data['data']);
+      return deserialize<_i60.SyncedScriptInfo>(data['data']);
     }
     if (dataClassName.startsWith('serverpod_auth_idp.')) {
       data['className'] = dataClassName.substring(19);
-      return _i65.Protocol().deserializeByClassName(data);
+      return _i74.Protocol().deserializeByClassName(data);
     }
     if (dataClassName.startsWith('serverpod_auth_core.')) {
       data['className'] = dataClassName.substring(20);
-      return _i66.Protocol().deserializeByClassName(data);
+      return _i75.Protocol().deserializeByClassName(data);
     }
     return super.deserializeByClassName(data);
   }
 
   void _registerHostProtocols() {
-    _i65.Protocol().registerHostProtocol('discoman', this);
-    _i66.Protocol().registerHostProtocol('discoman', this);
+    _i74.Protocol().registerHostProtocol('discoman', this);
+    _i75.Protocol().registerHostProtocol('discoman', this);
   }
 
   @override
@@ -705,10 +705,10 @@ class Protocol extends _i1.SerializationManager {
       return null;
     }
     try {
-      return _i65.Protocol().mapRecordToJson(record);
+      return _i74.Protocol().mapRecordToJson(record);
     } catch (_) {}
     try {
-      return _i66.Protocol().mapRecordToJson(record);
+      return _i75.Protocol().mapRecordToJson(record);
     } catch (_) {}
     throw Exception('Unsupported record type ${record.runtimeType}');
   }
