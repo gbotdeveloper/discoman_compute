@@ -12,7 +12,6 @@ class WorkerConfig {
   WorkerConfig({
     required this.serverUrl,
     required this.pythonPath,
-    required this.firebaseApiKey,
     required this.hostname,
   });
 
@@ -22,10 +21,6 @@ class WorkerConfig {
 
   /// Local Python interpreter used to run executions.
   final String pythonPath;
-
-  /// Firebase Web API key used only by the `login` flow to exchange the
-  /// creator's email + password for an ID token. Empty unless configured.
-  final String firebaseApiKey;
 
   /// Machine name reported on `register` and used as the default credential
   /// name at `login`.
@@ -40,11 +35,6 @@ class WorkerConfig {
 
   static String _env(String key) => Platform.environment[key]?.trim() ?? '';
 
-  /// The Firebase Web API key of the `no-code-ui-kosgeb` project, used only by
-  /// `discoman-compute login` to exchange the creator's email/password for a
-  /// Firebase ID token. This is a PUBLIC key (it ships in the web apps), so it
-  /// is safe to embed as the default; `FIREBASE_API_KEY` overrides it if the
-  /// project ever changes.
   /// Where a worker looks for the backend when nothing says otherwise.
   ///
   /// Production, deliberately: this binary is installed by creators, and the
@@ -53,9 +43,6 @@ class WorkerConfig {
   /// development passes `http://localhost:8080/`.
   static const _defaultServerUrl =
       'https://ca-dscm-prod-api.kindtree-c083f0e1.northeurope.azurecontainerapps.io/';
-
-  static const _defaultFirebaseApiKey =
-      'AIzaSyCop5feBwwPAeo7ElOZj1rEHcMY5klz6J4';
 
   static String _normalizeUrl(String url) => url.endsWith('/') ? url : '$url/';
 
@@ -89,9 +76,6 @@ class WorkerConfig {
     return WorkerConfig(
       serverUrl: _normalizeUrl(serverUrlRaw),
       pythonPath: python,
-      firebaseApiKey: _env('FIREBASE_API_KEY').isNotEmpty
-          ? _env('FIREBASE_API_KEY')
-          : _defaultFirebaseApiKey,
       hostname: hostname,
     );
   }

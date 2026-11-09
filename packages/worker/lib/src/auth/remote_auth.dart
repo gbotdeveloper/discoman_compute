@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
+import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart';
 
 import '../worker_config.dart';
 import 'file_auth_storage.dart';
@@ -34,30 +33,38 @@ Future<WorkerSession> signIn(
   required String password,
   SavedSignInStore? remember,
 }) async {
-  final apiKey = config.firebaseApiKey;
-  if (apiKey.isEmpty) {
-    throw RemoteAuthException(
-      'FIREBASE_API_KEY is not set. Set it to the Firebase Web API key of the '
-      'Discoman project before signing in.',
-    );
-  }
   if (email.trim().isEmpty || password.isEmpty) {
     throw RemoteAuthException('Email and password are both required.');
   }
 
-  final tokens = await _firebaseSignIn(apiKey, email.trim(), password);
-  final session = await _serverpodSession(config, tokens.idToken);
-  remember?.write(
-    SavedSignIn(email: email.trim(), refreshToken: tokens.refreshToken),
-  );
-  return session;
+  final session = _creatorSession(config, email.trim(), remember);
+  try {
+    final authSuccess = await session.client.emailIdp.login(
+      email: email.trim(),
+      password: password,
+    );
+    await session.sessionManager.updateSignedInUser(authSuccess);
+    return session;
+  } on EmailAccountLoginException catch (error) {
+    session.client.close();
+    throw RemoteAuthException(switch (error.reason) {
+      EmailAccountLoginExceptionReason.invalidCredentials =>
+        'Email or password is incorrect.',
+      EmailAccountLoginExceptionReason.tooManyAttempts =>
+        'Too many attempts. Try again in a few minutes.',
+      _ => 'Sign-in failed.',
+    });
+  } catch (error) {
+    session.client.close();
+    throw RemoteAuthException('Could not reach Discoman to sign in: $error');
+  }
 }
 
 /// Signs the creator saved in [store] back in, or returns null when nobody
-/// is saved or Firebase no longer accepts the saved sign-in.
+/// is saved or Discoman no longer accepts the saved sign-in.
 ///
-/// Throws [RemoteAuthException] when Firebase or Discoman cannot be reached,
-/// leaving the saved sign-in for the next try.
+/// Throws [RemoteAuthException] when Discoman cannot be reached, leaving the
+/// saved sign-in for the next try.
 Future<({WorkerSession session, String email})?> restoreSignIn(
   WorkerConfig config,
   SavedSignInStore store,
@@ -65,35 +72,61 @@ Future<({WorkerSession session, String email})?> restoreSignIn(
   final saved = store.read();
   if (saved == null) return null;
 
-  final tokens = await _firebaseRefresh(
-    config.firebaseApiKey,
-    saved.refreshToken,
-  );
-  if (tokens == null) {
-    store.clear();
-    return null;
-  }
-  store.write(
-    SavedSignIn(email: saved.email, refreshToken: tokens.refreshToken),
-  );
-  final session = await _serverpodSession(config, tokens.idToken);
-  return (session: session, email: saved.email);
-}
-
-Future<WorkerSession> _serverpodSession(
-  WorkerConfig config,
-  String idToken,
-) async {
-  final session = buildWorkerSession(config.serverUrl);
+  final session = _creatorSession(config, saved.email, store);
   try {
-    final authSuccess = await session.client.firebaseIdp.login(
-      idToken: idToken,
+    final authSuccess = await session.client.jwtRefresh.refreshAccessToken(
+      refreshToken: saved.refreshToken,
     );
     await session.sessionManager.updateSignedInUser(authSuccess);
-    return session;
+    return (session: session, email: saved.email);
+  } on ServerpodClientException catch (error) {
+    session.client.close();
+    // The backend answered and said no: the saved sign-in is spent.
+    if (error.statusCode >= 400 && error.statusCode < 500) {
+      store.clear();
+      return null;
+    }
+    throw RemoteAuthException('Could not reach Discoman to sign in: $error');
+  } on SerializableException {
+    // A refresh token the backend refuses (expired, used, revoked).
+    session.client.close();
+    store.clear();
+    return null;
   } catch (error) {
     session.client.close();
-    throw RemoteAuthException('Sign-in failed: $error');
+    throw RemoteAuthException('Could not reach Discoman to sign in: $error');
+  }
+}
+
+/// A session for a creator. With [remember], every refresh token the session
+/// is issued (signing in, and each time the session manager rotates it) is
+/// saved, so the app can sign the creator back in next time.
+WorkerSession _creatorSession(
+  WorkerConfig config,
+  String email,
+  SavedSignInStore? remember,
+) => buildWorkerSession(
+  config.serverUrl,
+  storage: remember == null ? null : _RememberingStorage(remember, email),
+);
+
+class _RememberingStorage implements ClientAuthSuccessStorage {
+  _RememberingStorage(this._store, this._email);
+
+  final SavedSignInStore _store;
+  final String _email;
+  AuthSuccess? _authSuccess;
+
+  @override
+  Future<AuthSuccess?> get() async => _authSuccess;
+
+  @override
+  Future<void> set(AuthSuccess? data) async {
+    _authSuccess = data;
+    final refreshToken = data?.refreshToken;
+    if (refreshToken != null) {
+      _store.write(SavedSignIn(email: _email, refreshToken: refreshToken));
+    }
   }
 }
 
@@ -144,8 +177,7 @@ Future<void> ensureMachineEnrolled(
 
 /// The `login` flow (interactive, run once per machine).
 ///
-/// Prompts for the creator's email + password, exchanges them with Firebase for
-/// an ID token, trades that for a Serverpod session, mints a per-machine compute
+/// Prompts for the creator's email + password, signs in to Discoman, mints a per-machine compute
 /// client credential, and persists ONLY the returned plaintext token to
 /// `~/.discoman/credentials.json`. The Serverpod session is discarded when the
 /// process exits — it is never written to disk.
@@ -195,100 +227,6 @@ Future<void> remoteRuntimeLogin(WorkerSession session) async {
     // A rejected token cannot be recovered here; the creator must re-run login.
     throw RemoteAuthException("Run 'discoman-compute login' again.");
   }
-}
-
-typedef _FirebaseTokens = ({String idToken, String refreshToken});
-
-/// Exchanges a Firebase refresh token for fresh tokens, or returns null when
-/// Firebase rejects it (expired, revoked, or the account is disabled).
-Future<_FirebaseTokens?> _firebaseRefresh(
-  String apiKey,
-  String refreshToken,
-) async {
-  final uri = Uri.parse(
-    'https://securetoken.googleapis.com/v1/token?key=$apiKey',
-  );
-  http.Response response;
-  try {
-    response = await http.post(
-      uri,
-      body: {'grant_type': 'refresh_token', 'refresh_token': refreshToken},
-    );
-  } catch (error) {
-    throw RemoteAuthException('Could not reach Firebase to sign in: $error');
-  }
-  if (response.statusCode == 400 || response.statusCode == 401) return null;
-  if (response.statusCode == 200) {
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map &&
-        decoded['id_token'] is String &&
-        decoded['refresh_token'] is String) {
-      return (
-        idToken: decoded['id_token'] as String,
-        refreshToken: decoded['refresh_token'] as String,
-      );
-    }
-  }
-  throw RemoteAuthException(
-    'Firebase sign-in failed (HTTP ${response.statusCode}).',
-  );
-}
-
-/// Exchanges [email] + [password] for Firebase tokens via the Identity
-/// Toolkit REST API. Throws [RemoteAuthException] with a readable message on any
-/// failure.
-Future<_FirebaseTokens> _firebaseSignIn(
-  String apiKey,
-  String email,
-  String password,
-) async {
-  final uri = Uri.parse(
-    'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword'
-    '?key=$apiKey',
-  );
-  http.Response response;
-  try {
-    response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-        'returnSecureToken': true,
-      }),
-    );
-  } catch (error) {
-    throw RemoteAuthException('Could not reach Firebase to sign in: $error');
-  }
-
-  if (response.statusCode == 200) {
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map &&
-        decoded['idToken'] is String &&
-        decoded['refreshToken'] is String) {
-      return (
-        idToken: decoded['idToken'] as String,
-        refreshToken: decoded['refreshToken'] as String,
-      );
-    }
-    throw RemoteAuthException(
-      'Firebase sign-in returned an unexpected response.',
-    );
-  }
-
-  var detail = 'Firebase sign-in failed (HTTP ${response.statusCode}).';
-  try {
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map && decoded['error'] is Map) {
-      final message = (decoded['error'] as Map)['message'];
-      if (message is String && message.isNotEmpty) {
-        detail = 'Firebase sign-in failed: $message';
-      }
-    }
-  } catch (_) {
-    // Keep the generic message.
-  }
-  throw RemoteAuthException(detail);
 }
 
 /// Prompts for a secret on stdin with terminal echo disabled where possible.

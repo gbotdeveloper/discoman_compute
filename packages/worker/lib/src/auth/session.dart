@@ -18,11 +18,14 @@ class WorkerSession {
 
 /// Builds a client whose session token is managed by an in-memory
 /// [ClientAuthSessionManager].
-WorkerSession buildWorkerSession(String serverUrl) {
+WorkerSession buildWorkerSession(
+  String serverUrl, {
+  ClientAuthSuccessStorage? storage,
+}) {
   final client = Client(serverUrl);
   final sessionManager = ClientAuthSessionManager(
     caller: client.modules.serverpod_auth_core,
-    storage: InMemoryAuthSuccessStorage(),
+    storage: storage ?? InMemoryAuthSuccessStorage(),
   );
   client.authKeyProvider = sessionManager;
   return WorkerSession(client, sessionManager);

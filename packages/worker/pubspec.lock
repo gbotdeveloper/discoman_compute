@@ -249,7 +249,7 @@ packages:
     source: hosted
     version: "4.0.0-beta.0"
   serverpod_auth_idp_client:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: serverpod_auth_idp_client
       sha256: d01d9812e88f76107cdd3818f46f7b01824a00cf9b0e8f69d31e2548fb126b32

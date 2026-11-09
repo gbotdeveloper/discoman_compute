@@ -102,7 +102,7 @@ class SavedSignIn {
 
   final String email;
 
-  /// Firebase's refresh token; the password itself is never stored.
+  /// The session's refresh token; the password itself is never stored.
   final String refreshToken;
 }
 

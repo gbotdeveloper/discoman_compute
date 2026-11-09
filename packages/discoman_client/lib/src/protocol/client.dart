@@ -54,38 +54,166 @@ import 'package:discoman_client/src/protocol/execution/models/execution_asset_up
 import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
     as _i23;
 import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i38;
-import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
     as _i39;
-import 'package:http/http.dart' as _i56;
-import 'protocol.dart' as _i57;
+import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
+    as _i40;
+import 'package:http/http.dart' as _i57;
+import 'protocol.dart' as _i58;
 
-/// By extending [FirebaseIdpBaseEndpoint], the Firebase identity provider
-/// endpoint is made available on the server.
-///
-/// The app signs the user in with Firebase (email/password, or anonymously for
-/// public app pages) and exchanges the resulting Firebase ID token here, once,
-/// for a Serverpod session. Every subsequent call carries the Serverpod token
-/// instead, so the backend authenticates against a session it owns — and can
-/// therefore revoke.
+/// Email and password accounts: creators of the web app, the dashboard's
+/// admins and the compute client all sign in here.
 /// {@category Endpoint}
-class EndpointFirebaseIdp extends _i3.EndpointFirebaseIdpBase {
-  EndpointFirebaseIdp(_i1.EndpointCaller caller) : super(caller);
+class EndpointEmailIdp extends _i3.EndpointEmailIdpBase {
+  EndpointEmailIdp(_i1.EndpointCaller caller) : super(caller);
 
   @override
-  String get name => 'firebaseIdp';
+  String get name => 'emailIdp';
 
   @override
-  _i2.Future<_i4.AuthSuccess> login({required String idToken}) =>
-      caller.callServerEndpoint<_i4.AuthSuccess>(
-        'firebaseIdp',
-        'login',
-        {'idToken': idToken},
+  _i2.Future<_i4.AuthSuccess> login({
+    required String email,
+    required String password,
+  }) => caller.callServerEndpoint<_i4.AuthSuccess>(
+    'emailIdp',
+    'login',
+    {
+      'email': email,
+      'password': password,
+    },
+  );
+
+  @override
+  _i2.Future<_i4.AuthSuccess> finishRegistration({
+    required String registrationToken,
+    required String password,
+  }) => caller.callServerEndpoint<_i4.AuthSuccess>(
+    'emailIdp',
+    'finishRegistration',
+    {
+      'registrationToken': registrationToken,
+      'password': password,
+    },
+  );
+
+  /// Starts the registration for a new user account with an email-based login
+  /// associated to it.
+  ///
+  /// Upon successful completion of this method, an email will have been
+  /// sent to [email] with a verification link, which the user must open to
+  /// complete the registration.
+  ///
+  /// Always returns a account request ID, which can be used to complete the
+  /// registration. If the email is already registered, the returned ID will not
+  /// be valid.
+  @override
+  _i2.Future<_i1.UuidValue> startRegistration({required String email}) =>
+      caller.callServerEndpoint<_i1.UuidValue>(
+        'emailIdp',
+        'startRegistration',
+        {'email': email},
       );
+
+  /// Verifies an account request code and returns a token
+  /// that can be used to complete the account creation.
+  ///
+  /// Throws an [EmailAccountRequestException] in case of errors, with reason:
+  /// - [EmailAccountRequestExceptionReason.expired] if the account request has
+  ///   already expired.
+  /// - [EmailAccountRequestExceptionReason.policyViolation] if the password
+  ///   does not comply with the password policy.
+  /// - [EmailAccountRequestExceptionReason.invalid] if no request exists
+  ///   for the given [accountRequestId] or [verificationCode] is invalid.
+  @override
+  _i2.Future<String> verifyRegistrationCode({
+    required _i1.UuidValue accountRequestId,
+    required String verificationCode,
+  }) => caller.callServerEndpoint<String>(
+    'emailIdp',
+    'verifyRegistrationCode',
+    {
+      'accountRequestId': accountRequestId,
+      'verificationCode': verificationCode,
+    },
+  );
+
+  /// Requests a password reset for [email].
+  ///
+  /// If the email address is registered, an email with reset instructions will
+  /// be send out. If the email is unknown, this method will have no effect.
+  ///
+  /// Always returns a password reset request ID, which can be used to complete
+  /// the reset. If the email is not registered, the returned ID will not be
+  /// valid.
+  ///
+  /// Throws an [EmailAccountPasswordResetException] in case of errors, with reason:
+  /// - [EmailAccountPasswordResetExceptionReason.tooManyAttempts] if the user has
+  ///   made too many attempts trying to request a password reset.
+  ///
+  @override
+  _i2.Future<_i1.UuidValue> startPasswordReset({required String email}) =>
+      caller.callServerEndpoint<_i1.UuidValue>(
+        'emailIdp',
+        'startPasswordReset',
+        {'email': email},
+      );
+
+  /// Verifies a password reset code and returns a finishPasswordResetToken
+  /// that can be used to finish the password reset.
+  ///
+  /// Throws an [EmailAccountPasswordResetException] in case of errors, with reason:
+  /// - [EmailAccountPasswordResetExceptionReason.expired] if the password reset
+  ///   request has already expired.
+  /// - [EmailAccountPasswordResetExceptionReason.tooManyAttempts] if the user has
+  ///   made too many attempts trying to verify the password reset.
+  /// - [EmailAccountPasswordResetExceptionReason.invalid] if no request exists
+  ///   for the given [passwordResetRequestId] or [verificationCode] is invalid.
+  ///
+  /// If multiple steps are required to complete the password reset, this endpoint
+  /// should be overridden to return credentials for the next step instead
+  /// of the credentials for setting the password.
+  @override
+  _i2.Future<String> verifyPasswordResetCode({
+    required _i1.UuidValue passwordResetRequestId,
+    required String verificationCode,
+  }) => caller.callServerEndpoint<String>(
+    'emailIdp',
+    'verifyPasswordResetCode',
+    {
+      'passwordResetRequestId': passwordResetRequestId,
+      'verificationCode': verificationCode,
+    },
+  );
+
+  /// Completes a password reset request by setting a new password.
+  ///
+  /// The [verificationCode] returned from [verifyPasswordResetCode] is used to
+  /// validate the password reset request.
+  ///
+  /// Throws an [EmailAccountPasswordResetException] in case of errors, with reason:
+  /// - [EmailAccountPasswordResetExceptionReason.expired] if the password reset
+  ///   request has already expired.
+  /// - [EmailAccountPasswordResetExceptionReason.policyViolation] if the new
+  ///   password does not comply with the password policy.
+  /// - [EmailAccountPasswordResetExceptionReason.invalid] if no request exists
+  ///   for the given [passwordResetRequestId] or [verificationCode] is invalid.
+  ///
+  /// Throws an [AuthUserBlockedException] if the auth user is blocked.
+  @override
+  _i2.Future<void> finishPasswordReset({
+    required String finishPasswordResetToken,
+    required String newPassword,
+  }) => caller.callServerEndpoint<void>(
+    'emailIdp',
+    'finishPasswordReset',
+    {
+      'finishPasswordResetToken': finishPasswordResetToken,
+      'newPassword': newPassword,
+    },
+  );
 
   @override
   _i2.Future<bool> hasAccount() => caller.callServerEndpoint<bool>(
-    'firebaseIdp',
+    'emailIdp',
     'hasAccount',
     {},
   );
@@ -479,8 +607,8 @@ class EndpointCreatorScript extends _i1.EndpointRef {
   String get name => 'creatorScript';
 
   /// The creator's projects, newest first, for the client's project chooser.
-  _i2.Future<List<_i38.CreatorProjectSummary>> listProjects() =>
-      caller.callServerEndpoint<List<_i38.CreatorProjectSummary>>(
+  _i2.Future<List<_i39.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i39.CreatorProjectSummary>>(
         'creatorScript',
         'listProjects',
         {},
@@ -566,7 +694,7 @@ class EndpointCreatorScript extends _i1.EndpointRef {
   /// old contract until they publish again.
   _i2.Future<void> publishContract(
     String projectId,
-    _i39.ContractDraft draft,
+    _i40.ContractDraft draft,
     String fingerprint,
   ) => caller.callServerEndpoint<void>(
     'creatorScript',
@@ -608,10 +736,10 @@ class Client extends _i1.ServerpodClientShared {
     onFailedCall,
     Function(_i1.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i56.Client? httpClientOverride,
+    _i57.Client? httpClientOverride,
   }) : super(
          host,
-         _i57.Protocol(),
+         _i58.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -621,7 +749,7 @@ class Client extends _i1.ServerpodClientShared {
              disconnectStreamsOnLostInternetConnection,
          httpClientOverride: httpClientOverride,
        ) {
-    firebaseIdp = EndpointFirebaseIdp(this);
+    emailIdp = EndpointEmailIdp(this);
     jwtRefresh = EndpointJwtRefresh(this);
     computeSettings = EndpointComputeSettings(this);
     computeWorker = EndpointComputeWorker(this);
@@ -630,7 +758,7 @@ class Client extends _i1.ServerpodClientShared {
     modules = Modules(this);
   }
 
-  late final EndpointFirebaseIdp firebaseIdp;
+  late final EndpointEmailIdp emailIdp;
 
   late final EndpointJwtRefresh jwtRefresh;
 
@@ -646,7 +774,7 @@ class Client extends _i1.ServerpodClientShared {
 
   @override
   Map<String, _i1.EndpointRef> get endpointRefLookup => {
-    'firebaseIdp': firebaseIdp,
+    'emailIdp': emailIdp,
     'jwtRefresh': jwtRefresh,
     'computeSettings': computeSettings,
     'computeWorker': computeWorker,
