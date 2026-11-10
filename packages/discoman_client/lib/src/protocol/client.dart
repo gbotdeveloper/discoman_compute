@@ -29,36 +29,38 @@ import 'package:discoman_client/src/protocol/execution/models/compute_client_cre
     as _i10;
 import 'package:discoman_client/src/protocol/execution/models/worker_registration.dart'
     as _i11;
-import 'package:discoman_client/src/protocol/execution/models/machine_report.dart'
+import 'package:discoman_client/src/protocol/execution/models/wake_channel.dart'
     as _i12;
-import 'package:discoman_client/src/protocol/execution/models/external_code_version.dart'
+import 'package:discoman_client/src/protocol/execution/models/machine_report.dart'
     as _i13;
-import 'package:discoman_client/src/protocol/runtime/synced_script_info.dart'
+import 'package:discoman_client/src/protocol/execution/models/external_code_version.dart'
     as _i14;
-import 'package:discoman_client/src/protocol/execution/models/claimed_execution.dart'
+import 'package:discoman_client/src/protocol/runtime/synced_script_info.dart'
     as _i15;
-import 'package:discoman_client/src/protocol/execution/models/heartbeat_response.dart'
+import 'package:discoman_client/src/protocol/execution/models/claimed_execution.dart'
     as _i16;
-import 'package:discoman_client/src/protocol/execution/models/claimed_machine_check.dart'
+import 'package:discoman_client/src/protocol/execution/models/heartbeat_response.dart'
     as _i17;
-import 'package:discoman_client/src/protocol/execution/models/machine_check_result.dart'
+import 'package:discoman_client/src/protocol/execution/models/claimed_machine_check.dart'
     as _i18;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_ref.dart'
+import 'package:discoman_client/src/protocol/execution/models/machine_check_result.dart'
     as _i19;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_ref.dart'
     as _i20;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_ticket.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload.dart'
     as _i21;
-import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_request.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_ticket.dart'
     as _i22;
-import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
+import 'package:discoman_client/src/protocol/execution/models/execution_asset_upload_request.dart'
     as _i23;
+import 'package:discoman_client/src/protocol/execution/models/execution_outcome.dart'
+    as _i24;
 import 'package:discoman_client/src/protocol/runtime/creator_project_summary.dart'
-    as _i39;
-import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
     as _i40;
-import 'package:http/http.dart' as _i57;
-import 'protocol.dart' as _i58;
+import 'package:discoman_client/src/protocol/runtime/contract_draft.dart'
+    as _i41;
+import 'package:http/http.dart' as _i58;
+import 'protocol.dart' as _i59;
 
 /// Email and password accounts: creators of the web app, the dashboard's
 /// admins and the compute client all sign in here.
@@ -361,12 +363,28 @@ class EndpointComputeWorker extends _i1.EndpointRef {
     },
   );
 
+  /// Opens the caller's wake channel for the run slots [workerIds] and marks
+  /// them as listening: from here on they wait to be woken instead of
+  /// asking for work. Null when this server has no wake-ups to offer, or the
+  /// caller is not a machine with a credential of its own; the client then
+  /// keeps polling.
+  ///
+  /// Called again before [WakeChannel.expiresAt], which is also how an idle
+  /// machine shows it is still there.
+  _i2.Future<_i12.WakeChannel?> openWakeChannel(
+    List<_i1.UuidValue> workerIds,
+  ) => caller.callServerEndpoint<_i12.WakeChannel?>(
+    'computeWorker',
+    'openWakeChannel',
+    {'workerIds': workerIds},
+  );
+
   /// Records which computer a self-hosted worker runs on and every script
   /// linked there, so the dashboard can show each computer once. Sent after
   /// [register] and again now and then while the worker is idle.
   _i2.Future<void> reportMachine(
     _i1.UuidValue workerId,
-    _i12.MachineReport report,
+    _i13.MachineReport report,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'reportMachine',
@@ -382,7 +400,7 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   _i2.Future<void> stampExternalCode(
     _i1.UuidValue workerId,
     _i1.UuidValue executionId,
-    List<_i13.ExternalCodeVersion> externalCode,
+    List<_i14.ExternalCodeVersion> externalCode,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'stampExternalCode',
@@ -395,8 +413,8 @@ class EndpointComputeWorker extends _i1.EndpointRef {
 
   /// The scripts the creator keeps in Discoman, for a computer to compare
   /// with the ones it has.
-  _i2.Future<List<_i14.SyncedScriptInfo>> listSyncedScripts() =>
-      caller.callServerEndpoint<List<_i14.SyncedScriptInfo>>(
+  _i2.Future<List<_i15.SyncedScriptInfo>> listSyncedScripts() =>
+      caller.callServerEndpoint<List<_i15.SyncedScriptInfo>>(
         'computeWorker',
         'listSyncedScripts',
         {},
@@ -436,10 +454,10 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   /// script on a second computer takes effect on its next poll with nothing to
   /// register or refresh. Ignored for cloud workers, which run whatever the
   /// row carries.
-  _i2.Future<_i15.ClaimedExecution?> claimNext(
+  _i2.Future<_i16.ClaimedExecution?> claimNext(
     _i1.UuidValue workerId,
     List<String> servedProjectIds,
-  ) => caller.callServerEndpoint<_i15.ClaimedExecution?>(
+  ) => caller.callServerEndpoint<_i16.ClaimedExecution?>(
     'computeWorker',
     'claimNext',
     {
@@ -451,10 +469,10 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   /// Worker liveness plus lease renewal for the execution it is running.
   /// `cancelRequested: true` also doubles as the stop signal when the lease
   /// was lost (the sweeper already gave the run away).
-  _i2.Future<_i16.HeartbeatResponse> heartbeat(
+  _i2.Future<_i17.HeartbeatResponse> heartbeat(
     _i1.UuidValue workerId,
     _i1.UuidValue? executionId,
-  ) => caller.callServerEndpoint<_i16.HeartbeatResponse>(
+  ) => caller.callServerEndpoint<_i17.HeartbeatResponse>(
     'computeWorker',
     'heartbeat',
     {
@@ -466,9 +484,9 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   /// Hands a self-hosted worker the check the dashboard asked it for, with
   /// the script every one of the creator's machine-kept projects should hold.
   /// Null when there is nothing to check.
-  _i2.Future<_i17.ClaimedMachineCheck?> claimMachineCheck(
+  _i2.Future<_i18.ClaimedMachineCheck?> claimMachineCheck(
     _i1.UuidValue workerId,
-  ) => caller.callServerEndpoint<_i17.ClaimedMachineCheck?>(
+  ) => caller.callServerEndpoint<_i18.ClaimedMachineCheck?>(
     'computeWorker',
     'claimMachineCheck',
     {'workerId': workerId},
@@ -478,7 +496,7 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   _i2.Future<void> reportMachineCheck(
     _i1.UuidValue workerId,
     _i1.UuidValue checkId,
-    _i18.MachineCheckResult result,
+    _i19.MachineCheckResult result,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'reportMachineCheck',
@@ -495,11 +513,11 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   ///
   /// Everything is enforced server-side: ownership, per-kind size caps,
   /// base64-length reconciliation, and per-execution asset count/byte caps.
-  _i2.Future<_i19.ExecutionAssetRef> uploadExecutionAsset(
+  _i2.Future<_i20.ExecutionAssetRef> uploadExecutionAsset(
     _i1.UuidValue workerId,
     _i1.UuidValue executionId,
-    _i20.ExecutionAssetUpload asset,
-  ) => caller.callServerEndpoint<_i19.ExecutionAssetRef>(
+    _i21.ExecutionAssetUpload asset,
+  ) => caller.callServerEndpoint<_i20.ExecutionAssetRef>(
     'computeWorker',
     'uploadExecutionAsset',
     {
@@ -511,11 +529,11 @@ class EndpointComputeWorker extends _i1.EndpointRef {
 
   /// Reserves one output file and returns a short-lived link the worker
   /// uploads it to directly, so its bytes never pass through the server.
-  _i2.Future<_i21.ExecutionAssetUploadTicket> createOutputUpload(
+  _i2.Future<_i22.ExecutionAssetUploadTicket> createOutputUpload(
     _i1.UuidValue workerId,
     _i1.UuidValue executionId,
-    _i22.ExecutionAssetUploadRequest asset,
-  ) => caller.callServerEndpoint<_i21.ExecutionAssetUploadTicket>(
+    _i23.ExecutionAssetUploadRequest asset,
+  ) => caller.callServerEndpoint<_i22.ExecutionAssetUploadTicket>(
     'computeWorker',
     'createOutputUpload',
     {
@@ -532,7 +550,7 @@ class EndpointComputeWorker extends _i1.EndpointRef {
   _i2.Future<void> reportResult(
     _i1.UuidValue workerId,
     _i1.UuidValue executionId,
-    _i23.ExecutionOutcome outcome,
+    _i24.ExecutionOutcome outcome,
   ) => caller.callServerEndpoint<void>(
     'computeWorker',
     'reportResult',
@@ -607,8 +625,8 @@ class EndpointCreatorScript extends _i1.EndpointRef {
   String get name => 'creatorScript';
 
   /// The creator's projects, newest first, for the client's project chooser.
-  _i2.Future<List<_i39.CreatorProjectSummary>> listProjects() =>
-      caller.callServerEndpoint<List<_i39.CreatorProjectSummary>>(
+  _i2.Future<List<_i40.CreatorProjectSummary>> listProjects() =>
+      caller.callServerEndpoint<List<_i40.CreatorProjectSummary>>(
         'creatorScript',
         'listProjects',
         {},
@@ -694,7 +712,7 @@ class EndpointCreatorScript extends _i1.EndpointRef {
   /// old contract until they publish again.
   _i2.Future<void> publishContract(
     String projectId,
-    _i40.ContractDraft draft,
+    _i41.ContractDraft draft,
     String fingerprint,
   ) => caller.callServerEndpoint<void>(
     'creatorScript',
@@ -736,10 +754,10 @@ class Client extends _i1.ServerpodClientShared {
     onFailedCall,
     Function(_i1.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
-    _i57.Client? httpClientOverride,
+    _i58.Client? httpClientOverride,
   }) : super(
          host,
-         _i58.Protocol(),
+         _i59.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
