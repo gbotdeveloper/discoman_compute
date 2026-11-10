@@ -3,14 +3,13 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
-import 'action_button.dart';
+import 'account_menu.dart';
 import 'contract_review_dialog.dart';
 import 'error_banner.dart';
 import 'external_code_dialog.dart';
 import 'install_packages_dialog.dart';
 import 'project_page.dart';
 import 'projects_panel.dart';
-import 'theme_switch.dart';
 import 'worker_panel.dart';
 
 /// The window once the creator is signed in: their projects, and the worker.
@@ -91,11 +90,7 @@ class HomePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SignedInHeader(
-            email: controller.signedInAs ?? '',
-            onSignOut: controller.isBusy ? null : controller.signOut,
-            themeSwitch: ThemeSwitch(controller: controller),
-          ),
+          _SignedInHeader(accountMenu: AccountMenu(controller: controller)),
           if (controller.errorMessage != null) ...[
             const SizedBox(height: 16),
             ErrorBanner(message: controller.errorMessage!),
@@ -129,15 +124,9 @@ class HomePage extends StatelessWidget {
 }
 
 class _SignedInHeader extends StatelessWidget {
-  const _SignedInHeader({
-    required this.email,
-    required this.onSignOut,
-    required this.themeSwitch,
-  });
+  const _SignedInHeader({required this.accountMenu});
 
-  final String email;
-  final VoidCallback? onSignOut;
-  final Widget themeSwitch;
+  final Widget accountMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -145,22 +134,15 @@ class _SignedInHeader extends StatelessWidget {
 
     return Row(
       children: [
+        Image.asset('assets/logo.png', width: 32, height: 32),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             'Discoman Compute',
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
-        themeSwitch,
-        const SizedBox(width: 16),
-        Text(
-          email,
-          style: textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(width: 12),
-        ActionButton(label: 'Sign out', isPrimary: false, onPressed: onSignOut),
+        Flexible(child: accountMenu),
       ],
     );
   }
