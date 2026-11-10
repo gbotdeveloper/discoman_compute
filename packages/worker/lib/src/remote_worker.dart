@@ -15,6 +15,7 @@ import 'scripts/script_store.dart';
 import 'scripts/script_sync.dart';
 import 'settings/usage_store.dart';
 import 'settings/worker_settings.dart';
+import 'wake_listener.dart';
 import 'worker_config.dart';
 
 /// How far along the worker is, for anything that shows the creator a status.
@@ -34,6 +35,9 @@ enum RemoteWorkerState {
 /// How often an idle worker repeats what it reported about its computer, so
 /// scripts linked or switched off while it runs show up on the dashboard.
 const _machineReportInterval = Duration(minutes: 1);
+
+/// How often a machine that is being woken still looks on its own.
+const _idleSafetyInterval = Duration(minutes: 30);
 
 /// The longest a worker waits between tries while it cannot reach Discoman.
 const _maxRetryDelay = Duration(seconds: 30);
@@ -123,6 +127,24 @@ class RemoteWorker {
 
   bool _lostContact = false;
 
+  /// Listens for wake-ups once the machine is registered; null before.
+  WakeListener? _wakeListener;
+
+  /// Counts wake-ups, so a run slot that was busy when one arrived notices
+  /// before it goes idle.
+  int _wakeCount = 0;
+  Completer<void> _wakeSignal = Completer<void>();
+
+  /// Makes every idle run slot look for work now. Called for a wake-up from
+  /// Discoman, and by the app when something changed here that could make
+  /// waiting runs claimable (a script linked, a project resumed).
+  void wake() {
+    _wakeCount++;
+    final signal = _wakeSignal;
+    _wakeSignal = Completer<void>();
+    if (!signal.isCompleted) signal.complete();
+  }
+
   /// Every line the worker would have printed.
   Stream<String> get log => _log.stream;
 
@@ -200,6 +222,22 @@ class RemoteWorker {
                 '$parallelRuns runs at once. Waiting for runs.',
     );
 
+    final listener = _wakeListener = WakeListener(
+      open: () => session.client.computeWorker.openWakeChannel([..._workerIds]),
+      onWake: wake,
+      onListeningChanged: ({required listening}) {
+        if (_log.isClosed) return;
+        _log.add(
+          listening
+              ? 'Listening for runs; Discoman will wake this machine.'
+              : 'Not being woken right now; asking Discoman for runs instead.',
+        );
+        // Either way, look once: nothing may fall between the two modes.
+        wake();
+      },
+    );
+    unawaited(listener.run());
+
     _loop = _runAll(session, registrations);
   }
 
@@ -207,6 +245,7 @@ class RemoteWorker {
   Future<void> stop() async {
     if (_currentState == RemoteWorkerState.stopped) return;
     _stopRequested = true;
+    wake();
     _log.add('Stopping; deregistering this machine.');
     await _loop;
     await _shutDown(RemoteWorkerState.stopped);
@@ -269,6 +308,7 @@ class RemoteWorker {
           if (syncsScripts) await _syncScripts(session);
           await _reportMachine(session, workerId);
         }
+        final wakesSeen = _wakeCount;
         final claimed = await _claim(session, workerId);
         _backInContact();
         retryDelay = const Duration(seconds: 3);
@@ -286,7 +326,7 @@ class RemoteWorker {
           } catch (_) {
             // Transient; retry on the next tick.
           }
-          await Future<void>.delayed(const Duration(seconds: 3));
+          await _idle(wakesSeen);
           continue;
         }
 
@@ -317,6 +357,20 @@ class RemoteWorker {
             : retryDelay * 2;
       }
     }
+  }
+
+  /// Idle until there is a reason to look again. While Discoman wakes this
+  /// machine that is the next wake-up, with a look of its own now and then
+  /// in case one was lost; otherwise it is a few seconds, as before.
+  Future<void> _idle(int wakesSeen) async {
+    if (_stopRequested) return;
+    if (!(_wakeListener?.listening ?? false)) {
+      await Future<void>.delayed(const Duration(seconds: 3));
+      return;
+    }
+    // A wake-up that came while this slot was asking: do not wait on it.
+    if (_wakeCount != wakesSeen) return;
+    await _wakeSignal.future.timeout(_idleSafetyInterval, onTimeout: () {});
   }
 
   /// The next run for this worker, or null when nothing it may take waits.
@@ -434,6 +488,8 @@ class RemoteWorker {
   /// Deregisters and closes, best effort — a machine that cannot say goodbye
   /// is marked offline by the server's lease expiry anyway.
   Future<void> _shutDown(RemoteWorkerState nextState) async {
+    _wakeListener?.stop();
+    _wakeListener = null;
     final session = _session;
     final workerIds = [..._workerIds];
     _session = null;

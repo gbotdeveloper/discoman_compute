@@ -216,6 +216,8 @@ class AppController extends ChangeNotifier {
         },
       ),
     );
+    // A worker that waits to be woken would not notice on its own.
+    _worker?.wake();
     _notify();
   }
 
@@ -364,6 +366,7 @@ class AppController extends ChangeNotifier {
     // every poll, so saving is the whole of telling it.
     store.save(store.load().copyWith(pausedProjectIds: paused));
     pausedProjectIds = paused;
+    _worker?.wake();
     _notify();
   }
 
@@ -432,6 +435,7 @@ class AppController extends ChangeNotifier {
         sourcePath: picked.path,
       );
       _refreshLinkedProjects();
+      _worker?.wake();
       await session.client.creatorScript.publishContract(
         projectId,
         picked.draft,
