@@ -226,7 +226,8 @@ class RemoteWorker {
       open: () => session.client.computeWorker.openWakeChannel([..._workerIds]),
       onWake: wake,
       onListeningChanged: ({required listening}) {
-        if (_log.isClosed) return;
+        // Stopping ends the listening too; that needs no line of its own.
+        if (_log.isClosed || _stopRequested) return;
         _log.add(
           listening
               ? 'Listening for runs; Discoman will wake this machine.'
