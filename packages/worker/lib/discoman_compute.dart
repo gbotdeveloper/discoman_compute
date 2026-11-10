@@ -11,11 +11,13 @@ export 'src/auth/file_auth_storage.dart'
     show MachineTokenStore, SavedSignIn, SavedSignInStore;
 export 'src/auth/remote_auth.dart'
     show
+        BrowserSignInPrompt,
         RemoteAuthException,
         enrolMachine,
         ensureMachineEnrolled,
         restoreSignIn,
-        signIn;
+        signIn,
+        signInWithBrowser;
 export 'src/auth/session.dart' show WorkerSession, buildWorkerSession;
 export 'src/execution_processor.dart' show ExecutionProcessor;
 export 'src/external_code.dart'
