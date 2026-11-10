@@ -295,12 +295,19 @@ jobs:
           path: artifacts
 
       - name: Collect the release files
+        env:
+          VERSION: ${{ needs.version-check.outputs.version_name }}
         run: |
+          # The version goes into each file's name, so a downloaded installer
+          # says which release it is.
           mkdir -p release
           for file in artifacts/macos/DiscomanCompute-macos.dmg \
             artifacts/windows/DiscomanCompute-Setup.exe \
             artifacts/windows/DiscomanCompute-windows.zip; do
-            if [ -f "$file" ]; then mv "$file" release/; fi
+            if [ -f "$file" ]; then
+              name=$(basename "$file")
+              mv "$file" "release/${name/DiscomanCompute-/DiscomanCompute-$VERSION-}"
+            fi
           done
           ls -la release
 
@@ -310,6 +317,7 @@ jobs:
           MACOS: ${{ needs.build-macos.result }}
           WINDOWS: ${{ needs.build-windows.result }}
           NOTARISED: ${{ needs.build-macos.outputs.notarised }}
+          VERSION: ${{ needs.version-check.outputs.version_name }}
         run: |
           previous_tag=$(git tag -l 'v*' | sort -V | tail -1)
 
@@ -326,11 +334,11 @@ jobs:
             echo "## Downloads"
             echo
             if [ "$MACOS" = "success" ]; then
-              echo "- **macOS** — \`DiscomanCompute-macos.dmg\`"
+              echo "- **macOS** — \`DiscomanCompute-$VERSION-macos.dmg\`"
             fi
             if [ "$WINDOWS" = "success" ]; then
-              echo "- **Windows** — \`DiscomanCompute-Setup.exe\`"
-              echo "- **Windows, no installer** — \`DiscomanCompute-windows.zip\`"
+              echo "- **Windows** — \`DiscomanCompute-$VERSION-Setup.exe\`"
+              echo "- **Windows, no installer** — \`DiscomanCompute-$VERSION-windows.zip\`"
             fi
             echo
             if [ "$MACOS" != "success" ]; then
@@ -366,8 +374,8 @@ jobs:
           name: Discoman Compute v${{ needs.version-check.outputs.version_name }}
           body: ${{ steps.notes.outputs.body }}
           draft: false
-          # Deliberately not marked prerelease while the version is 0.x:
-          # GitHub's /releases/latest/download/ links skip prereleases, and
-          # those links are what the website's download buttons point at.
+          # Deliberately not marked prerelease while the version is 0.x: the
+          # website's download buttons look up the latest release, and
+          # "latest" skips prereleases.
           prerelease: false
           files: release/*

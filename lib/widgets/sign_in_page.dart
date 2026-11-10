@@ -57,7 +57,10 @@ class _SignInPageState extends State<SignInPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
-                child: Image.asset('assets/logo.png', width: 64, height: 64),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset('assets/logo.png', width: 64, height: 64),
+                ),
               ),
               const SizedBox(height: 16),
               Text(

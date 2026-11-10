@@ -134,15 +134,19 @@ class _SignedInHeader extends StatelessWidget {
 
     return Row(
       children: [
-        Image.asset('assets/logo.png', width: 32, height: 32),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Discoman Compute',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: Image.asset('assets/logo.png', width: 32, height: 32),
         ),
-        Flexible(child: accountMenu),
+        const SizedBox(width: 10),
+        Text(
+          'Discoman Compute',
+          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Align(alignment: Alignment.centerRight, child: accountMenu),
+        ),
       ],
     );
   }
