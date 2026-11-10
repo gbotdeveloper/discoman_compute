@@ -5,11 +5,13 @@ import 'package:discoman_client/discoman_client.dart';
 // The engine's own `signIn` would be shadowed by this class's method, so it
 // comes in under a prefix while the types stay unprefixed.
 import 'package:discoman_worker/discoman_compute.dart'
-    hide restoreSignIn, signIn;
+    hide restoreSignIn, signIn, signInWithBrowser;
 import 'package:discoman_worker/discoman_compute.dart'
     as engine
-    show restoreSignIn, signIn;
+    show restoreSignIn, signIn, signInWithBrowser;
 import 'package:flutter/foundation.dart';
+
+import 'open_in_browser.dart';
 
 /// A script the creator picked, together with the contract read from it here.
 ///
@@ -47,7 +49,9 @@ class AppController extends ChangeNotifier {
     SavedSignInStore? signInStore,
     MachineIdStore? machineIdStore,
     Future<MachineResources> Function()? readMachine,
+    Future<void> Function(String url)? openUrl,
   }) : config = config ?? WorkerConfig.resolve(),
+       _openUrl = openUrl ?? openInBrowser,
        _settingsStore = settingsStore,
        _usageStore = usageStore,
        _signInStore = signInStore,
@@ -60,6 +64,7 @@ class AppController extends ChangeNotifier {
   final SavedSignInStore? _signInStore;
   final MachineIdStore? _machineIdStore;
   final Future<MachineResources> Function() _readMachine;
+  final Future<void> Function(String url) _openUrl;
 
   late final WorkerSettingsStore settingsStore =
       _settingsStore ?? WorkerSettingsStore.defaultLocation();
@@ -95,6 +100,11 @@ class AppController extends ChangeNotifier {
 
   /// The signed-in creator's email, or null while signed out.
   String? signedInAs;
+
+  /// Set while a browser sign-in waits for the creator to approve it: the
+  /// page that was opened and the code it shows.
+  BrowserSignInPrompt? browserSignIn;
+  bool _browserSignInCancelled = false;
 
   bool isBusy = false;
 
@@ -253,6 +263,47 @@ class AppController extends ChangeNotifier {
       await ensureMachineEnrolled(session, config);
       await _loadProjects();
     });
+  }
+
+  /// Signs in through the browser, where the creator can use Google or any
+  /// other way the web app offers: opens the approval page and waits for
+  /// the creator to approve there. Ends early on [cancelBrowserSignIn].
+  Future<void> signInWithBrowser() async {
+    _browserSignInCancelled = false;
+    await _run(() async {
+      try {
+        final result = await engine.signInWithBrowser(
+          config,
+          show: (prompt) {
+            browserSignIn = prompt;
+            _notify();
+            unawaited(_openUrl(prompt.approvalUrl));
+          },
+          cancelled: () => _browserSignInCancelled,
+          remember: signInStore,
+        );
+        if (result == null) return;
+        _session = result.session;
+        signedInAs = result.email;
+        await ensureMachineEnrolled(result.session, config);
+        await _loadProjects();
+      } finally {
+        browserSignIn = null;
+      }
+    });
+  }
+
+  /// Opens the approval page again, for a creator who closed it.
+  void reopenBrowserSignIn() {
+    final prompt = browserSignIn;
+    if (prompt != null) unawaited(_openUrl(prompt.approvalUrl));
+  }
+
+  /// Gives up on the browser sign-in that is waiting.
+  void cancelBrowserSignIn() {
+    _browserSignInCancelled = true;
+    browserSignIn = null;
+    _notify();
   }
 
   /// Signs the last creator back in without asking, if one is saved.

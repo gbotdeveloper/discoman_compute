@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:discoman_client/discoman_client.dart' show ScriptRunException;
 import 'package:serverpod_auth_idp_client/serverpod_auth_idp_client.dart';
 
 import '../worker_config.dart';
@@ -60,6 +61,72 @@ Future<WorkerSession> signIn(
   }
 }
 
+/// What a creator needs to approve a browser sign-in: the page to open and
+/// the short code that page shows, to compare.
+class BrowserSignInPrompt {
+  const BrowserSignInPrompt({
+    required this.approvalUrl,
+    required this.userCode,
+  });
+
+  final String approvalUrl;
+  final String userCode;
+}
+
+/// Signs a creator in through their browser, where they can use any way of
+/// signing in the web app offers (Google included), and returns the session
+/// with the account's email.
+///
+/// [show] is handed the page to open and the code to show; the call then
+/// waits until the creator approves there, the request runs out, or
+/// [cancelled] says to stop (null is returned then). The caller closes the
+/// client.
+///
+/// Throws [RemoteAuthException] with a readable message on any failure.
+Future<({WorkerSession session, String email})?> signInWithBrowser(
+  WorkerConfig config, {
+  required void Function(BrowserSignInPrompt prompt) show,
+  bool Function()? cancelled,
+  SavedSignInStore? remember,
+  Duration? pollEvery,
+}) async {
+  final storage = remember == null ? null : _RememberingStorage(remember, '');
+  final session = buildWorkerSession(config.serverUrl, storage: storage);
+  try {
+    final request = await session.client.deviceSignIn.start(config.hostname);
+    show(
+      BrowserSignInPrompt(
+        approvalUrl: request.approvalUrl,
+        userCode: request.userCode,
+      ),
+    );
+    final wait = pollEvery ?? Duration(seconds: request.pollSeconds);
+    AuthSuccess? authSuccess;
+    while (authSuccess == null) {
+      await Future<void>.delayed(wait);
+      if (cancelled?.call() ?? false) {
+        session.client.close();
+        return null;
+      }
+      authSuccess = await session.client.deviceSignIn.claim(request.deviceCode);
+    }
+    await session.sessionManager.updateSignedInUser(authSuccess);
+    final email = (await session.client.account.me()).email ?? '';
+    storage?.rememberAs(email);
+    return (session: session, email: email);
+  } on ScriptRunException catch (error) {
+    session.client.close();
+    throw RemoteAuthException(
+      error.reason == 'expired'
+          ? 'The sign-in was not approved in time. Try again.'
+          : error.message,
+    );
+  } catch (error) {
+    session.client.close();
+    throw RemoteAuthException('Could not reach Discoman to sign in: $error');
+  }
+}
+
 /// Signs the creator saved in [store] back in, or returns null when nobody
 /// is saved or Discoman no longer accepts the saved sign-in.
 ///
@@ -114,8 +181,15 @@ class _RememberingStorage implements ClientAuthSuccessStorage {
   _RememberingStorage(this._store, this._email);
 
   final SavedSignInStore _store;
-  final String _email;
+  String _email;
   AuthSuccess? _authSuccess;
+
+  /// Names the account once it is known (a browser sign-in learns it only
+  /// after the session arrives) and saves the sign-in under it.
+  void rememberAs(String email) {
+    _email = email;
+    _save();
+  }
 
   @override
   Future<AuthSuccess?> get() async => _authSuccess;
@@ -123,8 +197,12 @@ class _RememberingStorage implements ClientAuthSuccessStorage {
   @override
   Future<void> set(AuthSuccess? data) async {
     _authSuccess = data;
-    final refreshToken = data?.refreshToken;
-    if (refreshToken != null) {
+    _save();
+  }
+
+  void _save() {
+    final refreshToken = _authSuccess?.refreshToken;
+    if (refreshToken != null && _email.isNotEmpty) {
       _store.write(SavedSignIn(email: _email, refreshToken: refreshToken));
     }
   }
